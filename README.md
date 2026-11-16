@@ -30,7 +30,7 @@ JDK 21 or newer. Gradle is provided by the wrapper.
 ./gradlew :composeApp:packageDistributionForCurrentOS
 ```
 
-This produces a DMG on macOS, an MSI on Windows, and a DEB on Linux.
+This produces a DMG on macOS, an MSI on Windows, and a DEB or RPM on Linux.
 
 ## Layout
 
