@@ -11,6 +11,14 @@ kotlin {
     jvmToolchain(21)
     jvm()
 
+    compilerOptions {
+        optIn.addAll(
+            "androidx.compose.ui.text.ExperimentalTextApi",
+            "androidx.compose.ui.ExperimentalComposeUiApi",
+            "androidx.compose.foundation.ExperimentalFoundationApi",
+        )
+    }
+
     sourceSets {
         commonMain.dependencies {
             implementation(compose.runtime)
