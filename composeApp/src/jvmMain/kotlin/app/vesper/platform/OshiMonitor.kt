@@ -4,6 +4,8 @@ import app.vesper.app.MonitorSnapshot
 import app.vesper.app.PortInfo
 import app.vesper.app.ProcessInfo
 import app.vesper.app.SystemMonitor
+import com.sun.jna.platform.mac.SystemB
+import com.sun.jna.ptr.IntByReference
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -40,7 +42,7 @@ class OshiMonitor : SystemMonitor {
             val netHistory = ArrayDeque<Double>()
             val logical = cpu.logicalProcessorCount
             while (isActive) {
-                delay(2000)
+                delay(if (cpuHistory.isEmpty()) 500 else 2000)
                 runCatching {
                     val total = cpu.getSystemCpuLoadBetweenTicks(ticks) * 100
                     ticks = cpu.systemCpuLoadTicks
@@ -68,13 +70,14 @@ class OshiMonitor : SystemMonitor {
                     while (netHistory.size > 30) netHistory.removeFirst()
 
                     val vm = mem.virtualMemory
+                    val mac = macMemory(mem.pageSize)
                     state.value = MonitorSnapshot(
                         cpuTotal = total,
                         cpuHistory = cpuHistory.toList(),
                         perCore = perCore,
                         coreCount = logical,
-                        memUsed = mem.total - mem.available,
-                        memCached = linuxCached(),
+                        memUsed = mac?.first ?: (mem.total - mem.available),
+                        memCached = mac?.second ?: linuxCached(),
                         memTotal = mem.total,
                         swapUsed = vm.swapUsed,
                         processes = top,
@@ -97,6 +100,25 @@ class OshiMonitor : SystemMonitor {
             tx += nif.bytesSent
         }
         return rx to tx
+    }
+
+    private val machHost by lazy { SystemB.INSTANCE.mach_host_self() }
+
+    /**
+     * macOS memory split the way Activity Monitor shows it: used = app + wired + compressed,
+     * cached = file-backed + purgeable pages. Null elsewhere or when the call fails.
+     */
+    private fun macMemory(pageSize: Long): Pair<Long, Long>? {
+        if (HostOs.current != HostOs.MacOS) return null
+        return runCatching {
+            val s = SystemB.VMStatistics64()
+            val count = IntByReference(s.size() / Int.SIZE_BYTES)
+            if (SystemB.INSTANCE.host_statistics64(machHost, SystemB.HOST_VM_INFO64, s, count) != 0) return null
+            val app = (s.internal_page_count.toLong() - s.purgeable_count).coerceAtLeast(0)
+            val used = (app + s.wire_count + s.compressor_page_count) * pageSize
+            val cached = (s.external_page_count.toLong() + s.purgeable_count) * pageSize
+            used to cached
+        }.getOrNull()
     }
 
     private fun linuxCached(): Long {

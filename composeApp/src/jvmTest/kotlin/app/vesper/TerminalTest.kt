@@ -160,4 +160,38 @@ class TerminalTest {
         assertEquals(listOf("1", "2", "3", "4"), t.lines())
         assertEquals(1, t.cursorY)
     }
+
+    @Test
+    fun reflowRewrapsWhenNarrowedAndWidened() {
+        val t = term(cols = 10, rows = 4)
+        t.feed("abcdefghijkl\r\nxy")
+        assertEquals(listOf("abcdefghij", "kl", "xy"), t.lines())
+        t.resize(4, 4, reflow = true)
+        assertEquals(listOf("abcd", "efgh", "ijkl", "xy"), t.lines())
+        assertEquals(3, t.cursorY)
+        assertEquals(2, t.cursorX)
+        t.resize(20, 4, reflow = true)
+        assertEquals(listOf("abcdefghijkl", "xy"), t.lines())
+        assertEquals("abcdefghijkl\nxy", t.plainText())
+        assertEquals(1, t.cursorY)
+        assertEquals(2, t.cursorX)
+    }
+
+    @Test
+    fun reflowMovesOverflowIntoScrollbackAndKeepsWideCharsWhole() {
+        val t = term(cols = 6, rows = 2)
+        t.feed("ab\u4e2d\u6587x\r\nend")
+        t.resize(3, 2, reflow = true)
+        assertEquals(listOf("ab", "\u4e2d", "\u6587x", "end"), t.lines())
+        assertEquals(2, t.scrollback.size)
+        assertEquals("ab\u4e2d\u6587x\nend", t.plainText())
+    }
+
+    @Test
+    fun resizeWithoutReflowStillTruncates() {
+        val t = term(cols = 10, rows = 2)
+        t.feed("abcdefgh")
+        t.resize(4, 2)
+        assertEquals(listOf("abcd"), t.lines())
+    }
 }

@@ -338,8 +338,10 @@ class TerminalSession(
         synchronized(lock) {
             cols = newCols
             rows = newRows
+            // The shell redraws its own prompt; block output is rewrapped to the new width.
             promptTerm.resize(newCols, newRows)
-            currentBlock?.terminal?.resize(newCols, newRows)
+            currentBlock?.terminal?.resize(newCols, newRows, reflow = true)
+            for (b in blocks) if (b !== currentBlock) b.terminal.resize(newCols, newRows, reflow = true)
             if (mode != SessionMode.Blocks) current.resize(newCols, newRows)
         }
         runCatching { pty.resize(newCols, newRows) }

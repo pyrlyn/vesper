@@ -124,11 +124,17 @@ private fun SystemTab(state: AppState) {
         Spacer(Modifier.height(12.dp))
         val bars = snap.cpuHistory.takeLast(40)
         val accent = c.accentStrong
+        val track = c.bgActive
         Canvas(Modifier.fillMaxWidth().height(38.dp)) {
             val n = 40
             val gap = 2.dp.toPx()
             val w = (size.width - gap * (n - 1)) / n
             val offset = n - bars.size
+            // Slots without a sample yet show as low stubs, so the chart reads as a chart from launch.
+            val stub = 0.12f * size.height
+            for (i in 0 until offset) {
+                drawRoundRect(track, Offset(i * (w + gap), size.height - stub), Size(w, stub), CornerRadius(1.5.dp.toPx()))
+            }
             bars.forEachIndexed { i, v ->
                 val h = (v / 100.0).toFloat().coerceIn(0.04f, 1f) * size.height
                 val x = (i + offset) * (w + gap)

@@ -243,12 +243,21 @@ class Terminal(
 
     // ── Resize ───────────────────────────────────────────────────────────
 
-    fun resize(newCols: Int, newRows: Int) {
+    /**
+     * Resizes the screen. With [reflow], soft-wrapped lines on the main screen are rejoined and
+     * wrapped again at the new width, so no text is cut off (not done while the alternate screen
+     * is active: full-screen programs redraw themselves).
+     */
+    fun resize(newCols: Int, newRows: Int, reflow: Boolean = false) {
         val c = newCols.coerceAtLeast(2)
         val r = newRows.coerceAtLeast(1)
         if (c == cols && r == rows) return
-        mainLines = resizeScreen(mainLines, c, r, pushToScrollback = true)
-        altLines = altLines?.let { resizeScreen(it, c, r, pushToScrollback = false) }
+        if (reflow && c != cols && altLines == null) {
+            reflowMain(c, r)
+        } else {
+            mainLines = resizeScreen(mainLines, c, r, pushToScrollback = true)
+            altLines = altLines?.let { resizeScreen(it, c, r, pushToScrollback = false) }
+        }
         cols = c
         rows = r
         tabStops = BooleanArray(c) { it % 8 == 0 }
@@ -258,6 +267,71 @@ class Terminal(
         cursorY = cursorY.coerceIn(0, r - 1)
         pendingWrap = false
         version++
+    }
+
+    /** Rewraps scrollback and the main screen at [c] columns and keeps the cursor on its cell. */
+    private fun reflowMain(c: Int, r: Int) {
+        val physical = ArrayList<TermLine>(scrollback.size + mainLines.size)
+        physical.addAll(scrollback)
+        val lastRow = maxOf(mainLines.indexOfLast { !it.isBlank() }, cursorY)
+        for (i in 0..lastRow) physical.add(mainLines[i])
+        val cursorAbs = scrollback.size + cursorY
+
+        val out = ArrayList<TermLine>(physical.size)
+        var newCursorLine = 0
+        var newCursorX = 0
+        var i = 0
+        while (i < physical.size) {
+            // One logical line: physical lines joined while they are soft-wrapped.
+            val start = i
+            while (physical[i].wrapped && i + 1 < physical.size) i++
+            fun segLength(k: Int): Int {
+                val l = physical[k]
+                val n = if (l.wrapped && k < i) l.size else l.contentLength()
+                return if (k == cursorAbs) maxOf(n, cursorX) else n
+            }
+            val len = (start..i).sumOf { segLength(it) }
+            val cps = IntArray(len)
+            val attrs = LongArray(len)
+            var cursorOffset = -1
+            var at = 0
+            for (k in start..i) {
+                val n = segLength(k)
+                val l = physical[k]
+                val copy = minOf(n, l.size)
+                l.cps.copyInto(cps, at, 0, copy)
+                l.attrs.copyInto(attrs, at, 0, copy)
+                if (k == cursorAbs) cursorOffset = at + cursorX
+                at += n
+            }
+
+            var pos = 0
+            do {
+                var n = minOf(c, len - pos)
+                // Keep a wide character together: move it to the next row instead of splitting it.
+                if (n == c && pos + n < len && cps[pos + n] == WIDE_TAIL) n--
+                val line = TermLine(c)
+                cps.copyInto(line.cps, 0, pos, pos + n)
+                attrs.copyInto(line.attrs, 0, pos, pos + n)
+                val last = pos + n >= len
+                if (cursorOffset >= 0 && (cursorOffset < pos + n || last)) {
+                    newCursorLine = out.size
+                    newCursorX = (cursorOffset - pos).coerceIn(0, c - 1)
+                    cursorOffset = -1
+                }
+                pos += n
+                line.wrapped = !last
+                out.add(line)
+            } while (pos < len)
+            i++
+        }
+
+        val split = (out.size - r).coerceAtLeast(0)
+        scrollback.clear()
+        for (k in 0 until split) pushScrollback(out[k])
+        mainLines = Array(r) { k -> out.getOrNull(split + k) ?: TermLine(c) }
+        cursorY = (newCursorLine - split).coerceIn(0, r - 1)
+        cursorX = newCursorX
     }
 
     private fun resizeScreen(screen: Array<TermLine>, c: Int, r: Int, pushToScrollback: Boolean): Array<TermLine> {
