@@ -64,16 +64,17 @@ private fun jetbrainsMonoFamily(): FontFamily {
 
 /** [codeScale] lets the user change terminal font size (1.0 = design default of 12.5sp). */
 @Composable
-fun rememberVesperType(monoFamilyName: String, codeScale: Float): VesperType {
+fun rememberVesperType(monoFamilyName: String, codeScale: Float, ligatures: Boolean = false): VesperType {
     val ui = interFamily()
     val bundledMono = jetbrainsMonoFamily()
     val mono = remember(monoFamilyName, bundledMono) { resolveMonoFamily(monoFamilyName) ?: bundledMono }
-    return remember(ui, mono, codeScale) {
+    return remember(ui, mono, codeScale, ligatures) {
+        val features = if (ligatures) null else "calt 0, liga 0"
         fun uiStyle(size: Float, line: Float, weight: FontWeight = FontWeight.Normal, spacing: Float = 0f) =
             TextStyle(fontFamily = ui, fontSize = size.sp, lineHeight = line.sp, fontWeight = weight, letterSpacing = spacing.em)
 
         fun monoStyle(size: Float, line: Float, weight: FontWeight = FontWeight.Normal, spacing: Float = 0f) =
-            TextStyle(fontFamily = mono, fontSize = size.sp, lineHeight = line.sp, fontWeight = weight, letterSpacing = spacing.em)
+            TextStyle(fontFamily = mono, fontSize = size.sp, lineHeight = line.sp, fontWeight = weight, letterSpacing = spacing.em, fontFeatureSettings = features)
         VesperType(
             ui = ui,
             mono = mono,

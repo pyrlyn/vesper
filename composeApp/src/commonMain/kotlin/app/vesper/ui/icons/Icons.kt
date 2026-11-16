@@ -9,7 +9,6 @@ import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
 
 /**
- * Stroke icons. The first group is converted 1:1 from the Figma file's exported SVGs
  * (Lucide geometry at the design's native sizes); the second group uses Lucide's 24-grid.
  * All are drawn in black and tinted at the call site.
  */
@@ -37,127 +36,46 @@ object Icons {
 
     private fun lucide(name: String, vararg d: String) = icon(name, 24f, 24f) { lucide(*d) }
 
-    // ── From the design file ────────────────────────────────────────────────
-    val History: ImageVector by lazy {
-        icon("History", 16f, 16f) {
-            stroked("Vector", 1.33333f)
-            stroked("Vector_2", 1.33333f)
-            stroked("Vector_3", 1.33333f)
-        }
+    // ── Icons used in the design (Lucide geometry) ─────────────────────────
+    val History by lazy { lucide("History", "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", "M3 3v5h5", "M12 7v5l4 2") }
+    val Folder by lazy { lucide("Folder", "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z") }
+    val GitBranch by lazy {
+        lucide("GitBranch", "M6 3v12", "M21 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z", "M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z", "M18 9a9 9 0 0 1-9 9")
     }
-
-    val Folder: ImageVector by lazy {
-        icon("Folder", 14f, 14f) {
-            stroked("Vector", 1.16667f)
-        }
+    val CheckCircle by lazy { lucide("CheckCircle", "M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0z", "m9 12 2 2 4-4") }
+    val Loader by lazy { lucide("Loader", "M21 12a9 9 0 1 1-6.219-8.56") }
+    val Stop by lazy { lucide("Stop", "M7 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z") }
+    val Sparkles by lazy {
+        lucide(
+            "Sparkles",
+            "M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z",
+            "M20 3v4", "M22 5h-4",
+        )
     }
-
-    val GitBranch: ImageVector by lazy {
-        icon("GitBranch", 11f, 11f) {
-            stroked("Vector", 0.916667f)
-            stroked("Vector_2", 0.916667f)
-            stroked("Vector_3", 0.916667f)
-            stroked("Vector_4", 0.916667f)
-        }
+    val Terminal by lazy { lucide("Terminal", "m4 17 6-6-6-6", "M12 19h8") }
+    val Server by lazy {
+        lucide(
+            "Server", "M4 2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z",
+            "M4 14h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z", "M6 6h.01", "M6 18h.01",
+        )
     }
-
-    val CheckCircle: ImageVector by lazy {
-        icon("CheckCircle", 18f, 18f) {
-            stroked("Vector", 1.5f)
-            stroked("Vector_2", 1.5f)
-        }
+    val Database by lazy {
+        lucide("Database", "M21 5c0 1.66-4.03 3-9 3S3 6.66 3 5s4.03-3 9-3 9 1.34 9 3z", "M3 5v14a9 3 0 0 0 18 0V5", "M3 12a9 3 0 0 0 18 0")
     }
-
-    val Loader: ImageVector by lazy {
-        icon("Loader", 18f, 18f) {
-            stroked("Vector", 1.5f)
-        }
+    val Logs by lazy { lucide("Logs", "M13 12h8", "M13 18h8", "M13 6h8", "M3 12h1", "M3 18h1", "M3 6h1", "M8 12h1", "M8 18h1", "M8 6h1") }
+    val Play by lazy { lucide("Play", "M6 4.6a1 1 0 0 1 1.5-.87l12 7.4a1 1 0 0 1 0 1.74l-12 7.4A1 1 0 0 1 6 19.4z") }
+    val Settings by lazy {
+        lucide(
+            "Settings",
+            "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z",
+            "M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z",
+        )
     }
-
-    val Stop: ImageVector by lazy {
-        icon("Stop", 12f, 12f) {
-            stroked("Vector", 1f)
-        }
-    }
-
-    val Sparkles: ImageVector by lazy {
-        icon("Sparkles", 14f, 14f) {
-            stroked("Vector", 1.16667f)
-        }
-    }
-
-    val Terminal: ImageVector by lazy {
-        icon("Terminal", 14f, 14f) {
-            stroked("Vector", 1.16667f)
-            stroked("Vector_2", 1.16667f)
-        }
-    }
-
-    val Server: ImageVector by lazy {
-        icon("Server", 14f, 14f) {
-            stroked("Vector", 1.16667f)
-            stroked("Vector_2", 1.16667f)
-            stroked("Vector_3", 1.16667f)
-            stroked("Vector_4", 1.16667f)
-        }
-    }
-
-    val Database: ImageVector by lazy {
-        icon("Database", 14f, 14f) {
-            stroked("Vector", 1.16667f)
-            stroked("Vector_2", 1.16667f)
-            stroked("Vector_3", 1.16667f)
-        }
-    }
-
-    val Logs: ImageVector by lazy {
-        icon("Logs", 14f, 14f) {
-            stroked("Vector", 1.16667f)
-            stroked("Vector_2", 1.16667f)
-            stroked("Vector_3", 1.16667f)
-        }
-    }
-
-    val Play: ImageVector by lazy {
-        icon("Play", 14f, 14f) {
-            stroked("Vector", 1.16667f)
-        }
-    }
-
-    val Settings: ImageVector by lazy {
-        icon("Settings", 16f, 16f) {
-            stroked("Vector", 1.33333f)
-            stroked("Vector_2", 1.33333f)
-        }
-    }
-
-    val Search: ImageVector by lazy {
-        icon("Search", 14f, 14f) {
-            stroked("Vector", 1.16667f)
-            stroked("Vector_2", 1.16667f)
-        }
-    }
-
-    val Plus: ImageVector by lazy {
-        icon("Plus", 16f, 16f) {
-            stroked("Vector", 1.33333f)
-            stroked("Vector_2", 1.33333f)
-        }
-    }
-
-    val PanelRight: ImageVector by lazy {
-        icon("PanelRight", 16f, 16f) {
-            stroked("Vector", 1.33333f)
-            stroked("Vector_2", 1.33333f)
-        }
-    }
-
-    val More: ImageVector by lazy {
-        icon("More", 16f, 16f) {
-            stroked("Vector", 1.33333f)
-            stroked("Vector_2", 1.33333f)
-            stroked("Vector_3", 1.33333f)
-        }
+    val Search by lazy { lucide("Search", "m21 21-4.34-4.34", "M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0z") }
+    val Plus by lazy { lucide("Plus", "M5 12h14", "M12 5v14") }
+    val PanelRight by lazy { lucide("PanelRight", "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z", "M15 3v18") }
+    val More by lazy {
+        lucide("More", "M13 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0z", "M20 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0z", "M6 12a1 1 0 1 1-2 0 1 1 0 0 1 2 0z")
     }
 
     // ── Lucide (24-grid) ───────────────────────────────────────────────────
