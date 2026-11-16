@@ -143,7 +143,15 @@ object ShellIntegration {
             RPS1=''
             PS2=''
           }
-          __vesper_preexec() { __vesper_running=1; __vesper_osc "133;C" }
+          # Reports the command line as typed (percent-escaped), so blocks are named right even
+          # for type-ahead or when a theme redraws the prompt (transient prompts).
+          __vesper_preexec() {
+            __vesper_running=1
+            local c=${'$'}{1//\%/%25}
+            c=${'$'}{c//${'$'}'\n'/%0A}; c=${'$'}{c//${'$'}'\a'/%07}; c=${'$'}{c//${'$'}'\e'/%1B}
+            __vesper_osc "6973;cmd;${'$'}c"
+            __vesper_osc "133;C"
+          }
           autoload -Uz add-zsh-hook
           add-zsh-hook preexec __vesper_preexec
           precmd_functions=(__vesper_precmd_first ${'$'}{precmd_functions:#__vesper_precmd_*} __vesper_precmd_last)

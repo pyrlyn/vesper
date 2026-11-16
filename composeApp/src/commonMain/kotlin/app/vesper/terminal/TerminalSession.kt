@@ -25,9 +25,10 @@ class Block(
     val startedAt: Long,
     val terminal: Terminal,
 ) {
-    @Volatile var status: BlockStatus = BlockStatus.Running
-    @Volatile var exitCode: Int? = null
-    @Volatile var finishedAt: Long? = null
+    // Snapshot state, so headers recompose when the reader thread finishes the block.
+    var status: BlockStatus by mutableStateOf(BlockStatus.Running)
+    var exitCode: Int? by mutableStateOf(null)
+    var finishedAt: Long? by mutableStateOf(null)
     @Volatile var interruptRequested = false
 
     val isRunning: Boolean get() = status == BlockStatus.Running
@@ -93,6 +94,9 @@ class TerminalSession(
     private val blocks = ArrayList<Block>()
     private var nextBlockId = 1L
     private val pendingCommands = ArrayDeque<String>()
+
+    /** Command line the shell reported for the block about to start (OSC 6973;cmd). */
+    private var reportedCommand: String? = null
     private var startup: Terminal
     private var promptTerm: Terminal
     private var current: Terminal
@@ -182,6 +186,7 @@ class TerminalSession(
         when {
             data.startsWith("133;") -> handleShellMarker(data.substring(4))
             data.startsWith("7;") -> parseFileUrl(data.substring(2))?.let { cwd = it }
+            data.startsWith("6973;cmd;") -> reportedCommand = percentDecode(data.substring(9))
             data.startsWith("6973;") -> Unit // reserved for Vesper extensions
             else -> current.osc(data)
         }
@@ -198,12 +203,20 @@ class TerminalSession(
                 currentBlock?.let { finishBlock(it, null) }
                 currentBlock = null
                 running = false
+                reportedCommand = null
                 promptTerm.reset()
                 current = promptTerm
             }
             "C" -> {
                 if (mode != SessionMode.Blocks) return
-                val command = pendingCommands.removeFirstOrNull() ?: promptTerm.plainText().trim()
+                val reported = reportedCommand?.trim()
+                reportedCommand = null
+                val command = if (reported != null) {
+                    if (pendingCommands.firstOrNull() == reported) pendingCommands.removeFirst()
+                    reported
+                } else {
+                    pendingCommands.removeFirstOrNull() ?: promptTerm.plainText().trim()
+                }
                 lateinit var block: Block
                 val term = newTerminal(rows) { block }
                 block = Block(nextBlockId++, command, cwd, nowMillis(), term)
@@ -383,3 +396,9 @@ class TerminalSession(
         }
     }
 }
+
+private val percentEscape = Regex("%([0-9A-Fa-f]{2})")
+
+/** Decodes the %XX escapes the shell integration uses for control characters and '%'. */
+internal fun percentDecode(s: String): String =
+    percentEscape.replace(s) { it.groupValues[1].toInt(16).toChar().toString() }

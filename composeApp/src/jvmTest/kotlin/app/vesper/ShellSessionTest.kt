@@ -54,7 +54,34 @@ class ShellSessionTest {
             waitUntil(what = "printf block") { session.blocksSnapshot().any { it.command.startsWith("printf") && !it.isRunning } }
             val printf = session.blocksSnapshot().first { it.command.startsWith("printf") }
             assertEquals("a\nb", printf.terminal.plainText().trim())
+
+            // A compound command that ends in failure, then a slow one right after it.
+            session.submit("ls -la; false")
+            waitUntil(what = "ls block") { session.blocksSnapshot().any { it.command == "ls -la; false" && !it.isRunning } }
+            assertEquals(BlockStatus.Failed, session.blocksSnapshot().first { it.command == "ls -la; false" }.status)
+            session.submit("sleep 1")
+            waitUntil(what = "sleep block") { session.blocksSnapshot().any { it.command == "sleep 1" && !it.isRunning } }
             assertTrue(session.blocksSnapshot().none { it.isRunning })
+
+            // Type-ahead: the next commands are sent while the previous one still runs.
+            session.submit("sleep 0.5; echo first")
+            Thread.sleep(100)
+            session.submit("echo second")
+            session.submit("echo third")
+            runCatching {
+                waitUntil(what = "type-ahead blocks") {
+                    session.blocksSnapshot().any { it.command == "echo third" && !it.isRunning }
+                }
+            }.onFailure {
+                val got = session.blocksSnapshot().map { "${it.command} [${it.status}]" }
+                error("${it.message}; blocks: $got")
+            }
+            val running = session.blocksSnapshot().filter { it.isRunning }.map { it.command }
+            assertTrue(running.isEmpty(), "still running: $running")
+
+            // Commands with escape characters keep their exact text as the block name.
+            session.submit("echo 100%0A")
+            waitUntil(what = "percent block") { session.blocksSnapshot().any { it.command == "echo 100%0A" && !it.isRunning } }
         } finally {
             session.close()
             scope.cancel()

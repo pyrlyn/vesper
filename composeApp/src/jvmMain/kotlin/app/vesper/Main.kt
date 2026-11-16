@@ -48,6 +48,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import app.vesper.app.AppState
 import app.vesper.platform.HostOs
+import app.vesper.platform.MacTitleBar
 import app.vesper.platform.JvmServices
 import app.vesper.terminal.LoginEnvironment
 import app.vesper.ui.VesperApp
@@ -126,6 +127,7 @@ fun main() {
                     window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
                     window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
                     window.rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
+                    MacTitleBar.install(window.title, MacTitleBar.Style.Unified)
                 }
             }
             LaunchedEffect(colors.isDark) {
@@ -154,7 +156,7 @@ private fun FrameWindowScope.chromeFor(os: HostOs, windowState: WindowState, qui
         WindowDraggableArea(m.pointerInput(Unit) { detectTapGestures(onDoubleTap = { toggleMaximize() }) }) { content() }
     }
     return when (os) {
-        HostOs.MacOS -> WindowChrome(leadingInset = 64.dp, dragArea = drag)
+        HostOs.MacOS -> WindowChrome(leadingInset = 72.dp, titleBarHeight = 52.dp, dragArea = drag)
         HostOs.Windows -> WindowChrome(dragArea = drag, controls = { WindowsControls(windowState, toggleMaximize, quit) })
         HostOs.Linux -> WindowChrome(dragArea = drag, controls = { LinuxControls(windowState, toggleMaximize, quit) })
     }

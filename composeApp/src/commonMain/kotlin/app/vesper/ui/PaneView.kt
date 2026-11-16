@@ -235,7 +235,7 @@ private fun PaneHeader(state: AppState, ui: UiActions, pane: Pane, split: Boolea
             IconButton(Icons.Maximize, { ui.focusPane(pane); state.toggleZoom(pane) }, size = 14.dp, padding = 5.dp)
             IconButton(Icons.X, { state.closePane(pane) }, size = 14.dp, padding = 5.dp)
         } else {
-            val age = formatAgo(nowMillis() - session.startedAt).let { if (it == "now") "just started" else "session $it" }
+            val age = formatAgo(session.startedAt).let { if (it == "now") "just started" else "session $it" }
             val label = when {
                 session.exited -> "exited"
                 session.mode == SessionMode.Raw -> "classic mode · $age"
@@ -291,16 +291,27 @@ private fun EmptyState(state: AppState, ui: UiActions, pane: Pane) {
         ).joinToString(" · ")
         VText(sub, type.codeSmall, c.textMuted)
         Box(Modifier.height(24.dp))
-        Row(Modifier.widthIn(max = 560.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            val wf = state.settings.workflows
-            ActionCard(Icons.Play, "Run a workflow", if (wf.isEmpty()) "Save multi-step commands" else wf.take(3).joinToString(", ") { it.name }, "${mod}K", Modifier.weight(1f)) {
-                ui.openPalette(">")
+        val wf = state.settings.workflows
+        val cards: List<@Composable (Modifier) -> Unit> = listOf(
+            { m ->
+                ActionCard(Icons.Play, "Run a workflow", if (wf.isEmpty()) "Save multi-step commands" else wf.take(3).joinToString(", ") { it.name }, "${mod}K", m) {
+                    ui.openPalette(">")
+                }
+            },
+            { m -> ActionCard(Icons.Server, "Connect to a host", "${state.allHosts().size} known hosts", "$mod${shift}H", m) { state.openHosts() } },
+            { m -> ActionCard(Icons.Search, "Search history", "Commands, dirs, hosts", "${mod}K", m) { ui.openPalette() } },
+            { m -> ActionCard(Icons.Columns, "Split pane", "Work side by side", "$mod\\", m) { state.split(true) } },
+        )
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.widthIn(max = 720.dp)) {
+            // Four across when there is room, otherwise a 2×2 grid so titles stay readable.
+            val perRow = if (maxWidth < 560.dp) 2 else 4
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                cards.chunked(perRow).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        row.forEach { card -> card(Modifier.weight(1f)) }
+                    }
+                }
             }
-            ActionCard(Icons.Server, "Connect to a host", "${state.allHosts().size} known hosts", "$mod${shift}H", Modifier.weight(1f)) {
-                state.openHosts()
-            }
-            ActionCard(Icons.Search, "Search history", "Commands, dirs, hosts", "${mod}K", Modifier.weight(1f)) { ui.openPalette() }
-            ActionCard(Icons.Columns, "Split pane", "Work side by side", "$mod\\", Modifier.weight(1f)) { state.split(true) }
         }
         if (ctx.packageScripts.isNotEmpty()) {
             Box(Modifier.height(22.dp))
@@ -315,7 +326,7 @@ private fun EmptyState(state: AppState, ui: UiActions, pane: Pane) {
         if (recents.isNotEmpty()) {
             Box(Modifier.height(22.dp))
             Column(
-                Modifier.widthIn(max = 560.dp).fillMaxWidth()
+                Modifier.widthIn(max = 720.dp).fillMaxWidth()
                     .background(c.bgSurface, app.vesper.ui.components.RadiusXl)
                     .border(1.dp, c.borderSubtle, app.vesper.ui.components.RadiusXl)
                     .padding(6.dp),
@@ -331,7 +342,7 @@ private fun EmptyState(state: AppState, ui: UiActions, pane: Pane) {
                     ) {
                         VIcon(Icons.Folder, 14.dp)
                         VText(state.services.displayPath(dir.path), type.codeSmall, c.textPrimary, Modifier.weight(1f))
-                        VText(formatAgo(nowMillis() - dir.lastUsed), type.meta, c.textMuted)
+                        VText(formatAgo(dir.lastUsed), type.meta, c.textMuted)
                     }
                 }
             }

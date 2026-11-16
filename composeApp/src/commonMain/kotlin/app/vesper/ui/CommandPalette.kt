@@ -121,7 +121,7 @@ private fun buildItems(state: AppState, ui: UiActions): List<PaletteItem> {
     val seen = HashSet<String>()
     state.history.asReversed().forEach { h ->
         if (seen.add(h.command)) {
-            items += PaletteItem(PaletteGroup.History, h.command, "${state.services.displayPath(h.cwd)} · ${formatAgo(now - h.at)}", Icons.History) { split ->
+            items += PaletteItem(PaletteGroup.History, h.command, "${state.services.displayPath(h.cwd)} · ${formatAgo(h.at, now)}", Icons.History) { split ->
                 if (split) state.split(true, h.command) else state.runInFocused(h.command)
             }
         }
@@ -134,7 +134,7 @@ private fun buildItems(state: AppState, ui: UiActions): List<PaletteItem> {
         }
     }
     state.settings.recentDirs.forEach { d ->
-        items += PaletteItem(PaletteGroup.Directories, state.services.displayPath(d.path), "Open in a new tab · ${formatAgo(now - d.lastUsed)}", Icons.Folder) { split ->
+        items += PaletteItem(PaletteGroup.Directories, state.services.displayPath(d.path), "Open in a new tab · ${formatAgo(d.lastUsed, now)}", Icons.Folder) { split ->
             if (split) state.split(true, "cd ${shellQuote(d.path)}") else state.newTerminalTab(cwd = d.path)
         }
     }
@@ -155,6 +155,8 @@ private fun score(text: String, q: String): Int? {
         gaps += found - ti
         ti = found + 1
     }
+    // Scattered letters across a long command are noise, not a match.
+    if (gaps > 4 * q.length) return null
     return 300 - gaps
 }
 
@@ -172,8 +174,10 @@ fun CommandPalette(state: AppState, ui: UiActions) {
     val q = field.text.removePrefix(">").trim().lowercase()
     val matches = remember(q, all) {
         all.mapNotNull { item ->
-            val s = maxOf(score(item.title, q) ?: Int.MIN_VALUE, (score(item.subtitle, q) ?: Int.MIN_VALUE) - 150)
-            if (s == Int.MIN_VALUE) null else item to s
+            // Titles match fuzzily; subtitles only by substring, ranked below title hits.
+            val inSubtitle = if (q.isNotEmpty() && item.subtitle.contains(q, ignoreCase = true)) 150 else null
+            val s = listOfNotNull(score(item.title, q), inSubtitle).maxOrNull()
+            if (s == null) null else item to s
         }.let { list -> if (q.isEmpty()) list else list.sortedByDescending { it.second } }.map { it.first }
     }
     val counts = PaletteGroup.entries.associateWith { g -> matches.count { it.group == g } }
@@ -311,7 +315,7 @@ fun CommandPalette(state: AppState, ui: UiActions) {
                 KeyHint("${state.services.os.mod}⏎", "open in split")
                 KeyHint("⇥", "filter")
                 Spacer(Modifier.weight(1f))
-                VText("${visible.size} results", type.meta, c.textMuted)
+                VText("${if (filter == null) matches.size else counts[filter] ?: 0} results", type.meta, c.textMuted)
             }
         }
     }

@@ -81,6 +81,8 @@ import kotlinx.coroutines.delay
 class WindowChrome(
     /** Space reserved for native controls on the left (macOS traffic lights). */
     val leadingInset: Dp = 0.dp,
+    /** Title bar height; on macOS it matches the native unified title bar so the traffic lights are centred. */
+    val titleBarHeight: Dp = 46.dp,
     /** Wraps the empty title-bar area so it moves the window. */
     val dragArea: @Composable (Modifier, @Composable () -> Unit) -> Unit = { m, content -> Box(m) { content() } },
     /** Minimize / maximize / close for undecorated windows. */
@@ -228,7 +230,7 @@ private fun TitleBar(state: AppState, ui: UiActions, chrome: WindowChrome) {
     Row(
         Modifier
             .fillMaxWidth()
-            .height(46.dp)
+            .height(chrome.titleBarHeight)
             .background(c.bgSidebar)
             .padding(start = 14.dp + chrome.leadingInset, end = if (chrome.controls != null) 6.dp else 14.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -296,7 +298,7 @@ private fun tabLook(state: AppState, tab: Tab): TabLook {
     val c = Vesper.colors
     return when (tab) {
         is Tab.Settings -> TabLook(Icons.Settings, null, "Settings")
-        is Tab.Hosts -> TabLook(Icons.Server, null, "Hosts")
+        is Tab.Hosts -> TabLook(Icons.Globe, null, "Hosts")
         is Tab.Terminal -> {
             @Suppress("UNUSED_VARIABLE")
             val rev = tab.focused.session.revision
@@ -380,7 +382,7 @@ private fun Sidebar(state: AppState, ui: UiActions) {
                             SidebarItem(Icons.ChevronRight, cmd, false, mono = true, onClick = {
                                 state.focusedPane?.draft = cmd
                             }) {
-                                if (at > 0) VText(formatAgo(now - at), type.meta, c.textMuted)
+                                if (at > 0) VText(formatAgo(at, now), type.meta, c.textMuted)
                             }
                         }
                     }
@@ -577,8 +579,22 @@ private fun StatusBar(state: AppState) {
             }
             VText(pane.session.shellName, type.meta, c.textMuted)
             pane.context.gitBranch?.let { VText(it, type.meta, c.textMuted) }
+        } else if (state.activeTab is Tab.Hosts) {
+            val connected = state.tabs.filterIsInstance<Tab.Terminal>()
+                .flatMap { it.root.panes() }
+                .count { it.kind() == PaneKind.Ssh && !it.session.exited }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                StatusDot(if (connected > 0) c.success else c.textMuted, 6.dp)
+                VText("${state.allHosts().size} hosts · $connected connected", type.meta, c.textMuted)
+            }
+            VText("ssh config", type.meta, c.textMuted)
+            VText("~/.ssh/config", type.meta, c.textMuted)
         } else {
-            VText("Vesper ${state.services.appVersion}", type.meta, c.textMuted)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                StatusDot(c.success, 6.dp)
+                VText("settings saved", type.meta, c.textMuted)
+            }
+            VText(state.services.displayPath(state.services.configPath), type.meta, c.textMuted)
         }
         Spacer(Modifier.weight(1f))
         VText("UTF-8", type.meta, c.textMuted)
