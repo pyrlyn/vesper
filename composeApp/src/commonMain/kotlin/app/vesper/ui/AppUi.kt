@@ -1,5 +1,9 @@
 package app.vesper.ui
 
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import app.vesper.ui.components.Radius2xl
+import app.vesper.ui.components.RadiusPill
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -231,18 +235,33 @@ private fun TitleBar(state: AppState, ui: UiActions, chrome: WindowChrome) {
         Modifier
             .fillMaxWidth()
             .height(chrome.titleBarHeight)
-            .background(c.bgSidebar)
+            .background(if (c.glass) Color.Transparent else c.bgSidebar)
             .padding(start = 14.dp + chrome.leadingInset, end = if (chrome.controls != null) 6.dp else 14.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        state.tabs.forEachIndexed { index, tab ->
-            TabChip(state, tab, index, active = tab.id == state.activeTab?.id)
+        val tabs: @Composable () -> Unit = {
+            state.tabs.forEachIndexed { index, tab ->
+                TabChip(state, tab, index, active = tab.id == state.activeTab?.id)
+            }
+            IconButton(Icons.Plus, { state.newTerminalTab() }, size = 15.dp, padding = 6.dp)
         }
-        IconButton(Icons.Plus, { state.newTerminalTab() }, size = 15.dp, padding = 6.dp)
+        if (c.glass) {
+            // Liquid Glass: the tabs sit in one capsule.
+            Row(
+                Modifier
+                    .background((if (c.isDark) Color.White else Color.Black).copy(alpha = 0.05f), RadiusPill)
+                    .border(1.dp, c.borderSubtle, RadiusPill)
+                    .padding(horizontal = 4.dp, vertical = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) { tabs() }
+        } else {
+            tabs()
+        }
         chrome.dragArea(Modifier.weight(1f).fillMaxHeight()) { Spacer(Modifier.fillMaxSize()) }
         Box(Modifier.width(300.dp).clickable { ui.openPalette() }.pointerHoverIcon(PointerIcon.Hand)) {
-            SearchField("", {}, "Search commands, history, hosts…", Modifier.fillMaxWidth()) {
+            SearchField("", {}, "Search commands, history, hosts…", Modifier.fillMaxWidth(), shape = if (c.glass) RadiusPill else RadiusMd) {
                 Kbd(if (os == HostOs.MacOS) "⌘K" else "Ctrl K")
             }
             // Transparent layer so clicks open the palette instead of focusing the field.
@@ -265,7 +284,7 @@ private fun TabChip(state: AppState, tab: Tab, index: Int, active: Boolean) {
     val type = Vesper.type
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
-    val shape = RadiusMd
+    val shape = if (c.glass) RadiusPill else RadiusMd
     Row(
         Modifier
             .hoverable(source)
@@ -324,9 +343,23 @@ private fun Sidebar(state: AppState, ui: UiActions) {
     val c = Vesper.colors
     val type = Vesper.type
     Row {
-        Column(
-            Modifier.width(232.dp).fillMaxHeight().background(c.bgSidebar).padding(horizontal = 10.dp, vertical = 14.dp),
-        ) {
+        val frame = if (c.glass) {
+            // Liquid Glass: the sidebar floats as a rounded pane with a light top edge. No drop shadow:
+            // Compose would draw it under the translucent fill too.
+            Modifier
+                .padding(start = 8.dp, bottom = 8.dp)
+                .width(224.dp)
+                .fillMaxHeight()
+                .background(c.bgSidebar, Radius2xl)
+                .border(1.dp, c.borderDefault, Radius2xl)
+                .drawBehind {
+                    val r = 14.dp.toPx()
+                    drawLine(Color.White.copy(alpha = 0.12f), Offset(r, 1f), Offset(size.width - r, 1f), 1f)
+                }
+        } else {
+            Modifier.width(232.dp).fillMaxHeight().background(c.bgSidebar)
+        }
+        Column(frame.padding(horizontal = 10.dp, vertical = 14.dp)) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 val panes = state.tabs.filterIsInstance<Tab.Terminal>().flatMap { it.root.panes() }
                 SidebarSection("Sessions", panes.size.toString()) {
@@ -556,7 +589,7 @@ private fun StatusBar(state: AppState) {
     }
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
     Row(
-        Modifier.fillMaxWidth().background(c.bgSidebar).padding(horizontal = 14.dp, vertical = 6.dp),
+        Modifier.fillMaxWidth().background(if (c.glass) Color.Transparent else c.bgSidebar).padding(horizontal = 14.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

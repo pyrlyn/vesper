@@ -47,8 +47,9 @@ import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import app.vesper.app.AppState
+import app.vesper.app.WindowMaterial
 import app.vesper.platform.HostOs
-import app.vesper.platform.MacTitleBar
+import app.vesper.platform.MacWindow
 import app.vesper.platform.JvmServices
 import app.vesper.terminal.LoginEnvironment
 import app.vesper.ui.VesperApp
@@ -57,6 +58,7 @@ import app.vesper.ui.components.VIcon
 import app.vesper.ui.icons.Icons
 import app.vesper.ui.requestQuit
 import app.vesper.ui.theme.ThemeId
+import app.vesper.ui.theme.asGlass
 import app.vesper.ui.theme.Vesper
 import app.vesper.ui.theme.VesperTheme
 import app.vesper.ui.theme.colorsFor
@@ -111,30 +113,42 @@ fun main() {
                 delay(3000)
             }
         }
+        var systemReducesTransparency by remember { mutableStateOf(false) }
+        LaunchedEffect(os) {
+            while (os == HostOs.MacOS) {
+                systemReducesTransparency = withContext(Dispatchers.IO) { MacWindow.systemReducesTransparency() }
+                delay(3000)
+            }
+        }
         val theme = if (settings.followSystem) (if (systemDark) ThemeId.VesperDark else ThemeId.VesperLight) else settings.theme
-        val colors = remember(theme, settings.accent) { colorsFor(theme, settings.accent) }
+        // Liquid Glass is macOS-only for now; Reduce transparency (Vesper's or the system's) turns it off.
+        val glass = os == HostOs.MacOS && settings.material == WindowMaterial.Glass &&
+            !settings.reduceTransparency && !systemReducesTransparency
+        val colors = remember(theme, settings.accent, glass, settings.glassOpacity, settings.glassTint) {
+            colorsFor(theme, settings.accent).let { if (glass) it.asGlass(settings.glassOpacity, settings.glassTint) else it }
+        }
 
         Window(
             onCloseRequest = { requestQuit(state, quit) },
             state = windowState,
             title = "Vesper",
-            undecorated = os != HostOs.MacOS,
+            // macOS: transparent for Liquid Glass; MacWindow.install restores the native decorations.
+            undecorated = true,
+            transparent = os == HostOs.MacOS,
             icon = remember { VesperIconPainter(colors.accentStrong) },
         ) {
             LaunchedEffect(Unit) {
                 window.minimumSize = Dimension(900, 560)
-                if (os == HostOs.MacOS) {
-                    window.rootPane.putClientProperty("apple.awt.fullWindowContent", true)
-                    window.rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
-                    window.rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
-                    MacTitleBar.install(window.title, MacTitleBar.Style.Unified)
-                }
+                if (os == HostOs.MacOS) MacWindow.install(window.title, MacWindow.Style.Unified, restoreDecorations = true)
+            }
+            LaunchedEffect(glass, settings.glassBlur) {
+                if (os == HostOs.MacOS) MacWindow.setBlur(window.title, if (glass) settings.glassBlur else 0)
             }
             LaunchedEffect(colors.isDark) {
                 if (os == HostOs.MacOS) {
                     window.rootPane.putClientProperty("apple.awt.windowAppearance", if (colors.isDark) "NSAppearanceNameDarkAqua" else "NSAppearanceNameAqua")
                 }
-                window.background = java.awt.Color(colors.bgWindow.red, colors.bgWindow.green, colors.bgWindow.blue)
+                if (os != HostOs.MacOS) window.background = java.awt.Color(colors.bgWindow.red, colors.bgWindow.green, colors.bgWindow.blue)
             }
             val type = rememberVesperType(settings.fontFamily, settings.fontScale, settings.ligatures)
             val chrome = remember(os) { chromeFor(os, windowState, quit = { requestQuit(state, quit) }) }

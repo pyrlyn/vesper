@@ -1,5 +1,12 @@
 package app.vesper.ui.components
 
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,6 +39,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -49,6 +57,7 @@ val RadiusMd = RoundedCornerShape(6.dp)
 val RadiusLg = RoundedCornerShape(8.dp)
 val RadiusXl = RoundedCornerShape(10.dp)
 val Radius2xl = RoundedCornerShape(14.dp)
+val RadiusPill = RoundedCornerShape(percent = 50)
 
 @Composable
 fun VIcon(icon: ImageVector, size: Dp, tint: Color = Vesper.colors.iconDefault, modifier: Modifier = Modifier) {
@@ -259,6 +268,47 @@ fun Toggle(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = M
     }
 }
 
+/** Horizontal slider for [value] in [range]; [onChange] fires while dragging or on click. */
+@Composable
+fun VSlider(value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit, modifier: Modifier = Modifier) {
+    val c = Vesper.colors
+    val latest by androidx.compose.runtime.rememberUpdatedState(onChange)
+    val fraction = ((value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val inset = with(density) { 7.dp.toPx() } // thumb radius: the track runs between the thumb centres
+    fun emit(x: Float, width: Int) {
+        val track = width - 2 * inset
+        if (track > 0) latest(range.start + ((x - inset) / track).coerceIn(0f, 1f) * (range.endInclusive - range.start))
+    }
+    Box(
+        modifier
+            .size(width = 200.dp, height = 16.dp)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .pointerInput(range) {
+                // Press jumps to the spot, then the value follows the pointer (no touch slop).
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    down.consume()
+                    emit(down.position.x, size.width)
+                    horizontalDrag(down.id) { change ->
+                        change.consume()
+                        emit(change.position.x, size.width)
+                    }
+                }
+            }
+            .drawBehind {
+                val y = size.height / 2
+                val thumb = 7.dp.toPx()
+                val track = 4.dp.toPx()
+                val x = thumb + fraction * (size.width - 2 * thumb)
+                drawLine(c.borderStrong, Offset(thumb, y), Offset(size.width - thumb, y), track, StrokeCap.Round)
+                drawLine(c.accentStrong, Offset(thumb, y), Offset(x, y), track, StrokeCap.Round)
+                drawCircle(Color.Black.copy(alpha = 0.3f), thumb + 1.dp.toPx(), Offset(x, y + 1.dp.toPx()))
+                drawCircle(Color.White, thumb, Offset(x, y))
+            },
+    )
+}
+
 @Composable
 fun SearchField(
     value: String,
@@ -266,13 +316,14 @@ fun SearchField(
     placeholder: String,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
+    shape: Shape = RadiusMd,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val c = Vesper.colors
     Row(
         modifier
-            .background(c.bgInset, RadiusMd)
-            .border(1.dp, c.borderDefault, RadiusMd)
+            .background(c.bgInset, shape)
+            .border(1.dp, c.borderDefault, shape)
             .padding(start = 11.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,

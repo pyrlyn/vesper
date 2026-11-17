@@ -1,5 +1,8 @@
 package app.vesper.ui
 
+import kotlin.math.roundToInt
+import app.vesper.app.WindowMaterial
+import app.vesper.ui.components.VSlider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -222,6 +225,7 @@ private fun AppearanceSection(state: AppState) {
             }
         }
     }
+    if (os == HostOs.MacOS) WindowMaterialSection(state)
     Group("Typography") {
         SettingRow("Font family", "Monospace font for blocks and prompt") {
             val fonts = remember { listOf("JetBrains Mono") + state.services.installedMonoFonts().filter { it != "JetBrains Mono" } }
@@ -236,6 +240,107 @@ private fun AppearanceSection(state: AppState) {
         }
         SettingRow("Ligatures", "Render programming ligatures like → and !=", last = true) {
             Toggle(s.ligatures, { v -> state.updateSettings { it.copy(ligatures = v) } })
+        }
+    }
+}
+
+/** Settings › Appearance › Window material (macOS Liquid Glass). */
+@Composable
+private fun WindowMaterialSection(state: AppState) {
+    val c = Vesper.colors
+    val type = Vesper.type
+    val s = state.settings
+    val glass = s.material == WindowMaterial.Glass
+    Overline("Window material", Modifier.padding(bottom = 8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        MaterialCard("Solid", "no transparency", glass = false, active = !glass, Modifier.weight(1f)) {
+            state.updateSettings { it.copy(material = WindowMaterial.Solid) }
+        }
+        MaterialCard("Liquid Glass", "macOS", glass = true, active = glass, Modifier.weight(1f)) {
+            state.updateSettings { it.copy(material = WindowMaterial.Glass) }
+        }
+        Spacer(Modifier.weight(2f))
+    }
+    Spacer(Modifier.height(22.dp))
+    if (glass) {
+        Group("Fine-tune") {
+            SettingRow("Opacity", "How much of the desktop shows through") {
+                SliderValue(s.glassOpacity, 0.2f..1f, "${(s.glassOpacity * 100).roundToInt()}%") { v ->
+                    state.updateSettings { it.copy(glassOpacity = (v * 100).roundToInt() / 100f) }
+                }
+            }
+            SettingRow("Blur", "Higher values make text easier to read") {
+                SliderValue(s.glassBlur.toFloat(), 0f..100f, "${s.glassBlur} px") { v ->
+                    state.updateSettings { it.copy(glassBlur = v.roundToInt()) }
+                }
+            }
+            SettingRow("Tint with accent color", "Mix a little ${s.accent.name.lowercase()} into the glass") {
+                Toggle(s.glassTint, { v -> state.updateSettings { it.copy(glassTint = v) } })
+            }
+            SettingRow("Reduce transparency", "Also follows macOS Accessibility › Display", last = true) {
+                Toggle(s.reduceTransparency, { v -> state.updateSettings { it.copy(reduceTransparency = v) } })
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth()
+                .background(c.accentSoft, RadiusXl)
+                .border(1.dp, c.accentDeep, RadiusXl)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            VIcon(Icons.Zap, 16.dp, c.accent)
+            Column {
+                VText("Glass is GPU-accelerated", type.bodyMedium, c.textPrimary)
+                VText("macOS composites the blur. Turn on Reduce transparency to save power on battery.", type.caption, c.textSecondary, maxLines = 2)
+            }
+        }
+        Spacer(Modifier.height(22.dp))
+    }
+}
+
+@Composable
+private fun SliderValue(value: Float, range: ClosedFloatingPointRange<Float>, label: String, onChange: (Float) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        VSlider(value, range, onChange)
+        VText(label, Vesper.type.codeSmall, Vesper.colors.textCode, Modifier.width(44.dp), align = androidx.compose.ui.text.style.TextAlign.End)
+    }
+}
+
+@Composable
+private fun MaterialCard(title: String, subtitle: String, glass: Boolean, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val c = Vesper.colors
+    val type = Vesper.type
+    val accent = c.accentStrong
+    Column(
+        modifier
+            .background(if (active) c.accentSoft else c.bgSurface, RadiusLg)
+            .border(1.dp, if (active) accent else c.borderSubtle, RadiusLg)
+            .clickable(onClick = onClick)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .padding(7.dp),
+    ) {
+        // Thumbnail: a window over a coloured desktop; the glass one lets the colour through.
+        Box(
+            Modifier.fillMaxWidth().height(84.dp)
+                .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF2A1F5C), accent.copy(alpha = 0.55f))), RadiusMd)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+        ) {
+            Column(
+                Modifier.fillMaxSize()
+                    .background(if (glass) Color(0xFF0D0F15).copy(alpha = 0.45f) else Color(0xFF15171F), RadiusMd)
+                    .border(1.dp, Color.White.copy(alpha = if (glass) 0.18f else 0.08f), RadiusMd)
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Box(Modifier.fillMaxWidth(0.75f).height(3.dp).background(accent, CircleShape))
+                Box(Modifier.fillMaxWidth(0.55f).height(3.dp).background(Color.White.copy(alpha = 0.8f), CircleShape))
+                Box(Modifier.fillMaxWidth(0.65f).height(3.dp).background(c.success, CircleShape))
+            }
+        }
+        Column(Modifier.padding(start = 4.dp, top = 9.dp, bottom = 2.dp)) {
+            VText(title, type.bodySmall, if (active) c.textPrimary else c.textSecondary)
+            VText(subtitle, type.codeSmall, if (active) c.textSecondary else c.textMuted)
         }
     }
 }

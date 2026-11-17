@@ -51,7 +51,18 @@ data class Settings(
     val workflows: List<Workflow> = DefaultWorkflows,
     val hosts: List<SavedHost> = emptyList(),
     val onboarded: Boolean = false,
+    val material: WindowMaterial = WindowMaterial.Glass,
+    /** Glass opacity, 0.2–1 (the design's default is 58%). */
+    val glassOpacity: Float = 0.58f,
+    /** Blur of what is behind the window, in points. */
+    val glassBlur: Int = 48,
+    val glassTint: Boolean = true,
+    val reduceTransparency: Boolean = false,
 )
+
+/** Window material (Settings › Appearance › Window material). Glass is macOS-only for now. */
+@Serializable
+enum class WindowMaterial { Solid, Glass }
 
 val DefaultWorkflows = listOf(
     Workflow("Git: sync branch", listOf("git pull --rebase", "git push"), "Rebase on upstream, then push"),

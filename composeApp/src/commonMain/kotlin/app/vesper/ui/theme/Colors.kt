@@ -36,6 +36,8 @@ data class VesperColors(
     val magenta: Color,
     /** ANSI 0–15. */
     val ansi: List<Color>,
+    /** Translucent "Liquid Glass" variant: the desktop shows through the window. */
+    val glass: Boolean = false,
 ) {
     val borderFocus: Color get() = accentStrong
     val textOnAccent: Color get() = Color.White
@@ -226,4 +228,41 @@ private fun lerpWhite(c: Color, t: Float) = Color(
     green = c.green + (1f - c.green) * t,
     blue = c.blue + (1f - c.blue) * t,
     alpha = 1f,
+)
+
+/**
+ * Liquid Glass variant of [this] scheme (Figma "30 · Glass — macOS Liquid Glass"). Background
+ * alphas are the design's at 58% opacity and scale with [opacity]; borders become white (dark)
+ * or black (light) at low alpha. [tint] mixes a little of the accent into the glass.
+ */
+fun VesperColors.asGlass(opacity: Float, tint: Boolean): VesperColors {
+    val k = opacity.coerceIn(0.2f, 1f) / 0.58f
+    val mix = if (!tint) 0f else if (isDark) 0.07f else 0.04f
+    fun glass(rgb: Color, alpha: Float, min: Float = 0.05f): Color {
+        val t = lerpTo(rgb, accentStrong, mix)
+        return t.copy(alpha = (alpha * k).coerceIn(min, 1f))
+    }
+    val line = if (isDark) Color.White else Color.Black
+    return copy(
+        bgApp = Color.Transparent,
+        bgWindow = glass(bgWindow, if (isDark) 0.58f else 0.62f),
+        bgSidebar = glass(bgSidebar, 0.30f),
+        bgPanel = glass(bgPanel, if (isDark) 0.45f else 0.50f),
+        bgSurface = glass(bgSurface, if (isDark) 0.55f else 0.62f),
+        // Popovers have no backdrop blur here, so they stay more opaque than the design's 72%.
+        bgElevated = glass(bgElevated, if (isDark) 0.72f else 0.80f, min = 0.88f),
+        bgInset = glass(bgApp, if (isDark) 0.40f else 0.45f),
+        bgActive = line.copy(alpha = if (isDark) 0.09f else 0.07f),
+        borderSubtle = line.copy(alpha = if (isDark) 0.07f else 0.06f),
+        borderDefault = line.copy(alpha = if (isDark) 0.10f else 0.09f),
+        borderStrong = line.copy(alpha = if (isDark) 0.16f else 0.14f),
+        glass = true,
+    )
+}
+
+private fun lerpTo(a: Color, b: Color, t: Float) = Color(
+    red = a.red + (b.red - a.red) * t,
+    green = a.green + (b.green - a.green) * t,
+    blue = a.blue + (b.blue - a.blue) * t,
+    alpha = a.alpha,
 )
