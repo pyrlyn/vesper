@@ -33,6 +33,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.swing)
             implementation(libs.pty4j)
             implementation(libs.oshi.core)
+            implementation(libs.anthropic.java)
         }
         jvmTest.dependencies {
             implementation(libs.kotlin.test)

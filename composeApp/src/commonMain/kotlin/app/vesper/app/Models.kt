@@ -60,6 +60,29 @@ data class Settings(
     val reduceTransparency: Boolean = false,
     /** Shortcut overrides: action name → combo text ("shift+D"), "" for none. */
     val keybindings: Map<String, String> = emptyMap(),
+    /** Model for "#" questions. */
+    val agentModel: String = AgentModel.Opus.id,
+    /** Model for error explanations (Settings › AI agent › Complex tasks). */
+    val agentExplainModel: String = AgentModel.Opus.id,
+    val agentRunMode: AgentRunMode = AgentRunMode.Ask,
+    val agentAllowDestructive: Boolean = false,
+    /** An Explain button on blocks that exit non-zero. */
+    val agentExplainButton: Boolean = true,
+    val agentSendOutput: Boolean = true,
+    val agentSendGit: Boolean = true,
+    val agentSendMonitor: Boolean = false,
+    val redactPatterns: List<String> = DefaultRedactPatterns,
+    val agentRecent: List<String> = emptyList(),
+    val agentUsage: AgentUsage = AgentUsage(),
+    /** Folder the user's devices share for sync (Settings › Sync); empty when sync is off. */
+    val syncFolder: String = "",
+    val syncSettings: Boolean = true,
+    val syncKeybindings: Boolean = true,
+    val syncHosts: Boolean = false,
+    /** This device in the sync folder's device list. */
+    val deviceId: String = "",
+    /** When the synced settings this device has were written. */
+    val syncedAt: Long = 0,
 )
 
 /** Window material (Settings › Appearance › Window material). Glass is macOS-only for now. */
@@ -148,6 +171,8 @@ interface AppServices {
     val configPath: String
     val appVersion: String
     val monitor: SystemMonitor
+    val agent: AgentService
+    val sync: SyncStore
 
     fun createSession(
         id: Int,

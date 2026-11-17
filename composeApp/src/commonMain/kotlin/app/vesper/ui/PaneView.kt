@@ -131,6 +131,13 @@ fun PaneView(
                 override fun rerun(block: Block) = state.run(pane, block.command)
                 override fun copy(text: String) = ui.copy(text)
                 override fun remove(block: Block) = session.removeBlock(block)
+                override fun explain(block: Block) = state.agent.explain(pane, block)
+                override fun share(block: Block) {
+                    state.sharing = app.vesper.app.ShareRequest(pane, block)
+                }
+                override val explainButton: Boolean get() = state.settings.agentExplainButton
+                override fun explaining(block: Block): Boolean =
+                    state.agent.explain?.let { it.blockId == block.id && it.status == app.vesper.app.ExplainStatus.Thinking } == true
             }
         }
         val find = pane.find
@@ -171,6 +178,8 @@ fun PaneView(
                 )
             }
         }
+        val turn = pane.agentTurn
+        if (turn != null && fullscreen == null) AgentTurnView(state, pane, turn)
         if (fullscreen == null) {
             PromptBar(pane, rememberPromptActions(state, ui, pane), focus.prompt, state.services.displayPath(session.cwd))
         }
@@ -259,6 +268,7 @@ private fun BlocksSizer(pane: Pane) {
 private fun rememberPromptActions(state: AppState, ui: UiActions, pane: Pane): PromptActions = remember(pane) {
     object : PromptActions {
         override fun run(command: String) = state.run(pane, command)
+        override fun ask(text: String) = state.agent.ask(pane, text)
         override fun interrupt() = pane.session.interrupt()
         override fun sendRaw(text: String) = pane.session.write(text)
         override fun suggestions(input: String): List<Suggestion> = suggestFor(state, pane, input)

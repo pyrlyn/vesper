@@ -50,7 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Steps = listOf("Welcome", "Import shell setup", "Pick a theme")
+private val Steps = listOf("Welcome", "Import shell setup", "Pick a theme", "Set up the agent")
 
 /** First-launch setup over the window; Skip or finishing sets Settings.onboarded. */
 @Composable
@@ -90,7 +90,8 @@ fun Onboarding(state: AppState) {
                     when (step) {
                         0 -> WelcomeStep()
                         1 -> ImportStep(state, setup, importHistory, imported) { importHistory = it }
-                        else -> ThemeStep(state)
+                        2 -> ThemeStep(state)
+                        else -> AgentStep(state)
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -124,6 +125,7 @@ fun Onboarding(state: AppState) {
                                 enabled = !importing,
                             )
                         }
+                        2 -> VButton("Continue", { step++ }, icon = Icons.ArrowRightToLine, kind = ButtonKind.Accent)
                         else -> VButton("Start using Vesper", { state.finishOnboarding() }, icon = Icons.Check, kind = ButtonKind.Accent)
                     }
                 }
@@ -176,6 +178,26 @@ private fun WelcomeStep() {
     Feature(Icons.Terminal, "Command blocks", "Every command and its output is a block you can copy, rerun or search.")
     Feature(Icons.History, "History with context", "Exit codes, durations and directories for everything you run.")
     Feature(Icons.Server, "Hosts and monitor", "Your SSH hosts one click away, and the machine's vitals beside your work.")
+}
+
+@Composable
+private fun AgentStep(state: AppState) {
+    val c = Vesper.colors
+    StepTitle("Set up the agent", "Optional. Start a line with # to ask in plain language; failed commands get an Explain button.")
+    Spacer(Modifier.height(4.dp))
+    Feature(Icons.Sparkles, "Plans you approve", "The agent drafts commands; nothing runs until you press Run.")
+    Feature(Icons.Lock, "Secrets stay local", "Keys, tokens and .env files are redacted before anything is sent.")
+    Spacer(Modifier.height(4.dp))
+    val hint = state.agent.keyHint
+    if (hint != null) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            VIcon(Icons.CheckCircle, 15.dp, c.success)
+            VText(if (hint == "ANTHROPIC_API_KEY") "Using ANTHROPIC_API_KEY from your environment" else "API key saved", Vesper.type.bodySmall, c.textPrimary)
+        }
+    } else {
+        VText("Anthropic API key", Vesper.type.bodyMedium, c.textPrimary)
+        ApiKeyField(state)
+    }
 }
 
 @Composable

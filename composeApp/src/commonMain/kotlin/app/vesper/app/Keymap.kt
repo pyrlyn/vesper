@@ -35,7 +35,7 @@ data class KeyCombo(val key: String, val shift: Boolean = false, val alt: Boolea
     }
 }
 
-enum class ShortcutCategory(val title: String) { General("General"), Panes("Tabs & panes"), Terminal("Terminal") }
+enum class ShortcutCategory(val title: String) { General("General"), Panes("Tabs & panes"), Terminal("Terminal"), Agent("Agent") }
 
 enum class ShortcutAction(val title: String, val description: String, val category: ShortcutCategory, val default: KeyCombo) {
     Palette("Command palette", "Search commands, hosts, workflows and history", ShortcutCategory.General, KeyCombo("K")),
@@ -53,6 +53,8 @@ enum class ShortcutAction(val title: String, val description: String, val catego
     SplitDown("Split pane down", "Open a pane below the focused one", ShortcutCategory.Panes, KeyCombo("D", shift = true)),
     Zoom("Zoom pane", "Toggle full size for the focused pane", ShortcutCategory.Panes, KeyCombo("Enter")),
     Find("Find in output", "Search the focused pane's blocks", ShortcutCategory.Terminal, KeyCombo("F")),
+    ExplainError("Explain last error", "Ask the agent why the last failed command failed", ShortcutCategory.Agent, KeyCombo("E")),
+    AgentPanel("Agent panel", "Context, safety and recent questions", ShortcutCategory.Agent, KeyCombo("A", shift = true)),
 }
 
 /** The combo bound to [action]: the user's choice, else the default; null when unbound. */

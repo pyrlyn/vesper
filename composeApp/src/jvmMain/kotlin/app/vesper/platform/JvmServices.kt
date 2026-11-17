@@ -37,6 +37,8 @@ class JvmServices : AppServices {
     override val configPath: String = settingsFile.path
     override val appVersion: String = Paths.appVersion
     override val monitor: SystemMonitor by lazy { OshiMonitor() }
+    override val agent: app.vesper.app.AgentService by lazy { ClaudeAgent(Paths.configDir) }
+    override val sync: app.vesper.app.SyncStore by lazy { FolderSync() }
     private val launcher = Pty4jLauncher()
 
     private val json = Json {

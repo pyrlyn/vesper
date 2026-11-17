@@ -20,6 +20,8 @@ class Pane(val session: TerminalSession, val launchCommand: String?, /** Shown i
     var context by mutableStateOf(PromptContext())
     var draft by mutableStateOf("")
     val find = FindState()
+    /** The last "#" question and its plan, shown above the prompt. */
+    var agentTurn by mutableStateOf<AgentTurn?>(null)
 
     /** Kind of the current foreground command (or the command the pane was opened with). */
     fun kind(): PaneKind {
@@ -110,9 +112,11 @@ enum class SettingsSection(val title: String) {
     Appearance("Appearance"),
     Terminal("Terminal"),
     Keybindings("Keybindings"),
+    Agent("AI agent"),
     Hosts("Hosts & SSH"),
     Workflows("Workflows"),
     Privacy("Privacy"),
+    Sync("Sync"),
     About("About"),
 }
 
@@ -123,6 +127,9 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
     var activeTabId by mutableIntStateOf(-1)
     var settings by mutableStateOf(services.loadSettings())
         private set
+    var sidePanel by mutableStateOf(SidePanel.Monitor)
+    val agent = AgentController(this, scope)
+    val sync = SyncController(this, scope)
     var paletteOpen by mutableStateOf(false)
     var paletteQuery by mutableStateOf("")
     var monitorTab by mutableStateOf(MonitorTab.System)
@@ -130,6 +137,8 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
     /** While Settings › Keybindings records a shortcut, app shortcuts are off. */
     var recordingShortcut by mutableStateOf(false)
     var aboutOpen by mutableStateOf(false)
+    /** The Share block dialog, when open. */
+    var sharing by mutableStateOf<ShareRequest?>(null)
     /** The SSH connection waiting on a host key check or the user's trust. */
     var hostVerification by mutableStateOf<HostVerification?>(null)
     val history = mutableStateListOf<HistoryEntry>()
@@ -151,6 +160,7 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
     val focusedPane: Pane? get() = (activeTab as? Tab.Terminal)?.focused
 
     init {
+        sync.start()
         scope.launch(Dispatchers.Default) {
             val hosts = runCatching { services.sshHosts() }.getOrDefault(emptyList())
             val hist = runCatching { services.shellHistory(2000) }.getOrDefault(emptyList())
@@ -174,6 +184,7 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
         if (next == settings) return
         settings = next
         scope.launch(Dispatchers.Default) { runCatching { services.saveSettings(next) } }
+        sync.onLocalChange()
     }
 
     // ── Tabs & panes ─────────────────────────────────────────────────────
@@ -184,7 +195,10 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
         val pane = Pane(session, command, label)
         session.onBlockFinished = { block ->
             val entry = HistoryEntry(block.command, block.startedAt, block.cwd, block.exitCode, block.durationMs)
-            scope.launch(Dispatchers.Main) { record(entry) }
+            scope.launch(Dispatchers.Main) {
+                record(entry)
+                agent.onBlockFinished(pane, block)
+            }
         }
         if (command != null) launchWhenReady(pane, command)
         refreshContext(pane)

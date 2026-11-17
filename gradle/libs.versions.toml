@@ -5,6 +5,7 @@ coroutines = "1.11.0"
 serialization = "1.12.0"
 pty4j = "0.14.0"
 oshi = "6.12.0"
+anthropic = "3.3.0"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -12,6 +13,7 @@ kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 pty4j = { module = "org.jetbrains.pty4j:pty4j", version.ref = "pty4j" }
 oshi-core = { module = "com.github.oshi:oshi-core", version.ref = "oshi" }
+anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 
 [plugins]

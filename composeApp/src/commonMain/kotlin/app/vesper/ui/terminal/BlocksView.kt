@@ -84,6 +84,11 @@ interface BlockActions {
     fun rerun(block: Block)
     fun copy(text: String)
     fun remove(block: Block)
+    fun explain(block: Block)
+    fun share(block: Block)
+    /** Show Explain on failed blocks. */
+    val explainButton: Boolean
+    fun explaining(block: Block): Boolean
 }
 
 /** Find-in-output matches to highlight, and which one is current (scrolled into view). */
@@ -319,6 +324,7 @@ private fun BlockHeader(block: Block, actions: BlockActions, revision: Long) {
         StatusIcon(block.status)
         VText("›", type.command, c.textMuted)
         VText(block.command, type.command, c.textPrimary, Modifier.weight(1f))
+        if (block.byAgent) Badge("by agent", Tone.Accent)
         if ((hovered || menu) && !block.isRunning) {
             IconButton(Icons.Copy, { actions.copy(outputOf(block)) }, size = 13.dp, padding = 4.dp)
             IconButton(Icons.RotateCcw, { actions.rerun(block) }, size = 13.dp, padding = 4.dp)
@@ -332,7 +338,13 @@ private fun BlockHeader(block: Block, actions: BlockActions, revision: Long) {
         }
         when (block.status) {
             BlockStatus.Running -> RunningMeta(block, actions)
-            BlockStatus.Failed -> Badge("exit ${block.exitCode ?: "?"}", Tone.Danger)
+            BlockStatus.Failed -> {
+                Badge("exit ${block.exitCode ?: "?"}", Tone.Danger)
+                if (actions.explainButton) {
+                    val busy = actions.explaining(block)
+                    VButton(if (busy) "Explaining…" else "Explain", { actions.explain(block) }, icon = Icons.Sparkles, kind = ButtonKind.Accent, enabled = !busy)
+                }
+            }
             BlockStatus.Interrupted -> Badge("interrupted", Tone.Warning)
             BlockStatus.Success -> Unit
         }
@@ -349,6 +361,8 @@ private fun BlockMenu(block: Block, actions: BlockActions, dismiss: () -> Unit) 
         MenuItem("Copy command", { dismiss(); actions.copy(block.command) }, Icons.Copy)
         MenuItem("Copy output", { dismiss(); actions.copy(outputOf(block)) }, Icons.Copy)
         if (!block.isRunning) MenuItem("Rerun", { dismiss(); actions.rerun(block) }, Icons.RotateCcw)
+        if (block.status == BlockStatus.Failed) MenuItem("Explain with agent", { dismiss(); actions.explain(block) }, Icons.Sparkles)
+        if (!block.isRunning) MenuItem("Share block…", { dismiss(); actions.share(block) }, Icons.Upload)
         if (block.isRunning) MenuItem("Stop", { dismiss(); actions.stop(block) }, Icons.Stop)
         if (!block.isRunning) {
             MenuDivider()

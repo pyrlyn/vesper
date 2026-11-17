@@ -112,6 +112,17 @@ private fun buildItems(state: AppState, ui: UiActions): List<PaletteItem> {
     cmd("Find in output", "Search the focused pane's blocks", Icons.Search, state.settings.shortcutLabel(ShortcutAction.Find, os)) {
         state.focusedPane?.find?.let { it.open = true; it.focusRequests++ }
     }
+    cmd("Ask the agent", "Start a # question in the prompt", Icons.Sparkles, null) { state.focusedPane?.draft = "# " }
+    cmd("Explain last error", "Ask the agent why the last failed command failed", Icons.Sparkles, state.settings.shortcutLabel(ShortcutAction.ExplainError, os)) {
+        state.agent.explainLastFailure()
+    }
+    cmd("Share last block", "Save or copy a redacted copy of the last finished command", Icons.Upload, null) {
+        state.focusedPane?.let { pane ->
+            pane.session.blocksSnapshot().lastOrNull { !it.isRunning && it.command.isNotEmpty() }?.let { state.sharing = app.vesper.app.ShareRequest(pane, it) }
+        }
+    }
+    cmd("Sync settings", "Keep settings the same on your devices through a shared folder", Icons.Refresh, null) { state.openSettings(SettingsSection.Sync) }
+    cmd("AI agent settings", "API key, models, safety and redaction", Icons.Settings, null) { state.openSettings(app.vesper.app.SettingsSection.Agent) }
     cmd("Settings", "Theme, fonts, shell and more", Icons.Settings, state.settings.shortcutLabel(ShortcutAction.Settings, os)) { state.openSettings() }
     cmd("Keyboard shortcuts", "All key bindings", Icons.Keyboard) { state.openSettings(SettingsSection.Keybindings) }
     cmd("About Vesper", "Version, what's new and system info", Icons.Info) { state.aboutOpen = true }

@@ -99,9 +99,11 @@ private val SectionIcons = mapOf(
     SettingsSection.Appearance to Icons.Palette,
     SettingsSection.Terminal to Icons.Terminal,
     SettingsSection.Keybindings to Icons.Keyboard,
+    SettingsSection.Agent to Icons.Sparkles,
     SettingsSection.Hosts to Icons.Server,
     SettingsSection.Workflows to Icons.Play,
     SettingsSection.Privacy to Icons.Lock,
+    SettingsSection.Sync to Icons.Refresh,
     SettingsSection.About to Icons.Info,
 )
 
@@ -144,9 +146,11 @@ fun SettingsScreen(state: AppState, tab: Tab.Settings) {
                     SettingsSection.Appearance -> AppearanceSection(state)
                     SettingsSection.Terminal -> TerminalSection(state)
                     SettingsSection.Keybindings -> KeybindingsSection(state)
+                    SettingsSection.Agent -> AgentSection(state)
                     SettingsSection.Hosts -> HostsSection(state)
                     SettingsSection.Workflows -> WorkflowsSection(state)
                     SettingsSection.Privacy -> PrivacySection(state)
+                    SettingsSection.Sync -> SyncSection(state)
                     SettingsSection.About -> AboutSection(state)
                 }
             }
@@ -154,6 +158,10 @@ fun SettingsScreen(state: AppState, tab: Tab.Settings) {
         if (tab.section == SettingsSection.Appearance) {
             Box(Modifier.width(1.dp).fillMaxHeight().background(c.borderSubtle))
             LivePreview(state)
+        }
+        if (tab.section == SettingsSection.Agent) {
+            Box(Modifier.width(1.dp).fillMaxHeight().background(c.borderSubtle))
+            AgentUsagePanel(state)
         }
     }
 }
@@ -163,14 +171,16 @@ private fun sectionKeywords(s: SettingsSection): String = when (s) {
     SettingsSection.Terminal -> "shell font size scrollback cursor"
     SettingsSection.General -> "quit confirm sidebar monitor"
     SettingsSection.Keybindings -> "shortcuts keys"
+    SettingsSection.Agent -> "ai claude anthropic api key model redact secrets"
     SettingsSection.Hosts -> "ssh config"
     SettingsSection.Workflows -> "commands steps"
     SettingsSection.Privacy -> "history clear"
+    SettingsSection.Sync -> "account devices icloud dropbox folder share"
     SettingsSection.About -> "version license"
 }
 
 @Composable
-private fun Header(title: String, subtitle: String) {
+internal fun Header(title: String, subtitle: String) {
     val c = Vesper.colors
     val type = Vesper.type
     VText(title, type.display, c.textPrimary)
@@ -180,7 +190,7 @@ private fun Header(title: String, subtitle: String) {
 }
 
 @Composable
-private fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {
     val c = Vesper.colors
     Overline(title, Modifier.padding(bottom = 8.dp))
     Column(
@@ -191,7 +201,7 @@ private fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun SettingRow(title: String, subtitle: String, last: Boolean = false, control: @Composable () -> Unit) {
+internal fun SettingRow(title: String, subtitle: String, last: Boolean = false, control: @Composable () -> Unit) {
     val c = Vesper.colors
     val type = Vesper.type
     Row(
@@ -732,7 +742,7 @@ private fun updateWorkflow(state: AppState, index: Int, f: (Workflow) -> Workflo
 
 @Composable
 private fun PrivacySection(state: AppState) {
-    Header("Privacy", "Everything stays on this machine. Vesper sends nothing anywhere.")
+    Header("Privacy", "Vesper sends nothing anywhere unless you use the AI agent, which sends what Settings › AI agent allows to the Claude API.")
     Group("History") {
         SettingRow("Vesper history", "${state.history.size} commands saved for History and suggestions") {
             VButton("Clear", { state.clearHistory() }, icon = Icons.Trash, kind = ButtonKind.Danger)

@@ -24,6 +24,8 @@ class Block(
     val cwd: String,
     val startedAt: Long,
     val terminal: Terminal,
+    /** Started from an agent plan. */
+    val byAgent: Boolean = false,
 ) {
     // Snapshot state, so headers recompose when the reader thread finishes the block.
     var status: BlockStatus by mutableStateOf(BlockStatus.Running)
@@ -93,7 +95,8 @@ class TerminalSession(
     // ── Guarded by [lock] ────────────────────────────────────────────────
     private val blocks = ArrayList<Block>()
     private var nextBlockId = 1L
-    private val pendingCommands = ArrayDeque<String>()
+    /** Commands typed at the prompt, oldest first, and whether the agent sent them. */
+    private val pendingCommands = ArrayDeque<Pair<String, Boolean>>()
 
     /** Command line the shell reported for the block about to start (OSC 6973;cmd). */
     private var reportedCommand: String? = null
@@ -214,15 +217,16 @@ class TerminalSession(
                 if (mode != SessionMode.Blocks) return
                 val reported = reportedCommand?.trim()
                 reportedCommand = null
+                var byAgent = false
                 val command = if (reported != null) {
-                    if (pendingCommands.firstOrNull() == reported) pendingCommands.removeFirst()
+                    if (pendingCommands.firstOrNull()?.first == reported) byAgent = pendingCommands.removeFirst().second
                     reported
                 } else {
-                    pendingCommands.removeFirstOrNull() ?: promptTerm.plainText().trim()
+                    pendingCommands.removeFirstOrNull()?.let { (cmd, agent) -> byAgent = agent; cmd } ?: promptTerm.plainText().trim()
                 }
                 lateinit var block: Block
                 val term = newTerminal(rows) { block }
-                block = Block(nextBlockId++, command, cwd, nowMillis(), term)
+                block = Block(nextBlockId++, command, cwd, nowMillis(), term, byAgent)
                 blocks += block
                 currentBlock = block
                 current = term
@@ -307,7 +311,7 @@ class TerminalSession(
      * Runs [command] at the prompt, or sends it as a line of input to the running program
      * when a block is busy (e.g. a REPL).
      */
-    fun submit(command: String) {
+    fun submit(command: String, byAgent: Boolean = false) {
         val trimmed = command.trimEnd()
         val atPrompt: Boolean
         val paste: Boolean
@@ -315,7 +319,7 @@ class TerminalSession(
             atPrompt = mode == SessionMode.Blocks && currentBlock == null
             paste = promptTerm.bracketedPaste && trimmed.contains('\n')
             if (atPrompt && trimmed.isNotBlank()) {
-                pendingCommands.addLast(trimmed)
+                pendingCommands.addLast(trimmed to byAgent)
                 history.remove(trimmed)
                 history.add(trimmed)
             }

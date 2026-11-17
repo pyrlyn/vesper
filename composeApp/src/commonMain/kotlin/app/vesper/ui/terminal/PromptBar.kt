@@ -41,6 +41,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
@@ -69,6 +70,8 @@ data class Suggestion(val text: String, val source: String, val icon: ImageVecto
 /** Callbacks from the prompt to the app. */
 interface PromptActions {
     fun run(command: String)
+    /** A "# …" line: a question for the agent. */
+    fun ask(text: String)
     fun interrupt()
     fun sendRaw(text: String)
     fun suggestions(input: String): List<Suggestion>
@@ -110,8 +113,9 @@ fun PromptBar(
     var historyIndex by remember(pane) { mutableIntStateOf(-1) }
 
     val input = value.text
+    val agentMode = running == null && !starting && input.trimStart().startsWith("#")
     val suggestions = remember(input, running == null) {
-        if (input.isBlank() || running != null || input.contains('\n')) emptyList() else actions.suggestions(input).take(6)
+        if (input.isBlank() || running != null || agentMode || input.contains('\n')) emptyList() else actions.suggestions(input).take(6)
     }
     val ghost = suggestions.firstOrNull { it.text.startsWith(input) && it.text.length > input.length }?.text?.substring(input.length)
         ?.takeIf { value.selection.collapsed && value.selection.end == input.length }
@@ -133,7 +137,12 @@ fun PromptBar(
     fun submit() {
         val cmd = if (selected in suggestions.indices) suggestions[selected].text else value.text
         if (running == null && cmd.isBlank()) return
-        actions.run(cmd)
+        if (agentMode) {
+            if (cmd.trim().removePrefix("#").isBlank()) return
+            actions.ask(cmd)
+        } else {
+            actions.run(cmd)
+        }
         set(TextFieldValue(""))
         selected = -1
         dismissed = false
@@ -148,7 +157,7 @@ fun PromptBar(
                 Modifier
                     .fillMaxWidth()
                     .drawBehind {
-                        if (focused) {
+                        if (focused || agentMode) {
                             val w = 3.dp.toPx()
                             drawRoundRect(
                                 ring,
@@ -160,18 +169,18 @@ fun PromptBar(
                         }
                     }
                     .background(c.bgSurface, RadiusLg)
-                    .border(1.dp, if (focused) c.borderFocus else c.borderDefault, RadiusLg)
+                    .border(1.dp, if (focused || agentMode) c.borderFocus else c.borderDefault, RadiusLg)
                     .padding(start = 15.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                VText("›", type.prompt, if (focused) c.accentText else c.textMuted)
+                if (!agentMode) VText("›", type.prompt, if (focused) c.accentText else c.textMuted)
                 Box(Modifier.weight(1f)) {
                     val placeholder = when {
                         starting -> "Starting ${session.shellName}…"
                         running != null && secret -> "Password for ${running.command.substringBefore(' ')} — input is hidden"
                         running != null -> "Send input to ${running.command.take(40)} · Ctrl+C to stop"
-                        else -> "Type a command"
+                        else -> "Type a command, or # to ask the agent"
                     }
                     if (input.isEmpty()) VText(placeholder, type.prompt, c.textMuted)
                     if (ghost != null && !secret) {
@@ -196,9 +205,9 @@ fun PromptBar(
                             set(it)
                         },
                         textStyle = type.prompt.copy(color = c.textPrimary),
+                        visualTransformation = if (secret) PasswordVisualTransformation() else if (agentMode) AgentHash(c.accentText) else VisualTransformation.None,
                         cursorBrush = SolidColor(c.accentStrong),
                         maxLines = 6,
-                        visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(focusRequester)
@@ -273,6 +282,10 @@ fun PromptBar(
                     )
                 }
                 when {
+                    agentMode -> {
+                        app.vesper.ui.components.Badge("agent", app.vesper.ui.components.Tone.Accent)
+                        KeyHint("⏎", "ask")
+                    }
                     ghost != null || showPopup -> {
                         KeyHint("⇥", "accept")
                         KeyHint("⏎", "run")
@@ -286,6 +299,18 @@ fun PromptBar(
                 }
             }
         }
+    }
+}
+
+/** Colours the leading "#" of an agent question. */
+private class AgentHash(private val color: Color) : VisualTransformation {
+    override fun filter(text: AnnotatedString): androidx.compose.ui.text.input.TransformedText {
+        val i = text.text.indexOf('#')
+        val styled = buildAnnotatedString {
+            append(text)
+            if (i >= 0) addStyle(SpanStyle(color = color), i, i + 1)
+        }
+        return androidx.compose.ui.text.input.TransformedText(styled, androidx.compose.ui.text.input.OffsetMapping.Identity)
     }
 }
 

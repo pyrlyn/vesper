@@ -147,13 +147,16 @@ fun VesperApp(state: AppState, chrome: WindowChrome, onQuit: () -> Unit) {
                     null -> Unit
                 }
             }
-            if (state.settings.showMonitor && state.activeTab is Tab.Terminal) MonitorPanel(state)
+            if (state.settings.showMonitor && state.activeTab is Tab.Terminal) {
+                if (state.sidePanel == app.vesper.app.SidePanel.Agent) AgentPanel(state) else MonitorPanel(state)
+            }
         }
         StatusBar(state)
     }
     if (state.paletteOpen) CommandPalette(state, ui)
     state.hostVerification?.let { HostKeyDialog(state, it) }
     if (state.aboutOpen) AboutDialog(state)
+    state.sharing?.let { ShareDialog(state, it) }
     if (!state.settings.onboarded && state.historyLoaded) Onboarding(state)
     if (state.quitRequested) QuitDialog(state, onQuit)
 }
@@ -229,6 +232,8 @@ private fun runShortcut(action: ShortcutAction, state: AppState, ui: UiActions):
         ShortcutAction.SplitRight -> state.split(horizontal = true)
         ShortcutAction.SplitDown -> state.split(horizontal = false)
         ShortcutAction.Zoom -> tab?.let { state.toggleZoom(it.focused) } ?: return false
+        ShortcutAction.ExplainError -> if (!state.agent.explainLastFailure()) return false
+        ShortcutAction.AgentPanel -> toggleAgentPanel(state)
         ShortcutAction.Find -> {
             val pane = tab?.focused ?: return false
             if (pane.session.fullscreenTerminal() != null) return false
@@ -237,6 +242,13 @@ private fun runShortcut(action: ShortcutAction, state: AppState, ui: UiActions):
         }
     }
     return true
+}
+
+/** Shows the Agent panel, or goes back to Monitor when it is already showing. */
+private fun toggleAgentPanel(state: AppState) {
+    val showing = state.settings.showMonitor && state.sidePanel == app.vesper.app.SidePanel.Agent
+    state.sidePanel = if (showing) app.vesper.app.SidePanel.Monitor else app.vesper.app.SidePanel.Agent
+    if (!state.settings.showMonitor) state.updateSettings { it.copy(showMonitor = true) }
 }
 
 /** Asks first when commands are running; asking again (a second ⌘Q) quits. */
@@ -298,6 +310,7 @@ private fun TitleBar(state: AppState, ui: UiActions, chrome: WindowChrome) {
             Box(Modifier.matchParentSize().clickable { ui.openPalette() })
         }
         Spacer(Modifier.width(4.dp))
+        IconButton(Icons.Sparkles, { toggleAgentPanel(state) }, active = state.settings.showMonitor && state.sidePanel == app.vesper.app.SidePanel.Agent)
         IconButton(Icons.PanelRight, { state.updateSettings { it.copy(showMonitor = !it.showMonitor) } }, active = state.settings.showMonitor)
         IconButton(Icons.Settings, { state.openSettings() }, active = state.activeTab is Tab.Settings)
         chrome.controls?.let {
@@ -452,7 +465,7 @@ private fun Sidebar(state: AppState, ui: UiActions) {
                     }
                 }
             }
-            TipCard(state)
+            AgentSidebarCard(state)
         }
         Box(Modifier.width(1.dp).fillMaxHeight().background(c.borderSubtle))
     }
@@ -503,35 +516,6 @@ private fun SidebarItem(
             Modifier.weight(1f),
         )
         trailing()
-    }
-}
-
-private val Tips = listOf(
-    "Press %K to search commands, history, hosts and workflows.",
-    "Tab accepts the grey suggestion; ↑ walks back through history.",
-    "%\\ splits the pane; %Enter zooms the focused one.",
-    "Shift+Enter adds a line; multi-line commands run as one block.",
-    "Full-screen apps like vim, htop and less get a classic grid automatically.",
-)
-
-@Composable
-private fun TipCard(state: AppState) {
-    val c = Vesper.colors
-    val type = Vesper.type
-    val tipIndex = remember { (nowMillis() / 60_000 % Tips.size).toInt() }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .background(c.accentSoft.copy(alpha = c.accentSoft.alpha * 0.8f), RadiusXl)
-            .border(1.dp, c.accentStrong.copy(alpha = 0.55f), RadiusXl)
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            VIcon(Icons.Sparkles, 14.dp, c.accentText)
-            VText("Tip", type.title, c.textPrimary)
-        }
-        VText(Tips[tipIndex].replace("%", state.services.os.mod), type.caption, c.textSecondary, maxLines = 4)
     }
 }
 
