@@ -1,5 +1,14 @@
 package app.vesper.ui.terminal
 
+import androidx.compose.foundation.text.selection.DisableSelection
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.mutableStateOf
+import app.vesper.ui.components.MenuDivider
+import app.vesper.ui.components.MenuItem
+import app.vesper.ui.components.MenuPopup
+import app.vesper.terminal.FindMatch
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -77,6 +86,11 @@ interface BlockActions {
     fun remove(block: Block)
 }
 
+/** Find-in-output matches to highlight, and which one is current (scrolled into view). */
+class FindHighlight(val matches: List<FindMatch>, val current: Int)
+
+private fun lineKey(blockId: Long, line: Int): Long = (blockId shl 24) or line.toLong()
+
 /**
  * Commands and their output as cards. Uses a reversed lazy list so the view sticks to the
  * newest output unless the user scrolled up; each block is split into per-line items so
@@ -89,6 +103,7 @@ fun BlocksView(
     listState: LazyListState,
     actions: BlockActions,
     modifier: Modifier = Modifier,
+    find: FindHighlight? = null,
 ) {
     val c = Vesper.colors
     val type = Vesper.type
@@ -120,6 +135,25 @@ fun BlocksView(
             else -> Row(b, local - 1)
         }
     }
+
+    // Matches per output line: column ranges, flagged when it is the current one.
+    val highlights = remember(find) {
+        val map = HashMap<Long, MutableList<Pair<IntRange, Boolean>>>()
+        find?.matches?.forEachIndexed { i, m ->
+            map.getOrPut(lineKey(m.blockId, m.line)) { ArrayList() } += (m.start until m.end) to (i == find.current)
+        }
+        map
+    }
+    val target = find?.matches?.getOrNull(find.current)
+    LaunchedEffect(target) {
+        if (target == null) return@LaunchedEffect
+        val bi = blocks.indexOfFirst { it.id == target.blockId }
+        if (bi < 0) return@LaunchedEffect
+        val item = total - 1 - (starts[bi] + 1 + target.line)
+        if (listState.layoutInfo.visibleItemsInfo.none { it.index == item }) listState.scrollToItem((item - 4).coerceAtLeast(0))
+    }
+    val matchBg = c.warning.copy(alpha = 0.28f)
+    val currentBg = c.warning.copy(alpha = 0.7f)
 
     SelectionContainer(modifier) {
         LazyColumn(
@@ -165,10 +199,22 @@ fun BlocksView(
                             val t = r.block.terminal
                             if (r.line < t.mainLineCount()) renderLine(t.mainLine(r.line), palette) else null
                         }
+                        val marks = highlights[lineKey(r.block.id, r.line)]
                         Box(
                             Modifier.fillMaxWidth().height(with(androidx.compose.ui.platform.LocalDensity.current) { cell.height.toDp() }.coerceAtLeast(20.dp))
                                 .cardSegment(Seg.Middle, bg, edge, running)
-                                .padding(start = BlockMetrics.OutputStart, end = BlockMetrics.OutputEnd),
+                                .padding(start = BlockMetrics.OutputStart, end = BlockMetrics.OutputEnd)
+                                .then(
+                                    if (marks == null) Modifier else Modifier.drawBehind {
+                                        for ((cols, current) in marks) {
+                                            drawRect(
+                                                if (current) currentBg else matchBg,
+                                                Offset(cols.first * cell.width, 0f),
+                                                Size((cols.last + 1 - cols.first) * cell.width, size.height),
+                                            )
+                                        }
+                                    },
+                                ),
                             contentAlignment = Alignment.CenterStart,
                         ) {
                             if (render != null) TermRow(render, codeStyle, cell.width)
@@ -252,18 +298,37 @@ private fun BlockHeader(block: Block, actions: BlockActions, revision: Long) {
     val type = Vesper.type
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
+    var menu by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().hoverable(source).padding(horizontal = 14.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().hoverable(source)
+            .pointerInput(block.id) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val e = awaitPointerEvent()
+                        if (e.type == PointerEventType.Press && e.buttons.isSecondaryPressed) {
+                            e.changes.forEach { it.consume() }
+                            menu = true
+                        }
+                    }
+                }
+            }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StatusIcon(block.status)
         VText("›", type.command, c.textMuted)
         VText(block.command, type.command, c.textPrimary, Modifier.weight(1f))
-        if (hovered && !block.isRunning) {
-            IconButton(Icons.Copy, { actions.copy(block.terminal.let { t -> synchronized(t.lock) { t.plainText() } }) }, size = 13.dp, padding = 4.dp)
+        if ((hovered || menu) && !block.isRunning) {
+            IconButton(Icons.Copy, { actions.copy(outputOf(block)) }, size = 13.dp, padding = 4.dp)
             IconButton(Icons.RotateCcw, { actions.rerun(block) }, size = 13.dp, padding = 4.dp)
-            IconButton(Icons.Trash, { actions.remove(block) }, size = 13.dp, padding = 4.dp)
+        }
+        if (hovered || menu) {
+            Box {
+                IconButton(Icons.More, { menu = true }, size = 13.dp, padding = 4.dp)
+                // The popup is a separate layout tree; selecting its text inside the SelectionContainer crashes.
+                if (menu) DisableSelection { BlockMenu(block, actions) { menu = false } }
+            }
         }
         when (block.status) {
             BlockStatus.Running -> RunningMeta(block, actions)
@@ -273,6 +338,22 @@ private fun BlockHeader(block: Block, actions: BlockActions, revision: Long) {
         }
         if (!block.isRunning) VText(formatDuration(block.durationMs), type.meta, c.textMuted)
         VText(formatClock(block.startedAt), type.meta, c.textMuted)
+    }
+}
+
+private fun outputOf(block: Block): String = block.terminal.let { t -> synchronized(t.lock) { t.plainText() } }.trimEnd()
+
+@Composable
+private fun BlockMenu(block: Block, actions: BlockActions, dismiss: () -> Unit) {
+    MenuPopup(dismiss) {
+        MenuItem("Copy command", { dismiss(); actions.copy(block.command) }, Icons.Copy)
+        MenuItem("Copy output", { dismiss(); actions.copy(outputOf(block)) }, Icons.Copy)
+        if (!block.isRunning) MenuItem("Rerun", { dismiss(); actions.rerun(block) }, Icons.RotateCcw)
+        if (block.isRunning) MenuItem("Stop", { dismiss(); actions.stop(block) }, Icons.Stop)
+        if (!block.isRunning) {
+            MenuDivider()
+            MenuItem("Delete block", { dismiss(); actions.remove(block) }, Icons.Trash, danger = true)
+        }
     }
 }
 

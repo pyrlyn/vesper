@@ -5,6 +5,12 @@ expect fun nowMillis(): Long
 /** Local wall-clock time, e.g. "14:29:58" (seconds) or "14:30". */
 expect fun formatClock(epochMillis: Long, seconds: Boolean = true): String
 
+/** Local calendar day as days since 1970-01-01, for grouping by day. */
+expect fun localDay(epochMillis: Long): Long
+
+/** Local date, e.g. "Mon, 12 Nov". */
+expect fun formatDay(epochMillis: Long): String
+
 fun formatDuration(ms: Long): String = when {
     ms < 1_000 -> "${(ms / 10) / 100.0}s".let { if (ms < 10) "0.01s" else it }
     ms < 10_000 -> "${(ms / 10) / 100.0}s"

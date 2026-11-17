@@ -1,5 +1,7 @@
 package app.vesper.platform
 
+import kotlinx.serialization.builtins.ListSerializer
+import app.vesper.app.HistoryEntry
 import app.vesper.app.AppServices
 import app.vesper.app.HostEntry
 import app.vesper.app.PromptContext
@@ -31,6 +33,7 @@ class JvmServices : AppServices {
     override val os: HostOs = HostOs.current
     override val homeDir: String = Paths.home.path
     private val settingsFile = File(Paths.configDir, "settings.json")
+    private val historyFile = File(Paths.configDir, "history.json")
     override val configPath: String = settingsFile.path
     override val appVersion: String = Paths.appVersion
     override val monitor: SystemMonitor by lazy { OshiMonitor() }
@@ -71,6 +74,35 @@ class JvmServices : AppServices {
         tmp.writeText(json.encodeToString(Settings.serializer(), settings))
         Files.move(tmp.toPath(), settingsFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     }
+
+    // ── History ──────────────────────────────────────────────────────────
+
+    override fun loadHistory(): List<HistoryEntry> = runCatching {
+        if (historyFile.isFile) json.decodeFromString(historyListSerializer, historyFile.readText()) else emptyList()
+    }.getOrDefault(emptyList())
+
+    @Synchronized
+    override fun saveHistory(history: List<HistoryEntry>) {
+        historyFile.parentFile?.mkdirs()
+        val tmp = File(historyFile.parentFile, historyFile.name + ".tmp")
+        tmp.writeText(compactJson.encodeToString(historyListSerializer, history))
+        Files.move(tmp.toPath(), historyFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+    }
+
+    private val historyListSerializer = ListSerializer(HistoryEntry.serializer())
+    private val compactJson = Json { ignoreUnknownKeys = true }
+
+    override fun exportFile(fileName: String, content: String): String? = runCatching {
+        val dir = File(Paths.home, "Downloads").takeIf { it.isDirectory } ?: Paths.home
+        val safe = fileName.replace(Regex("[^A-Za-z0-9._-]"), "-").ifEmpty { "vesper-export.txt" }
+        val base = safe.substringBeforeLast('.')
+        val ext = safe.substringAfterLast('.', "")
+        var file = File(dir, safe)
+        var n = 2
+        while (file.exists()) file = File(dir, if (ext.isEmpty()) "$base-$n" else "$base-$n.$ext").also { n++ }
+        file.writeText(content)
+        file.path
+    }.getOrNull()
 
     // ── SSH config ───────────────────────────────────────────────────────
 

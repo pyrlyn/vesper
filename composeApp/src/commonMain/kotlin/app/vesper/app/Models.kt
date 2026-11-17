@@ -89,7 +89,17 @@ data class HostEntry(
     }
 }
 
-data class HistoryEntry(val command: String, val at: Long, val cwd: String)
+/** A finished command. [exitCode] is null when the shell did not report one. */
+@Serializable
+data class HistoryEntry(
+    val command: String,
+    val at: Long,
+    val cwd: String,
+    val exitCode: Int? = null,
+    val durationMs: Long = 0,
+) {
+    val failed: Boolean get() = exitCode != null && exitCode != 0
+}
 
 /** What the prompt chips show for the current directory. */
 data class PromptContext(
@@ -149,6 +159,11 @@ interface AppServices {
 
     fun loadSettings(): Settings
     fun saveSettings(settings: Settings)
+    fun loadHistory(): List<HistoryEntry>
+    fun saveHistory(history: List<HistoryEntry>)
+
+    /** Writes [content] to a new file named like [fileName] in Downloads (or home); returns its path. */
+    fun exportFile(fileName: String, content: String): String?
     fun sshHosts(): List<HostEntry>
     fun shellHistory(limit: Int): List<String>
 

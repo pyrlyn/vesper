@@ -107,6 +107,9 @@ class TerminalSession(
     private val pty: PtyConnection
     val pid: Long get() = pty.pid
 
+    /** Called on the reader thread, under [lock], when a command's block finishes. */
+    @Volatile var onBlockFinished: ((Block) -> Unit)? = null
+
     private val router = object : VtHandler {
         override fun print(cp: Int) = current.print(cp)
         override fun execute(code: Int) = current.execute(code)
@@ -258,6 +261,7 @@ class TerminalSession(
         if (block.terminal.isAltScreen) block.terminal.feed("\u001b[?1049l")
         altScreen = false
         if (block.command == "clear" || block.command == "reset") blocks.remove(block)
+        if (block.command.isNotBlank()) runCatching { onBlockFinished?.invoke(block) }
     }
 
     @Volatile private var invalidatePending = false

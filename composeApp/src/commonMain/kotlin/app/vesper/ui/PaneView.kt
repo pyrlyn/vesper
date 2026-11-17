@@ -1,5 +1,18 @@
 package app.vesper.ui
 
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import app.vesper.ui.terminal.FindHighlight
+import app.vesper.terminal.findInBlocks
+import app.vesper.terminal.findPattern
+import app.vesper.app.FindState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -118,6 +131,17 @@ fun PaneView(
                 override fun remove(block: Block) = session.removeBlock(block)
             }
         }
+        val find = pane.find
+        val pattern = remember(find.query, find.caseSensitive, find.regex) { findPattern(find.query, find.caseSensitive, find.regex) }
+        val matches = remember(find.open, pattern, session.revision) {
+            if (!find.open || pattern == null) emptyList() else synchronized(session.lock) { findInBlocks(blocks, pattern) }
+        }
+        // A new query starts at the newest match (index -1); next/previous wrap around.
+        val current = when {
+            matches.isEmpty() -> -1
+            find.index < 0 -> matches.lastIndex
+            else -> find.index.coerceAtMost(matches.lastIndex)
+        }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
                 fullscreen != null -> GridView(session, fullscreen, palette, focus.grid, state.services.os == app.vesper.platform.HostOs.MacOS)
@@ -125,15 +149,94 @@ fun PaneView(
                 else -> {
                     val listState = rememberLazyListState()
                     BlocksSizer(pane)
-                    BlocksView(session, palette, listState, blockActions, Modifier.fillMaxSize())
-                    LaunchedEffect(running?.id) { if (running != null) listState.scrollToItem(0) }
+                    val highlight = remember(matches, current) { if (find.open) FindHighlight(matches, current) else null }
+                    BlocksView(session, palette, listState, blockActions, Modifier.fillMaxSize(), highlight)
+                    LaunchedEffect(running?.id) { if (running != null && !find.open) listState.scrollToItem(0) }
                 }
+            }
+            if (find.open && fullscreen == null) {
+                FindBar(
+                    find,
+                    count = matches.size,
+                    current = current,
+                    invalid = find.query.isNotEmpty() && pattern == null,
+                    onMove = { delta -> if (matches.isNotEmpty()) find.index = (current + delta).mod(matches.size) },
+                    onClose = {
+                        find.open = false
+                        runCatching { focus.prompt.requestFocus() }
+                    },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 18.dp),
+                )
             }
         }
         if (fullscreen == null) {
             PromptBar(pane, rememberPromptActions(state, ui, pane), focus.prompt, state.services.displayPath(session.cwd))
         }
     }
+}
+
+/** Find in output: query, case and regex toggles, match count, previous/next. */
+@Composable
+private fun FindBar(
+    find: FindState,
+    count: Int,
+    current: Int,
+    invalid: Boolean,
+    onMove: (Int) -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier,
+) {
+    val c = Vesper.colors
+    val type = Vesper.type
+    val field = remember { FocusRequester() }
+    LaunchedEffect(find.focusRequests) {
+        withFrameNanos { } // the field is attached only after the first frame
+        runCatching { field.requestFocus() }
+    }
+    app.vesper.ui.components.SearchField(
+        find.query,
+        { find.query = it; find.index = -1 },
+        "Find in output",
+        modifier
+            .width(420.dp)
+            .background(c.bgElevated, app.vesper.ui.components.RadiusMd)
+            .onPreviewKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (e.key) {
+                    Key.Enter, Key.NumPadEnter -> onMove(if (e.isShiftPressed) -1 else 1)
+                    Key.DirectionDown -> onMove(1)
+                    Key.DirectionUp -> onMove(-1)
+                    Key.Escape -> onClose()
+                    else -> return@onPreviewKeyEvent false
+                }
+                true
+            },
+        focusRequester = field,
+    ) {
+        FindToggle("Aa", find.caseSensitive) { find.caseSensitive = !find.caseSensitive; find.index = -1 }
+        FindToggle(".*", find.regex) { find.regex = !find.regex; find.index = -1 }
+        val label = when {
+            invalid -> "bad regex"
+            find.query.isEmpty() -> ""
+            count == 0 -> "no results"
+            else -> "${current + 1} of $count${if (count >= 10_000) "+" else ""}"
+        }
+        VText(label, type.meta, if (invalid) c.danger else c.textMuted, Modifier.padding(horizontal = 6.dp))
+        IconButton(Icons.ChevronUp, { onMove(-1) }, size = 13.dp, padding = 4.dp)
+        IconButton(Icons.ChevronDown, { onMove(1) }, size = 13.dp, padding = 4.dp)
+        IconButton(Icons.X, onClose, size = 13.dp, padding = 4.dp)
+    }
+}
+
+@Composable
+private fun FindToggle(label: String, active: Boolean, onClick: () -> Unit) {
+    val c = Vesper.colors
+    Box(
+        Modifier.padding(start = 4.dp)
+            .background(if (active) c.accentSoft else Color.Transparent, app.vesper.ui.components.RadiusXs)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+    ) { VText(label, Vesper.type.codeSmall, if (active) c.accentText else c.textMuted) }
 }
 
 /** Keeps the PTY size in step with the blocks area. */
@@ -299,7 +402,7 @@ private fun EmptyState(state: AppState, ui: UiActions, pane: Pane) {
                 }
             },
             { m -> ActionCard(Icons.Server, "Connect to a host", "${state.allHosts().size} known hosts", "$mod${shift}H", m) { state.openHosts() } },
-            { m -> ActionCard(Icons.Search, "Search history", "Commands, dirs, hosts", "${mod}K", m) { ui.openPalette() } },
+            { m -> ActionCard(Icons.Search, "Search history", "Commands, exit codes, dirs", "${mod}Y", m) { state.openHistory() } },
             { m -> ActionCard(Icons.Columns, "Split pane", "Work side by side", "$mod\\", m) { state.split(true) } },
         )
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.widthIn(max = 720.dp)) {

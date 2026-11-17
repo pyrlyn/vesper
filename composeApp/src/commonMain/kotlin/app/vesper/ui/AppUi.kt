@@ -137,6 +137,7 @@ fun VesperApp(state: AppState, chrome: WindowChrome, onQuit: () -> Unit) {
                     is Tab.Terminal -> TerminalTabView(state, ui, tab, focuses)
                     is Tab.Settings -> SettingsScreen(state, tab)
                     is Tab.Hosts -> HostsScreen(state, tab)
+                    is Tab.History -> HistoryScreen(state, tab)
                     null -> Unit
                 }
             }
@@ -185,6 +186,13 @@ private fun handleShortcut(e: KeyEvent, state: AppState, ui: UiActions, clipboar
         Key.Backslash -> state.split(horizontal = !shift)
         Key.D -> state.split(horizontal = !shift)
         Key.H -> if (shift) state.openHosts() else return false
+        Key.Y -> state.openHistory()
+        Key.F -> {
+            val pane = tab?.focused ?: return false
+            if (pane.session.fullscreenTerminal() != null) return false
+            pane.find.open = true
+            pane.find.focusRequests++
+        }
         Key.B -> state.updateSettings { it.copy(showSidebar = !it.showSidebar) }
         Key.J -> state.updateSettings { it.copy(showMonitor = !it.showMonitor) }
         Key.Enter -> tab?.let { state.toggleZoom(it.focused) }
@@ -318,6 +326,7 @@ private fun tabLook(state: AppState, tab: Tab): TabLook {
     return when (tab) {
         is Tab.Settings -> TabLook(Icons.Settings, null, "Settings")
         is Tab.Hosts -> TabLook(Icons.Globe, null, "Hosts")
+        is Tab.History -> TabLook(Icons.History, null, "History")
         is Tab.Terminal -> {
             @Suppress("UNUSED_VARIABLE")
             val rev = tab.focused.session.revision
@@ -400,7 +409,7 @@ private fun Sidebar(state: AppState, ui: UiActions) {
                         }
                     }
                 }
-                val history = state.history.asReversed().take(6).map { it.command to it.at }
+                val history = state.history.asReversed().distinctBy { it.command }.take(6).map { it.command to it.at }
                     .ifEmpty { state.shellHistory.asReversed().distinct().take(4).map { it to -1L } }
                 if (history.isNotEmpty()) {
                     var now by remember { mutableLongStateOf(nowMillis()) }
@@ -410,7 +419,7 @@ private fun Sidebar(state: AppState, ui: UiActions) {
                             now = nowMillis()
                         }
                     }
-                    SidebarSection("History", null) {
+                    SidebarSection("History", "all", onAction = { state.openHistory() }) {
                         history.forEach { (cmd, at) ->
                             SidebarItem(Icons.ChevronRight, cmd, false, mono = true, onClick = {
                                 state.focusedPane?.draft = cmd

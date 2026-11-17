@@ -108,6 +108,10 @@ private fun buildItems(state: AppState, ui: UiActions): List<PaletteItem> {
         state.updateSettings { it.copy(showSidebar = !it.showSidebar) }
     }
     cmd("Hosts", "Manage SSH hosts", Icons.Server, "$mod${shift}H") { state.openHosts() }
+    cmd("History", "Search finished commands, failures and durations", Icons.History, "${mod}Y") { state.openHistory() }
+    cmd("Find in output", "Search the focused pane's blocks", Icons.Search, "${mod}F") {
+        state.focusedPane?.find?.let { it.open = true; it.focusRequests++ }
+    }
     cmd("Settings", "Theme, fonts, shell and more", Icons.Settings, "$mod,") { state.openSettings() }
     cmd("Keyboard shortcuts", "All key bindings", Icons.Keyboard) { state.openSettings(SettingsSection.Keybindings) }
     for (t in ThemeId.entries) {

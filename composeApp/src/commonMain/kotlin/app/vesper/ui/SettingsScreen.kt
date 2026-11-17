@@ -476,6 +476,8 @@ private fun keybindings(os: HostOs): List<Pair<String, String>> {
         "Toggle sidebar" to "${m}B",
         "Toggle monitor" to "${m}J",
         "Hosts" to "$m${s}H",
+        "History" to "${m}Y",
+        "Find in output" to "${m}F",
         "Settings" to "$m,",
         "Accept suggestion" to "⇥",
         "Previous command" to "↑",
@@ -553,8 +555,8 @@ private fun updateWorkflow(state: AppState, index: Int, f: (Workflow) -> Workflo
 private fun PrivacySection(state: AppState) {
     Header("Privacy", "Everything stays on this machine. Vesper sends nothing anywhere.")
     Group("History") {
-        SettingRow("Vesper history", "${state.history.size} commands from this run, used for suggestions") {
-            VButton("Clear", { state.history.clear() }, icon = Icons.Trash, kind = ButtonKind.Danger)
+        SettingRow("Vesper history", "${state.history.size} commands saved for History and suggestions") {
+            VButton("Clear", { state.clearHistory() }, icon = Icons.Trash, kind = ButtonKind.Danger)
         }
         SettingRow("Recent directories", "${state.settings.recentDirs.size} directories", last = true) {
             VButton("Clear", { state.updateSettings { it.copy(recentDirs = emptyList()) } }, icon = Icons.Trash, kind = ButtonKind.Danger)

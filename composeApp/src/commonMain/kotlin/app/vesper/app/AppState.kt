@@ -19,6 +19,7 @@ enum class PaneKind { Local, Ssh, Database, Logs }
 class Pane(val session: TerminalSession, val launchCommand: String?) {
     var context by mutableStateOf(PromptContext())
     var draft by mutableStateOf("")
+    val find = FindState()
 
     /** Kind of the current foreground command (or the command the pane was opened with). */
     fun kind(): PaneKind {
@@ -51,6 +52,20 @@ class Pane(val session: TerminalSession, val launchCommand: String?) {
     }
 }
 
+/** Find in output (⌘F) for one pane. */
+class FindState {
+    var open by mutableStateOf(false)
+    var query by mutableStateOf("")
+    var caseSensitive by mutableStateOf(false)
+    var regex by mutableStateOf(false)
+
+    /** Index of the current match; moved by next/previous. */
+    var index by mutableIntStateOf(0)
+
+    /** Bumped to ask the find field to take focus (it may already be open). */
+    var focusRequests by mutableIntStateOf(0)
+}
+
 sealed class PaneNode {
     class Leaf(val pane: Pane) : PaneNode()
     class Split(val horizontal: Boolean, first: PaneNode, second: PaneNode) : PaneNode() {
@@ -78,6 +93,14 @@ sealed class Tab(val id: Int) {
 
     class Hosts(id: Int) : Tab(id) {
         var selected by mutableStateOf<String?>(null)
+    }
+
+    class History(id: Int) : Tab(id) {
+        var query by mutableStateOf("")
+        var thisDirectory by mutableStateOf<String?>(null)
+        var failedOnly by mutableStateOf(false)
+        var lastWeek by mutableStateOf(false)
+        var selected by mutableStateOf<HistoryEntry?>(null)
     }
 }
 
@@ -113,6 +136,7 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
     var gridSize by mutableStateOf(0 to 0)
 
     private var nextId = 1
+    private var historyLoaded = false
 
     val activeTab: Tab? get() = tabs.firstOrNull { it.id == activeTabId } ?: tabs.firstOrNull()
 
@@ -122,9 +146,13 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
         scope.launch(Dispatchers.Default) {
             val hosts = runCatching { services.sshHosts() }.getOrDefault(emptyList())
             val hist = runCatching { services.shellHistory(2000) }.getOrDefault(emptyList())
+            val own = runCatching { services.loadHistory() }.getOrDefault(emptyList())
             withContext(Dispatchers.Main) {
                 sshHosts = hosts
                 shellHistory = hist
+                // Commands finished before the file was read stay after the loaded ones.
+                history.addAll(0, own.takeLast(MaxHistory))
+                historyLoaded = true
             }
         }
     }
@@ -146,6 +174,10 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
         val dir = cwd?.takeIf { services.exists(it) } ?: services.homeDir
         val session = services.createSession(nextId++, dir, settings.shell, scope, 120, 38) { which -> colorReply(which) }
         val pane = Pane(session, command)
+        session.onBlockFinished = { block ->
+            val entry = HistoryEntry(block.command, block.startedAt, block.cwd, block.exitCode, block.durationMs)
+            scope.launch(Dispatchers.Main) { record(entry) }
+        }
         if (command != null) launchWhenReady(pane, command)
         refreshContext(pane)
         rememberDir(dir)
@@ -182,6 +214,11 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
         val existing = tabs.filterIsInstance<Tab.Settings>().firstOrNull()
         val tab = existing ?: Tab.Settings(nextId++).also { tabs += it }
         if (section != null) tab.section = section
+        activeTabId = tab.id
+    }
+
+    fun openHistory() {
+        val tab = tabs.filterIsInstance<Tab.History>().firstOrNull() ?: Tab.History(nextId++).also { tabs += it }
         activeTabId = tab.id
     }
 
@@ -264,13 +301,45 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
     fun run(pane: Pane, command: String) {
         val trimmed = command.trim()
         if (trimmed.isEmpty()) return
-        val wasIdle = pane.session.currentBlock() == null
         pane.session.submit(trimmed)
-        if (wasIdle) {
-            history.removeAll { it.command == trimmed }
-            history.add(HistoryEntry(trimmed, nowMillis(), pane.session.cwd))
-            if (history.size > 500) history.removeRange(0, history.size - 500)
-        }
+    }
+
+    /** Adds a finished command to the history and saves it. */
+    private fun record(entry: HistoryEntry) {
+        history.add(entry)
+        if (history.size > MaxHistory) history.removeRange(0, history.size - MaxHistory)
+        saveHistory()
+    }
+
+    /** The terminal tab used last, made active (a new one in [cwd] if there is none). */
+    private fun terminalForHistory(cwd: String): Pane {
+        val tab = tabs.filterIsInstance<Tab.Terminal>().lastOrNull() ?: return newTerminalTab(cwd).focused
+        activeTabId = tab.id
+        return tab.focused
+    }
+
+    fun runAgain(entry: HistoryEntry) = run(terminalForHistory(entry.cwd), entry.command)
+
+    fun insertIntoPrompt(command: String) {
+        terminalForHistory(services.homeDir).draft = command
+    }
+
+    /** Saves [command] as a one-step workflow; false when one with the same steps exists. */
+    fun saveAsWorkflow(command: String): Boolean {
+        if (settings.workflows.any { it.steps == listOf(command) }) return false
+        updateSettings { it.copy(workflows = it.workflows + Workflow(commandKey(command), listOf(command))) }
+        return true
+    }
+
+    fun clearHistory() {
+        history.clear()
+        saveHistory()
+    }
+
+    private fun saveHistory() {
+        if (!historyLoaded) return // would overwrite the file with a partial list
+        val snapshot = history.toList()
+        scope.launch(Dispatchers.Default) { runCatching { services.saveHistory(snapshot) } }
     }
 
     fun runInFocused(command: String) {
@@ -316,6 +385,10 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
     fun hasRunningProcesses(): List<Pair<Pane, String>> = tabs.filterIsInstance<Tab.Terminal>()
         .flatMap { it.root.panes() }
         .mapNotNull { p -> p.session.currentBlock()?.let { p to it.command } }
+
+    companion object {
+        const val MaxHistory = 5000
+    }
 
     fun shutdown() {
         tabs.filterIsInstance<Tab.Terminal>().flatMap { it.root.panes() }.forEach { it.session.close() }
