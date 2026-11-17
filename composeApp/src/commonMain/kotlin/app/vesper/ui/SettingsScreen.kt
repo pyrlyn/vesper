@@ -1,5 +1,29 @@
 package app.vesper.ui
 
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
+import app.vesper.ui.components.FilterChip
+import app.vesper.app.reservedCombo
+import app.vesper.app.shortcutConflicts
+import app.vesper.app.comboFor
+import app.vesper.app.KeyNames
+import app.vesper.app.KeyCombo
+import app.vesper.app.ShortcutCategory
+import app.vesper.app.ShortcutAction
 import kotlin.math.roundToInt
 import app.vesper.app.WindowMaterial
 import app.vesper.ui.components.VSlider
@@ -346,7 +370,7 @@ private fun MaterialCard(title: String, subtitle: String, glass: Boolean, active
 }
 
 @Composable
-private fun ThemeCard(theme: ThemeId, accent: AccentId, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
+internal fun ThemeCard(theme: ThemeId, accent: AccentId, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val c = Vesper.colors
     val type = Vesper.type
     val t = colorsFor(theme, accent)
@@ -460,45 +484,200 @@ private fun TerminalSection(state: AppState) {
     }
 }
 
-private fun keybindings(os: HostOs): List<Pair<String, String>> {
+private fun fixedKeys(os: HostOs): List<Pair<String, String>> {
     val m = os.mod
-    val s = os.shift
-    return listOf(
-        "Command palette" to "${m}K",
-        "New tab" to "${m}T",
-        "Close pane / tab" to "${m}W",
-        "Go to tab 1–9" to "${m}1 … ${m}9",
-        "Previous / next tab" to "$m[  $m]",
-        "Split right" to "$m\\  or  ${m}D",
-        "Split down" to "$m$s\\  or  $m${s}D",
-        "Zoom pane" to "$m⏎",
-        "Move focus between panes" to "$m${os.alt}←→",
-        "Toggle sidebar" to "${m}B",
-        "Toggle monitor" to "${m}J",
-        "Hosts" to "$m${s}H",
-        "History" to "${m}Y",
-        "Find in output" to "${m}F",
-        "Settings" to "$m,",
-        "Accept suggestion" to "⇥",
-        "Previous command" to "↑",
-        "New line in prompt" to "${s}⏎",
-        "Interrupt" to "Ctrl+C",
-    )
+    return buildList {
+        add("Go to tab 1–9" to "${m}1 … ${m}9")
+        add("Move focus between panes" to "$m${os.alt}←→")
+        add("Split right / down" to "$m\\  $m${os.shift}\\")
+        if (os == HostOs.MacOS) add("Quit" to "${m}Q")
+        add("Accept suggestion" to "⇥")
+        add("Previous command" to "↑")
+        add("New line in prompt" to "${os.shift}⏎")
+        add("Interrupt" to "Ctrl+C")
+    }
+}
+
+private fun setShortcut(state: AppState, action: ShortcutAction, combo: KeyCombo?) {
+    state.updateSettings { s ->
+        val map = s.keybindings.toMutableMap()
+        if (combo == action.default) map.remove(action.name) else map[action.name] = combo?.toString() ?: ""
+        s.copy(keybindings = map)
+    }
 }
 
 @Composable
 private fun KeybindingsSection(state: AppState) {
     val c = Vesper.colors
-    Header("Keybindings", if (state.services.os == HostOs.MacOS) "Shortcuts use ⌘." else "Shortcuts use Ctrl; add Shift while a full-screen program (vim, htop) has focus.")
-    Group("Shortcuts") {
-        val list = keybindings(state.services.os)
-        list.forEachIndexed { i, (name, key) ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                VText(name, Vesper.type.body, c.textPrimary, Modifier.weight(1f))
-                Kbd(key)
-            }
-            if (i < list.lastIndex) Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
+    val type = Vesper.type
+    val os = state.services.os
+    var query by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf<ShortcutCategory?>(null) }
+    var conflictsOnly by remember { mutableStateOf(false) }
+    var recording by remember { mutableStateOf<ShortcutAction?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    DisposableEffect(recording) {
+        state.recordingShortcut = recording != null
+        onDispose { state.recordingShortcut = false }
+    }
+    val settings = state.settings
+    val conflicts = settings.shortcutConflicts()
+
+    Row(verticalAlignment = Alignment.Top) {
+        Column(Modifier.weight(1f)) {
+            Header("Keybindings", "Click a shortcut to record a new one. Conflicts are flagged. Shortcuts use ${if (os == HostOs.MacOS) "⌘" else "Ctrl; add Shift while a full-screen program has focus"}.")
         }
+        if (settings.keybindings.isNotEmpty()) VButton("Reset all", { state.updateSettings { it.copy(keybindings = emptyMap()) } }, icon = Icons.RotateCcw)
+    }
+    Row(Modifier.padding(bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        app.vesper.ui.components.SearchField(query, { query = it }, "Search shortcuts", Modifier.weight(1f).widthIn(max = 280.dp))
+        Spacer(Modifier.width(4.dp))
+        FilterChip("All", category == null && !conflictsOnly) { category = null; conflictsOnly = false }
+        ShortcutCategory.entries.forEach { cat -> FilterChip(cat.title, category == cat) { category = if (category == cat) null else cat } }
+        if (conflicts.isNotEmpty()) {
+            val clashes = conflicts.keys.mapNotNull { settings.comboFor(it) }.toSet().size
+            FilterChip("$clashes conflict${if (clashes > 1) "s" else ""}", true, danger = true) { conflictsOnly = !conflictsOnly }
+        }
+    }
+    notice?.let { VText(it, type.caption, c.warning, Modifier.padding(bottom = 10.dp)) }
+
+    val q = query.trim().lowercase()
+    for (cat in ShortcutCategory.entries) {
+        if (category != null && category != cat) continue
+        val actions = ShortcutAction.entries.filter { a ->
+            a.category == cat &&
+                (!conflictsOnly || a in conflicts) &&
+                (q.isEmpty() || q in a.title.lowercase() || q in a.description.lowercase() || q in (settings.comboFor(a)?.label(os)?.lowercase() ?: ""))
+        }
+        if (actions.isEmpty()) continue
+        Group(cat.title) {
+            actions.forEachIndexed { i, action ->
+                ShortcutRow(
+                    state,
+                    action,
+                    combo = settings.comboFor(action),
+                    conflict = conflicts[action],
+                    recording = recording == action,
+                    onRecord = { recording = action; notice = null },
+                    onDone = { recording = null },
+                    onNotice = { notice = it },
+                )
+                if (i < actions.lastIndex) Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
+            }
+        }
+    }
+    if (category == null && !conflictsOnly) {
+        val fixed = fixedKeys(os).filter { q.isEmpty() || q in it.first.lowercase() }
+        if (fixed.isNotEmpty()) Group("Fixed") {
+            fixed.forEachIndexed { i, (name, key) ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    VText(name, type.body, c.textPrimary, Modifier.weight(1f))
+                    Kbd(key)
+                }
+                if (i < fixed.lastIndex) Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShortcutRow(
+    state: AppState,
+    action: ShortcutAction,
+    combo: KeyCombo?,
+    conflict: ShortcutAction?,
+    recording: Boolean,
+    onRecord: () -> Unit,
+    onDone: () -> Unit,
+    onNotice: (String?) -> Unit,
+) {
+    val c = Vesper.colors
+    val type = Vesper.type
+    val os = state.services.os
+    val bg = when {
+        recording -> c.accentSoft
+        conflict != null -> c.dangerSoft
+        else -> Color.Transparent
+    }
+    Row(
+        Modifier.fillMaxWidth().background(bg).padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            VText(action.title, type.bodyMedium, c.textPrimary)
+            when {
+                recording -> VText("Recording a new shortcut · ⌫ removes it", type.caption, c.textMuted)
+                conflict != null -> VText("Conflicts with \"${conflict.title}\" (${state.settings.comboFor(conflict)?.label(os)})", type.caption, c.danger)
+                action.description.isNotEmpty() -> VText(action.description, type.caption, c.textMuted)
+            }
+        }
+        if (recording) {
+            ShortcutRecorder(os, onCancel = onDone, onNotice = onNotice) { combo ->
+                setShortcut(state, action, combo)
+                onDone()
+            }
+        } else {
+            if (combo == null) {
+                VText("none", type.meta, c.textMuted)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { combo.caps(os).forEach { Kbd(it) } }
+            }
+            if (conflict != null) VButton("Resolve", onRecord, icon = Icons.AlertTriangle, kind = ButtonKind.Danger)
+            if (state.settings.keybindings.containsKey(action.name)) {
+                IconButton(Icons.RotateCcw, { setShortcut(state, action, action.default) }, size = 13.dp, padding = 5.dp)
+            }
+        }
+        IconButton(Icons.Pencil, if (recording) onDone else onRecord, size = 13.dp, padding = 5.dp, active = recording)
+    }
+}
+
+/** Captures the next shortcut. Esc cancels; Backspace clears the binding (null). */
+@Composable
+private fun ShortcutRecorder(os: HostOs, onCancel: () -> Unit, onNotice: (String?) -> Unit, onRecorded: (KeyCombo?) -> Unit) {
+    val c = Vesper.colors
+    val focus = remember { FocusRequester() }
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        runCatching { focus.requestFocus() }
+    }
+    Row(
+        Modifier
+            .focusRequester(focus)
+            .onFocusChanged { f -> if (focused && !f.isFocused) onCancel(); focused = f.isFocused }
+            .focusable()
+            .onPreviewKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
+                val name = KeyNames[e.key]
+                val mod = if (os == HostOs.MacOS) e.isMetaPressed else e.isCtrlPressed
+                when {
+                    e.key == Key.Escape -> onCancel()
+                    (e.key == Key.Backspace || e.key == Key.Delete) && !mod -> onRecorded(null)
+                    name == null -> Unit // a modifier on its own, or a key shortcuts can't use
+                    !mod -> onNotice("Shortcuts start with ${os.mod.removeSuffix("+")}.")
+                    else -> {
+                        val combo = KeyCombo(name, e.isShiftPressed, e.isAltPressed)
+                        val reserved = reservedCombo(combo, os)
+                        if (reserved != null) {
+                            onNotice("${combo.label(os)} is kept for $reserved.")
+                        } else {
+                            onNotice(null)
+                            onRecorded(combo)
+                        }
+                    }
+                }
+                true
+            }
+            .background(c.bgInset, RadiusMd)
+            .border(1.dp, c.accentStrong, RadiusMd)
+            .padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        app.vesper.ui.components.StatusDot(c.danger)
+        VText("Press keys…", Vesper.type.meta, c.textSecondary)
+        Kbd("esc")
     }
 }
 
@@ -570,7 +749,9 @@ private fun AboutSection(state: AppState) {
     val type = Vesper.type
     Header("About", "A modern terminal with command blocks, built with Kotlin Multiplatform and Compose.")
     Group("Vesper") {
-        SettingRow("Version", state.services.appVersion) { Badge(state.services.os.name, Tone.Neutral) }
+        SettingRow("Version", "${state.services.appVersion} · ${state.services.systemInfo}") {
+            VButton("About Vesper", { state.aboutOpen = true }, icon = Icons.Info)
+        }
         SettingRow("Settings file", state.services.displayPath(state.services.configPath)) {
             VButton("Reveal", { state.services.revealInFileManager(state.services.configPath) }, icon = Icons.Folder)
         }

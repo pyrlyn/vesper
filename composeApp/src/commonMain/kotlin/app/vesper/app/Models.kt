@@ -58,6 +58,8 @@ data class Settings(
     val glassBlur: Int = 48,
     val glassTint: Boolean = true,
     val reduceTransparency: Boolean = false,
+    /** Shortcut overrides: action name → combo text ("shift+D"), "" for none. */
+    val keybindings: Map<String, String> = emptyMap(),
 )
 
 /** Window material (Settings › Appearance › Window material). Glass is macOS-only for now. */
@@ -164,6 +166,19 @@ interface AppServices {
 
     /** Writes [content] to a new file named like [fileName] in Downloads (or home); returns its path. */
     fun exportFile(fileName: String, content: String): String?
+    /** "macOS 15.2 · aarch64 · Java 21.0.5", for About. */
+    val systemInfo: String
+    /** Host key check before an SSH connection, for ssh arguments like ["-p", "2222", "prod"]. Blocking. */
+    fun checkHostKey(sshArgs: List<String>): HostKeyCheck
+    /**
+     * Trusts the keys [check] found: adds them to known_hosts when [remember], else to a file only this connection uses.
+     * Returns the ssh options that make ssh accept exactly those keys, or null when they could not be saved.
+     */
+    fun trustHostKey(check: HostKeyCheck.Unknown, remember: Boolean): List<String>?
+    /** What onboarding can show about the user's shell setup. Blocking. */
+    fun shellSetup(): ShellSetup
+    /** Time-stamped commands from the login shell's history file, oldest first. Blocking. */
+    fun importShellHistory(): List<HistoryEntry>
     fun sshHosts(): List<HostEntry>
     fun shellHistory(limit: Int): List<String>
 
@@ -176,3 +191,37 @@ interface AppServices {
     fun systemPrefersDark(): Boolean
     fun installedMonoFonts(): List<String>
 }
+
+/** Result of checking a host's key against known_hosts before connecting. */
+sealed interface HostKeyCheck {
+    /** Already in known_hosts, or the user's ssh config turns checking off. */
+    data object Known : HostKeyCheck
+
+    /** First connection: the key the host presents now, to compare and trust. */
+    data class Unknown(
+        val host: String,
+        val port: Int,
+        /** "ED25519" */
+        val keyType: String,
+        /** "SHA256:…" */
+        val fingerprint: String,
+        /** Lines in known_hosts format for every key the host offered. */
+        val keyLines: List<String>,
+        val knownHostsFile: String,
+    ) : HostKeyCheck
+
+    /** Vesper cannot check this host itself (jump host, ssh tools missing, unreachable); ssh asks in the terminal. */
+    data class Skipped(val reason: String) : HostKeyCheck
+}
+
+data class ShellSetup(
+    val shell: String,
+    /** e.g. "~/.zshrc", null when there is none */
+    val rcFile: String?,
+    val aliases: Int,
+    val functions: Int,
+    val historyFile: String?,
+    val historyCommands: Int,
+    /** Shells from /etc/shells (or found on PATH on Windows). */
+    val shells: List<String>,
+)

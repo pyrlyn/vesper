@@ -1,5 +1,7 @@
 package app.vesper.ui
 
+import app.vesper.app.shortcutLabel
+import app.vesper.app.ShortcutAction
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.graphics.Color
@@ -371,8 +373,7 @@ private fun EmptyState(state: AppState, ui: UiActions, pane: Pane) {
     val c = Vesper.colors
     val type = Vesper.type
     val ctx = pane.context
-    val mod = state.services.os.mod
-    val shift = state.services.os.shift
+    fun keys(action: ShortcutAction) = state.settings.shortcutLabel(action, state.services.os) ?: ""
     val scroll = androidx.compose.foundation.rememberScrollState()
     Column(
         Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 24.dp, vertical = 28.dp),
@@ -397,13 +398,13 @@ private fun EmptyState(state: AppState, ui: UiActions, pane: Pane) {
         val wf = state.settings.workflows
         val cards: List<@Composable (Modifier) -> Unit> = listOf(
             { m ->
-                ActionCard(Icons.Play, "Run a workflow", if (wf.isEmpty()) "Save multi-step commands" else wf.take(3).joinToString(", ") { it.name }, "${mod}K", m) {
+                ActionCard(Icons.Play, "Run a workflow", if (wf.isEmpty()) "Save multi-step commands" else wf.take(3).joinToString(", ") { it.name }, keys(ShortcutAction.Palette), m) {
                     ui.openPalette(">")
                 }
             },
-            { m -> ActionCard(Icons.Server, "Connect to a host", "${state.allHosts().size} known hosts", "$mod${shift}H", m) { state.openHosts() } },
-            { m -> ActionCard(Icons.Search, "Search history", "Commands, exit codes, dirs", "${mod}Y", m) { state.openHistory() } },
-            { m -> ActionCard(Icons.Columns, "Split pane", "Work side by side", "$mod\\", m) { state.split(true) } },
+            { m -> ActionCard(Icons.Server, "Connect to a host", "${state.allHosts().size} known hosts", keys(ShortcutAction.Hosts), m) { state.openHosts() } },
+            { m -> ActionCard(Icons.Search, "Search history", "Commands, exit codes, dirs", keys(ShortcutAction.History), m) { state.openHistory() } },
+            { m -> ActionCard(Icons.Columns, "Split pane", "Work side by side", keys(ShortcutAction.SplitRight), m) { state.split(true) } },
         )
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.widthIn(max = 720.dp)) {
             // Four across when there is room, otherwise a 2×2 grid so titles stay readable.

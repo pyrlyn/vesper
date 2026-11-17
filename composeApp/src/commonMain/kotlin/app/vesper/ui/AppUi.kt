@@ -1,5 +1,11 @@
 package app.vesper.ui
 
+import app.vesper.ui.components.RadiusLg
+import androidx.compose.runtime.produceState
+import app.vesper.app.actionFor
+import app.vesper.app.ShortcutAction
+import app.vesper.app.KeyCombo
+import app.vesper.app.KeyNames
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import app.vesper.ui.components.Radius2xl
@@ -146,6 +152,9 @@ fun VesperApp(state: AppState, chrome: WindowChrome, onQuit: () -> Unit) {
         StatusBar(state)
     }
     if (state.paletteOpen) CommandPalette(state, ui)
+    state.hostVerification?.let { HostKeyDialog(state, it) }
+    if (state.aboutOpen) AboutDialog(state)
+    if (!state.settings.onboarded && state.historyLoaded) Onboarding(state)
     if (state.quitRequested) QuitDialog(state, onQuit)
 }
 
@@ -157,6 +166,7 @@ private fun handleShortcut(e: KeyEvent, state: AppState, ui: UiActions, clipboar
     val fullscreen = state.focusedPane?.session?.fullscreenTerminal() != null
     // On Windows/Linux, Ctrl+key belongs to the program in a full-screen terminal, so app shortcuts need Shift there.
     val mod = if (mac) e.isMetaPressed && !e.isCtrlPressed else e.isCtrlPressed && !e.isMetaPressed && (!fullscreen || e.isShiftPressed)
+    if (state.recordingShortcut) return false
     if (!mod) {
         if (e.key == Key.Escape && state.paletteOpen) {
             state.paletteOpen = false
@@ -170,34 +180,11 @@ private fun handleShortcut(e: KeyEvent, state: AppState, ui: UiActions, clipboar
     }
     val shift = e.isShiftPressed && (mac || !fullscreen)
     val tab = state.activeTab as? Tab.Terminal
+    val action = KeyNames[e.key]?.let { state.settings.actionFor(KeyCombo(it, shift, e.isAltPressed)) }
+    if (action != null) return runShortcut(action, state, ui)
     when (e.key) {
-        Key.T -> state.newTerminalTab()
-        Key.W -> when (val t = state.activeTab) {
-            is Tab.Terminal -> state.closePane(t.focused)
-            null -> Unit
-            else -> state.closeTab(t)
-        }
-        Key.K -> {
-            state.paletteQuery = ""
-            state.paletteOpen = !state.paletteOpen
-        }
-        Key.P -> if (shift) ui.openPalette(">") else return false
-        Key.Comma -> state.openSettings()
+        // ⌘\ and ⌘⇧\ keep splitting whatever the split shortcuts are bound to.
         Key.Backslash -> state.split(horizontal = !shift)
-        Key.D -> state.split(horizontal = !shift)
-        Key.H -> if (shift) state.openHosts() else return false
-        Key.Y -> state.openHistory()
-        Key.F -> {
-            val pane = tab?.focused ?: return false
-            if (pane.session.fullscreenTerminal() != null) return false
-            pane.find.open = true
-            pane.find.focusRequests++
-        }
-        Key.B -> state.updateSettings { it.copy(showSidebar = !it.showSidebar) }
-        Key.J -> state.updateSettings { it.copy(showMonitor = !it.showMonitor) }
-        Key.Enter -> tab?.let { state.toggleZoom(it.focused) }
-        Key.LeftBracket -> state.cycleTab(-1)
-        Key.RightBracket -> state.cycleTab(1)
         Key.Q -> if (mac) requestQuit(state, onQuit) else return false
         Key.V -> {
             val pane = state.focusedPane ?: return false
@@ -218,8 +205,43 @@ private fun handleShortcut(e: KeyEvent, state: AppState, ui: UiActions, clipboar
     return true
 }
 
+private fun runShortcut(action: ShortcutAction, state: AppState, ui: UiActions): Boolean {
+    val tab = state.activeTab as? Tab.Terminal
+    when (action) {
+        ShortcutAction.Palette -> {
+            state.paletteQuery = ""
+            state.paletteOpen = !state.paletteOpen
+        }
+        ShortcutAction.CommandsOnly -> ui.openPalette(">")
+        ShortcutAction.Settings -> state.openSettings()
+        ShortcutAction.Hosts -> state.openHosts()
+        ShortcutAction.History -> state.openHistory()
+        ShortcutAction.ToggleSidebar -> state.updateSettings { it.copy(showSidebar = !it.showSidebar) }
+        ShortcutAction.ToggleMonitor -> state.updateSettings { it.copy(showMonitor = !it.showMonitor) }
+        ShortcutAction.NewTab -> state.newTerminalTab()
+        ShortcutAction.Close -> when (val t = state.activeTab) {
+            is Tab.Terminal -> state.closePane(t.focused)
+            null -> Unit
+            else -> state.closeTab(t)
+        }
+        ShortcutAction.PreviousTab -> state.cycleTab(-1)
+        ShortcutAction.NextTab -> state.cycleTab(1)
+        ShortcutAction.SplitRight -> state.split(horizontal = true)
+        ShortcutAction.SplitDown -> state.split(horizontal = false)
+        ShortcutAction.Zoom -> tab?.let { state.toggleZoom(it.focused) } ?: return false
+        ShortcutAction.Find -> {
+            val pane = tab?.focused ?: return false
+            if (pane.session.fullscreenTerminal() != null) return false
+            pane.find.open = true
+            pane.find.focusRequests++
+        }
+    }
+    return true
+}
+
+/** Asks first when commands are running; asking again (a second ⌘Q) quits. */
 fun requestQuit(state: AppState, onQuit: () -> Unit) {
-    if (state.settings.confirmQuit && state.hasRunningProcesses().isNotEmpty()) state.quitRequested = true else onQuit()
+    if (state.quitRequested || !state.settings.confirmQuit || state.hasRunningProcesses().isEmpty()) onQuit() else state.quitRequested = true
 }
 
 /** Moves focus to the nearest pane in the pressed direction (tree order approximation). */
@@ -658,31 +680,61 @@ private fun QuitDialog(state: AppState, onQuit: () -> Unit) {
     val c = Vesper.colors
     val type = Vesper.type
     val running = state.hasRunningProcesses()
-    Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).clickable(interactionSource = null, indication = null) { state.quitRequested = false },
-        contentAlignment = Alignment.Center,
+    val mac = state.services.os == HostOs.MacOS
+    val now by produceState(nowMillis()) { while (true) { delay(1000); value = nowMillis() } }
+    app.vesper.ui.components.VDialog(
+        "Quit Vesper?",
+        onDismiss = { state.quitRequested = false },
+        icon = Icons.AlertTriangle,
+        iconTint = c.warning,
+        footer = {
+            VText(if (mac) "⌘Q again to force" else "Close again to force", type.meta, c.textMuted, Modifier.weight(1f))
+            app.vesper.ui.components.VButton("Cancel", { state.quitRequested = false }, kind = app.vesper.ui.components.ButtonKind.Ghost)
+            app.vesper.ui.components.VButton("Quit anyway", onQuit, icon = Icons.X, kind = app.vesper.ui.components.ButtonKind.Danger)
+        },
     ) {
-        Column(
-            Modifier.width(420.dp).popover(c).padding(20.dp).clickable(interactionSource = null, indication = null) {},
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                VIcon(Icons.AlertTriangle, 18.dp, c.warning)
-                VText("Quit Vesper?", type.heading, c.textPrimary)
-            }
-            VText(
-                "${running.size} process${if (running.size == 1) " is" else "es are"} still running and will be stopped.",
-                type.body,
-                c.textSecondary,
-                maxLines = 3,
-            )
-            running.take(5).forEach { (_, cmd) -> VText("› $cmd", type.codeSmall, c.textCode) }
-            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                app.vesper.ui.components.VButton("Cancel", { state.quitRequested = false })
-                app.vesper.ui.components.VButton("Quit", onQuit, kind = app.vesper.ui.components.ButtonKind.Danger)
+        VText(
+            if (running.isEmpty()) "Nothing is running any more." else "These are still running and will be stopped:",
+            type.body,
+            c.textSecondary,
+        )
+        if (running.isNotEmpty()) {
+            Column(Modifier.fillMaxWidth().background(c.bgSurface, RadiusLg).border(1.dp, c.borderSubtle, RadiusLg)) {
+                running.take(6).forEachIndexed { i, (pane, command) ->
+                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
+                    val ssh = command.trimStart().startsWith("ssh ")
+                    val started = pane.session.currentBlock()?.startedAt ?: now
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        VIcon(if (ssh) Icons.Server else Icons.Terminal, 15.dp, c.iconDefault)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            VText(command.lineSequence().first(), type.codeSmall, c.textPrimary)
+                            VText(
+                                "${state.services.displayPath(pane.session.cwd)} · running ${formatElapsed(now - started)}",
+                                type.meta,
+                                c.textMuted,
+                            )
+                        }
+                        app.vesper.ui.components.StatusDot(if (ssh) c.success else c.accentStrong)
+                    }
+                }
+                if (running.size > 6) VText("and ${running.size - 6} more", type.meta, c.textMuted, Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
             }
         }
     }
+}
+
+/** 42s → "00:42", 1h 2m → "1:02:00". */
+private fun formatElapsed(ms: Long): String {
+    val s = (ms / 1000).coerceAtLeast(0)
+    val h = s / 3600
+    val m = (s % 3600) / 60
+    val sec = s % 60
+    fun two(n: Long) = n.toString().padStart(2, '0')
+    return if (h > 0) "$h:${two(m)}:${two(sec)}" else "${two(m)}:${two(sec)}"
 }
 
 expect fun resizeHorizontalCursor(): PointerIcon

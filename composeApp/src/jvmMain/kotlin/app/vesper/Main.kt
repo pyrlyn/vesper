@@ -95,6 +95,7 @@ fun main() {
                 runCatching {
                     val desktop = Desktop.getDesktop()
                     desktop.setQuitStrategy(QuitStrategy.CLOSE_ALL_WINDOWS)
+                    desktop.setAboutHandler { javax.swing.SwingUtilities.invokeLater { state.aboutOpen = true } }
                     desktop.setQuitHandler { _, response ->
                         response.cancelQuit()
                         javax.swing.SwingUtilities.invokeLater { requestQuit(state, quit) }

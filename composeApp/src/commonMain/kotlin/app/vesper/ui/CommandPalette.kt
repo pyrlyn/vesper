@@ -1,5 +1,7 @@
 package app.vesper.ui
 
+import app.vesper.app.shortcutLabel
+import app.vesper.app.ShortcutAction
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -77,8 +79,6 @@ class PaletteItem(
 
 private fun buildItems(state: AppState, ui: UiActions): List<PaletteItem> {
     val os = state.services.os
-    val mod = os.mod
-    val shift = os.shift
     val items = ArrayList<PaletteItem>()
     for (h in state.allHosts()) {
         items += PaletteItem(PaletteGroup.Hosts, "Connect to ${h.alias}", "ssh ${h.address}" + (if (h.tag.isNotEmpty()) " · ${h.tag}" else ""), Icons.Server) { split ->
@@ -95,25 +95,26 @@ private fun buildItems(state: AppState, ui: UiActions): List<PaletteItem> {
     fun cmd(title: String, subtitle: String, icon: ImageVector, shortcut: String? = null, run: () -> Unit) {
         items += PaletteItem(PaletteGroup.Commands, title, subtitle, icon, shortcut) { run() }
     }
-    cmd("New tab", "Open a terminal in the current directory", Icons.Plus, "${mod}T") { state.newTerminalTab() }
-    cmd("Split right", "Open a pane beside the focused one", Icons.Columns, "$mod\\") { state.split(true) }
-    cmd("Split down", "Open a pane below the focused one", Icons.Rows, "$mod$shift\\") { state.split(false) }
-    cmd("Zoom pane", "Toggle full size for the focused pane", Icons.Maximize, "${mod}⏎") { state.focusedPane?.let(state::toggleZoom) }
+    cmd("New tab", "Open a terminal in the current directory", Icons.Plus, state.settings.shortcutLabel(ShortcutAction.NewTab, os)) { state.newTerminalTab() }
+    cmd("Split right", "Open a pane beside the focused one", Icons.Columns, state.settings.shortcutLabel(ShortcutAction.SplitRight, os)) { state.split(true) }
+    cmd("Split down", "Open a pane below the focused one", Icons.Rows, state.settings.shortcutLabel(ShortcutAction.SplitDown, os)) { state.split(false) }
+    cmd("Zoom pane", "Toggle full size for the focused pane", Icons.Maximize, state.settings.shortcutLabel(ShortcutAction.Zoom, os)) { state.focusedPane?.let(state::toggleZoom) }
     cmd("Clear blocks", "Remove finished blocks from this session", Icons.Trash) { state.focusedPane?.session?.clearBlocks() }
     cmd("Interrupt", "Send Ctrl+C to the running command", Icons.Stop) { state.focusedPane?.session?.interrupt() }
-    cmd("Toggle monitor", "Show or hide the system monitor", Icons.PanelRight, "${mod}J") {
+    cmd("Toggle monitor", "Show or hide the system monitor", Icons.PanelRight, state.settings.shortcutLabel(ShortcutAction.ToggleMonitor, os)) {
         state.updateSettings { it.copy(showMonitor = !it.showMonitor) }
     }
-    cmd("Toggle sidebar", "Show or hide sessions, workflows and history", Icons.PanelRight, "${mod}B") {
+    cmd("Toggle sidebar", "Show or hide sessions, workflows and history", Icons.PanelRight, state.settings.shortcutLabel(ShortcutAction.ToggleSidebar, os)) {
         state.updateSettings { it.copy(showSidebar = !it.showSidebar) }
     }
-    cmd("Hosts", "Manage SSH hosts", Icons.Server, "$mod${shift}H") { state.openHosts() }
-    cmd("History", "Search finished commands, failures and durations", Icons.History, "${mod}Y") { state.openHistory() }
-    cmd("Find in output", "Search the focused pane's blocks", Icons.Search, "${mod}F") {
+    cmd("Hosts", "Manage SSH hosts", Icons.Server, state.settings.shortcutLabel(ShortcutAction.Hosts, os)) { state.openHosts() }
+    cmd("History", "Search finished commands, failures and durations", Icons.History, state.settings.shortcutLabel(ShortcutAction.History, os)) { state.openHistory() }
+    cmd("Find in output", "Search the focused pane's blocks", Icons.Search, state.settings.shortcutLabel(ShortcutAction.Find, os)) {
         state.focusedPane?.find?.let { it.open = true; it.focusRequests++ }
     }
-    cmd("Settings", "Theme, fonts, shell and more", Icons.Settings, "$mod,") { state.openSettings() }
+    cmd("Settings", "Theme, fonts, shell and more", Icons.Settings, state.settings.shortcutLabel(ShortcutAction.Settings, os)) { state.openSettings() }
     cmd("Keyboard shortcuts", "All key bindings", Icons.Keyboard) { state.openSettings(SettingsSection.Keybindings) }
+    cmd("About Vesper", "Version, what's new and system info", Icons.Info) { state.aboutOpen = true }
     for (t in ThemeId.entries) {
         cmd("Theme: ${t.title}", "Switch color theme", Icons.Palette) { state.updateSettings { it.copy(theme = t, followSystem = false) } }
     }

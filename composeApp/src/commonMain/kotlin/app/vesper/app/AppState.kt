@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
 /** What a pane is running, derived from its command — drives icons, dots and titles. */
 enum class PaneKind { Local, Ssh, Database, Logs }
 
-class Pane(val session: TerminalSession, val launchCommand: String?) {
+class Pane(val session: TerminalSession, val launchCommand: String?, /** Shown instead of the launch command, e.g. "ssh prod" for a saved host. */ val label: String? = null) {
     var context by mutableStateOf(PromptContext())
     var draft by mutableStateOf("")
     val find = FindState()
@@ -29,6 +29,7 @@ class Pane(val session: TerminalSession, val launchCommand: String?) {
 
     fun title(displayPath: (String) -> String): String {
         val running = session.currentBlock()?.command ?: launchCommand
+        if (label != null && running == launchCommand) return label
         return when (running?.let(::kindOf)) {
             PaneKind.Ssh, PaneKind.Database, PaneKind.Logs -> running.substringBefore(" | ").take(40)
             else -> {
@@ -126,6 +127,11 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
     var paletteQuery by mutableStateOf("")
     var monitorTab by mutableStateOf(MonitorTab.System)
     var quitRequested by mutableStateOf(false)
+    /** While Settings › Keybindings records a shortcut, app shortcuts are off. */
+    var recordingShortcut by mutableStateOf(false)
+    var aboutOpen by mutableStateOf(false)
+    /** The SSH connection waiting on a host key check or the user's trust. */
+    var hostVerification by mutableStateOf<HostVerification?>(null)
     val history = mutableStateListOf<HistoryEntry>()
     var sshHosts by mutableStateOf<List<HostEntry>>(emptyList())
         private set
@@ -136,7 +142,9 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
     var gridSize by mutableStateOf(0 to 0)
 
     private var nextId = 1
-    private var historyLoaded = false
+    /** True once the saved history is read; importing before then would lose entries. */
+    var historyLoaded by mutableStateOf(false)
+        private set
 
     val activeTab: Tab? get() = tabs.firstOrNull { it.id == activeTabId } ?: tabs.firstOrNull()
 
@@ -170,10 +178,10 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
 
     // ── Tabs & panes ─────────────────────────────────────────────────────
 
-    private fun newPane(cwd: String?, command: String?): Pane {
+    private fun newPane(cwd: String?, command: String?, label: String? = null): Pane {
         val dir = cwd?.takeIf { services.exists(it) } ?: services.homeDir
         val session = services.createSession(nextId++, dir, settings.shell, scope, 120, 38) { which -> colorReply(which) }
-        val pane = Pane(session, command)
+        val pane = Pane(session, command, label)
         session.onBlockFinished = { block ->
             val entry = HistoryEntry(block.command, block.startedAt, block.cwd, block.exitCode, block.durationMs)
             scope.launch(Dispatchers.Main) { record(entry) }
@@ -203,8 +211,8 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
         }
     }
 
-    fun newTerminalTab(cwd: String? = focusedPane?.session?.cwd, command: String? = null): Tab.Terminal {
-        val tab = Tab.Terminal(nextId++, PaneNode.Leaf(newPane(cwd, command)))
+    fun newTerminalTab(cwd: String? = focusedPane?.session?.cwd, command: String? = null, label: String? = null): Tab.Terminal {
+        val tab = Tab.Terminal(nextId++, PaneNode.Leaf(newPane(cwd, command, label)))
         tabs += tab
         activeTabId = tab.id
         return tab
@@ -352,19 +360,81 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
         runInFocused(cmd)
     }
 
+    /** Connects to [host] after checking its key; a first connection asks to verify the fingerprint. */
     fun connect(host: HostEntry) {
+        val verification = HostVerification(host)
+        hostVerification = verification
+        scope.launch(Dispatchers.IO) {
+            val check = runCatching { services.checkHostKey(sshArgs(host)) }.getOrElse { HostKeyCheck.Skipped("check failed") }
+            withContext(Dispatchers.Main) {
+                if (hostVerification !== verification) return@withContext // cancelled
+                if (check is HostKeyCheck.Unknown) {
+                    verification.check = check
+                } else {
+                    hostVerification = null
+                    openSsh(host, emptyList())
+                }
+            }
+        }
+    }
+
+    /** Trusts the key shown in the verify dialog and connects. */
+    fun trustAndConnect(remember: Boolean) {
+        val verification = hostVerification ?: return
+        val check = verification.check ?: return
+        verification.saving = true
+        scope.launch(Dispatchers.IO) {
+            val options = services.trustHostKey(check, remember)
+            withContext(Dispatchers.Main) {
+                verification.saving = false
+                if (options == null) {
+                    verification.error = "Couldn't save the key to ${services.displayPath(check.knownHostsFile)}"
+                    return@withContext
+                }
+                hostVerification = null
+                openSsh(verification.host, options)
+            }
+        }
+    }
+
+    private fun sshArgs(host: HostEntry): List<String> {
         val saved = settings.hosts.firstOrNull { it.alias == host.alias }
-        val target = if (host.source == "ssh-config") host.alias else host.address.substringBefore(':')
+        val custom = host.source != "ssh-config"
+        return buildList {
+            if (saved?.forwardAgent == true) add("-A")
+            if (custom && host.port != 22) { add("-p"); add(host.port.toString()) }
+            if (custom && host.proxyJump.isNotBlank()) { add("-J"); add(host.proxyJump) }
+            if (custom && host.identityFile.isNotBlank()) { add("-i"); add(host.identityFile) }
+            add(if (custom) host.address.substringBefore(':') else host.alias)
+        }
+    }
+
+    private fun openSsh(host: HostEntry, options: List<String>) {
+        val saved = settings.hosts.firstOrNull { it.alias == host.alias }
         val cmd = buildString {
             append("ssh ")
-            if (saved?.forwardAgent == true) append("-A ")
-            if (host.source != "ssh-config" && host.port != 22) append("-p ${host.port} ")
-            if (host.source != "ssh-config" && host.proxyJump.isNotBlank()) append("-J ${host.proxyJump} ")
-            if (host.source != "ssh-config" && host.identityFile.isNotBlank()) append("-i ${host.identityFile} ")
-            append(target)
-            if (!saved?.startupCommand.isNullOrBlank()) append(" -t '${saved!!.startupCommand}; exec \$SHELL -l'")
+            append((options + sshArgs(host)).joinToString(" ", transform = ::shellArg))
+            val startup = saved?.startupCommand.orEmpty()
+            if (startup.isNotBlank()) append(" -t ").append(shellArg("$startup; exec \$SHELL -l"))
         }
-        newTerminalTab(command = cmd)
+        newTerminalTab(command = cmd, label = "ssh ${host.alias}")
+    }
+
+    /** Lines from the user's shell history with timestamps, merged into History. Returns how many were added. */
+    suspend fun importShellHistory(): Int {
+        val imported = withContext(Dispatchers.IO) { runCatching { services.importShellHistory() }.getOrDefault(emptyList()) }
+        val seen = history.mapTo(HashSet()) { it.command to it.at }
+        val fresh = imported.filter { seen.add(it.command to it.at) }
+        if (fresh.isEmpty()) return 0
+        val merged = (history + fresh).sortedBy { it.at }.takeLast(MaxHistory)
+        history.clear()
+        history.addAll(merged)
+        saveHistory()
+        return fresh.size
+    }
+
+    fun finishOnboarding() {
+        updateSettings { it.copy(onboarded = true) }
     }
 
     fun refreshContext(pane: Pane) {
@@ -394,3 +464,14 @@ class AppState(val services: AppServices, private val scope: CoroutineScope) {
         tabs.filterIsInstance<Tab.Terminal>().flatMap { it.root.panes() }.forEach { it.session.close() }
     }
 }
+
+class HostVerification(val host: HostEntry) {
+    /** Null while checking. */
+    var check by mutableStateOf<HostKeyCheck.Unknown?>(null)
+    var saving by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+}
+
+/** [s] as one shell word: unchanged when safe, else single-quoted. */
+fun shellArg(s: String): String =
+    if (s.isNotEmpty() && s.all { it.isLetterOrDigit() || it in "@%_+=:,./~-" }) s else "'" + s.replace("'", "'\\''") + "'"

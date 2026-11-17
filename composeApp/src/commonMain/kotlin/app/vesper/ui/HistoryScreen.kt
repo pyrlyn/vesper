@@ -1,5 +1,6 @@
 package app.vesper.ui
 
+import app.vesper.ui.components.FilterChip
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.foundation.background
@@ -137,20 +138,6 @@ private fun Filters(state: AppState, tab: Tab.History, count: Int) {
         FilterChip("Failed only", tab.failedOnly, danger = true) { tab.failedOnly = !tab.failedOnly }
         FilterChip("Last 7 days", tab.lastWeek) { tab.lastWeek = !tab.lastWeek }
     }
-}
-
-@Composable
-private fun FilterChip(label: String, active: Boolean, danger: Boolean = false, onClick: () -> Unit) {
-    val c = Vesper.colors
-    val (bg, fg) = when {
-        !active -> c.bgActive to c.textSecondary
-        danger -> c.dangerSoft to c.danger
-        else -> c.accentSoft to c.accentText
-    }
-    Box(
-        Modifier.background(bg, RadiusSm).clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand)
-            .padding(horizontal = 7.dp, vertical = 3.dp),
-    ) { VText(label, Vesper.type.codeSmall, fg) }
 }
 
 private val WhereWidth = 170.dp

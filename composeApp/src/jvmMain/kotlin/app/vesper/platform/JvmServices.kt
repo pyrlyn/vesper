@@ -171,7 +171,7 @@ class JvmServices : AppServices {
     override fun shellHistory(limit: Int): List<String> {
         val shell = File(ShellIntegration.defaultShell()).name.removeSuffix(".exe").lowercase()
         val lines = when {
-            shell == "zsh" -> zshHistory(File(System.getenv("HISTFILE") ?: File(Paths.home, ".zsh_history").path))
+            shell == "zsh" -> zshHistory(zshHistoryFile())
             shell == "bash" -> readLenient(File(Paths.home, ".bash_history")).lines().filter { !it.startsWith("#") }
             shell == "fish" -> readLenient(File(Paths.home, ".local/share/fish/fish_history")).lines()
                 .filter { it.startsWith("- cmd: ") }.map { it.removePrefix("- cmd: ").replace("\\n", "\n").replace("\\\\", "\\") }
@@ -183,21 +183,122 @@ class JvmServices : AppServices {
         return lines.map { it.trim() }.filter { it.isNotEmpty() && it.length < 500 }.takeLast(limit)
     }
 
-    private fun zshHistory(file: File): List<String> {
+    private fun zshHistory(file: File): List<String> = zshHistoryEntries(file).map { it.command }
+
+    private class ShellCommand(val command: String, val atSeconds: Long?, val durationSeconds: Long = 0)
+
+    /** zsh history; extended entries (": <start>:<elapsed>;command") carry their time. */
+    private fun zshHistoryEntries(file: File): List<ShellCommand> {
         val text = unmetafy(readBytes(file))
-        val out = ArrayList<String>()
+        val out = ArrayList<ShellCommand>()
         val sb = StringBuilder()
+        var at: Long? = null
+        var elapsed = 0L
         for (line in text.lines()) {
-            val content = if (sb.isEmpty() && line.startsWith(": ") && line.contains(';')) line.substringAfter(';') else line
+            val content = if (sb.isEmpty() && line.startsWith(": ") && line.contains(';')) {
+                val meta = line.substring(2).substringBefore(';').split(':')
+                at = meta.getOrNull(0)?.trim()?.toLongOrNull()
+                elapsed = meta.getOrNull(1)?.trim()?.toLongOrNull() ?: 0
+                line.substringAfter(';')
+            } else {
+                if (sb.isEmpty()) { at = null; elapsed = 0 }
+                line
+            }
             if (content.endsWith("\\")) {
                 sb.append(content.dropLast(1)).append('\n')
             } else {
                 sb.append(content)
-                out += sb.toString()
+                out += ShellCommand(sb.toString(), at, elapsed)
                 sb.setLength(0)
             }
         }
         return out
+    }
+
+    override fun importShellHistory(): List<HistoryEntry> {
+        val shell = File(ShellIntegration.defaultShell()).name.removeSuffix(".exe").lowercase()
+        val commands: List<ShellCommand> = when (shell) {
+            "zsh" -> zshHistoryEntries(zshHistoryFile())
+            "bash" -> {
+                // With HISTTIMEFORMAT set, bash writes "#<epoch>" before each command.
+                var at: Long? = null
+                readLenient(File(Paths.home, ".bash_history")).lines().mapNotNull { l ->
+                    if (l.startsWith("#") && l.drop(1).all(Char::isDigit) && l.length > 1) { at = l.drop(1).toLongOrNull(); null }
+                    else ShellCommand(l, at).also { at = null }
+                }
+            }
+            "fish" -> {
+                val out = ArrayList<ShellCommand>()
+                var cmd: String? = null
+                for (l in readLenient(fishHistoryFile()).lines()) {
+                    when {
+                        l.startsWith("- cmd: ") -> cmd = l.removePrefix("- cmd: ").replace("\\n", "\n").replace("\\\\", "\\")
+                        l.trimStart().startsWith("when: ") && cmd != null -> {
+                            out += ShellCommand(cmd!!, l.trim().removePrefix("when: ").toLongOrNull())
+                            cmd = null
+                        }
+                    }
+                }
+                out
+            }
+            else -> emptyList()
+        }
+        return commands
+            .filter { it.atSeconds != null && it.command.isNotBlank() && it.command.length < 500 }
+            .map { HistoryEntry(it.command.trim(), it.atSeconds!! * 1000, "", null, it.durationSeconds * 1000) }
+            .sortedBy { it.at }
+    }
+
+    private fun zshHistoryFile() = File(System.getenv("HISTFILE") ?: File(Paths.home, ".zsh_history").path)
+    private fun fishHistoryFile() = File(Paths.home, ".local/share/fish/fish_history")
+
+    override val systemInfo: String by lazy {
+        val osName = when (os) {
+            HostOs.MacOS -> "macOS"
+            HostOs.Windows -> "Windows"
+            HostOs.Linux -> "Linux"
+        }
+        "$osName ${System.getProperty("os.version")} · ${System.getProperty("os.arch")} · Java ${System.getProperty("java.version")}"
+    }
+
+    override fun checkHostKey(sshArgs: List<String>): app.vesper.app.HostKeyCheck = SshHostKeys.check(sshArgs)
+
+    override fun trustHostKey(check: app.vesper.app.HostKeyCheck.Unknown, remember: Boolean): List<String>? = SshHostKeys.trust(check, remember)
+
+    override fun shellSetup(): app.vesper.app.ShellSetup {
+        val path = ShellIntegration.defaultShell()
+        val shell = File(path).name.removeSuffix(".exe").lowercase()
+        val rc = when (shell) {
+            "zsh" -> File(System.getenv("ZDOTDIR")?.takeIf { it.isNotBlank() } ?: Paths.home.path, ".zshrc")
+            "bash" -> File(Paths.home, ".bashrc").takeIf { it.isFile } ?: File(Paths.home, ".bash_profile")
+            "fish" -> File(Paths.home, ".config/fish/config.fish")
+            else -> null
+        }?.takeIf { it.isFile }
+        val rcText = rc?.let(::readLenient).orEmpty()
+        val aliases = rcText.lines().count { Regex("^\\s*(alias|abbr)\\s").containsMatchIn(it) }
+        val functions = rcText.lines().count { Regex("^\\s*(function\\s+[\\w.-]+|[\\w.-]+\\s*\\(\\))").containsMatchIn(it) }
+        val historyFile = when (shell) {
+            "zsh" -> zshHistoryFile()
+            "bash" -> File(Paths.home, ".bash_history")
+            "fish" -> fishHistoryFile()
+            else -> null
+        }?.takeIf { it.isFile }
+        val shells = if (os == HostOs.Windows) {
+            listOf(path)
+        } else {
+            readLenient(File("/etc/shells")).lines().map { it.trim() }
+                .filter { it.startsWith("/") && File(it).canExecute() }
+                .ifEmpty { listOf(path) }
+        }
+        return app.vesper.app.ShellSetup(
+            shell = path,
+            rcFile = rc?.let { displayPath(it.path) },
+            aliases = aliases,
+            functions = functions,
+            historyFile = historyFile?.let { displayPath(it.path) },
+            historyCommands = if (historyFile == null) 0 else shellHistory(1_000_000).size,
+            shells = (listOf(path) + shells).distinct(),
+        )
     }
 
     /** zsh stores non-ASCII bytes "metafied": 0x83 followed by byte xor 0x20. */

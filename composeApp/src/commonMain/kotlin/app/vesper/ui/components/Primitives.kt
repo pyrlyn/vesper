@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -404,4 +405,94 @@ fun MenuItem(label: String, onClick: () -> Unit, icon: ImageVector? = null, shor
 @Composable
 fun MenuDivider() {
     Box(Modifier.fillMaxWidth().padding(vertical = 4.dp).height(1.dp).background(Vesper.colors.borderSubtle))
+}
+
+@Composable
+fun Checkbox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = Vesper.colors
+    Box(
+        modifier.size(16.dp)
+            .background(if (checked) c.accentStrong else Color.Transparent, RadiusXs)
+            .border(1.dp, if (checked) c.accentStrong else c.borderStrong, RadiusXs)
+            .then(if (enabled) Modifier.clickable { onChange(!checked) } else Modifier),
+        contentAlignment = Alignment.Center,
+    ) { if (checked) VIcon(Icons.Check, 11.dp, Color.White) }
+}
+
+/** Checkbox with a label; the whole row toggles. */
+@Composable
+fun CheckRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.layout.Row(
+        modifier.clickable(interactionSource = null, indication = null) { onChange(!checked) },
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked, onChange)
+        VText(label, Vesper.type.bodySmall, Vesper.colors.textPrimary)
+    }
+}
+
+/**
+ * Modal dialog over a dimmed window: a title row with an optional icon and close button, a body,
+ * and an optional footer band. A click on the scrim dismisses it.
+ */
+@Composable
+fun VDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    width: Dp = 440.dp,
+    icon: ImageVector? = null,
+    iconTint: Color = Vesper.colors.iconDefault,
+    footer: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    val c = Vesper.colors
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).clickable(interactionSource = null, indication = null, onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.foundation.layout.Column(
+            Modifier.width(width).popover(c, RadiusXl).clickable(interactionSource = null, indication = null) {},
+        ) {
+            androidx.compose.foundation.layout.Row(
+                Modifier.fillMaxWidth().padding(start = 18.dp, end = 10.dp, top = 14.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (icon != null) VIcon(icon, 18.dp, iconTint)
+                VText(title, Vesper.type.heading, c.textPrimary, Modifier.weight(1f))
+                IconButton(Icons.X, onDismiss, size = 14.dp)
+            }
+            androidx.compose.foundation.layout.Column(
+                Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = content,
+            )
+            if (footer != null) {
+                Box(Modifier.fillMaxWidth().height(1.dp).background(c.borderSubtle))
+                androidx.compose.foundation.layout.Row(
+                    Modifier.fillMaxWidth().background(c.bgInset, androidx.compose.foundation.shape.RoundedCornerShape(bottomStart = 10.dp, bottomEnd = 10.dp))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = footer,
+                )
+            }
+        }
+    }
+}
+
+/** Toggle chip for filters: accent when active, red for a danger filter. */
+@Composable
+fun FilterChip(label: String, active: Boolean, danger: Boolean = false, onClick: () -> Unit) {
+    val c = Vesper.colors
+    val (bg, fg) = when {
+        !active -> c.bgActive to c.textSecondary
+        danger -> c.dangerSoft to c.danger
+        else -> c.accentSoft to c.accentText
+    }
+    Box(
+        Modifier.background(bg, RadiusSm).clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand)
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+    ) { VText(label, Vesper.type.codeSmall, fg) }
 }
