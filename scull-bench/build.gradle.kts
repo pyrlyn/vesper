@@ -24,6 +24,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.scullHarness)
             implementation(projects.scullParser)
+            implementation(projects.scullGrid)
             implementation(libs.okio)
         }
     }
