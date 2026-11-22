@@ -1,8 +1,21 @@
+# Gradle / Kotlin
 .gradle/
-.kotlin/
 build/
 */build/
+.kotlin/
+local.properties
+# The wrapper jar is committed so `./gradlew` works from a fresh clone.
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE / OS
 .idea/
 *.iml
-local.properties
 .DS_Store
+
+# Native UI build output
+/macos/.build
+/windows/*/bin
+/windows/*/obj
+
+# rtok cache and worktrees
+.rtok/

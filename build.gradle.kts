@@ -1,6 +1,6 @@
+// build-logic carries every Gradle plugin the modules use. Naming one of its plugins here puts
+// that single classpath on the root, so each module applies Kotlin, Compose and ktlint by id and
+// the Kotlin Gradle plugin is loaded once.
 plugins {
-    alias(libs.plugins.kotlin.multiplatform) apply false
-    alias(libs.plugins.kotlin.compose) apply false
-    alias(libs.plugins.kotlin.serialization) apply false
-    alias(libs.plugins.compose.multiplatform) apply false
+    id("scull.kmp") apply false
 }
