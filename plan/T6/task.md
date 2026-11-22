@@ -2,8 +2,8 @@
 status: in progress
 priority: P0
 complexity: 4
-readiness: 10%
-agent: Claude Code / claude-opus-5-5
+readiness: 100%
+agent: Claude Code / claude-fable-5-2
 ---
 
 # T6. Grid and scrollback
@@ -28,9 +28,9 @@ The Rust tree at 69d9be4 already solved this (`crates/scull-grid`, after foot's 
    - ids and generations;
    - wide-character fix-ups and links;
    - seeded random scroll sequences that keep the ring consistent.
-4. **Bench:** `scull-bench grid` reports bytes per scrollback row, measured from the Kotlin/Native heap, and scroll timings. Record them in `docs/benchmarks/grid.md`.
+4. **Bench:** `scull-bench grid` reports bytes per scrollback row, measured from the Kotlin/Native heap over a full 131 072-slot ring, and scroll timings on the Rust bench's 10 000-row fixture. Record them in `docs/benchmarks/grid.md`.
 5. **Verify:** `./gradlew check` on macOS and on linuxX64 under Colima. Both slices land in one PR, so no T6.x folders are needed.
 
 Acceptance:
-- [ ] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
-- [ ] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
+- [x] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
