@@ -260,7 +260,9 @@ public class Row(
             fill = Cell(cells[0])
             len = 0
         }
-        cells = if (len == 0) NO_CELLS else cells.copyOf(len)
+        // A row whose array already fits is left alone: a full-width line, or a recycled slot that
+        // took a line as long as its last one, would be copied for nothing on every scrolled line.
+        if (cells.size != len) cells = if (len == 0) NO_CELLS else cells.copyOf(len)
         spans?.trimToSize()
     }
 
