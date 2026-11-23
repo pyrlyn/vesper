@@ -160,7 +160,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 - [ ] **T25.** Fuzz smoke and Unicode table freshness in CI.
 - [ ] **T29.** Green required checks on `main`.
 - [ ] **T900.** Dependency advisory updates on the Gradle graph.
-- [ ] **T901.** Port the scull-ffi C host tests to Zig.
+- [x] **T901.** Port the scull-ffi C host tests to Zig.
 
 ## 5. Testing strategy
 
