@@ -33,6 +33,8 @@ include(
     ":scull-ffi",
     // PNG decode with a caller-set allocation cap, for the image protocols (T19).
     ":scull-png",
+    // Images and their placements under a byte quota, and the protocol decoders (T19).
+    ":scull-image",
     // Test and measurement tools; nothing in the shipped library depends on them.
     ":scull-harness",
     ":scull-bench",

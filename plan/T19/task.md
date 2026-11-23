@@ -1,10 +1,16 @@
-# T19. Images
+---
+status: in progress
+priority: P1
+complexity: 5
+readiness: 5%
+agent: Claude Code / claude-opus-5-5
+---
 
-Status: not started
+# T19. Images
 
 Sixel, kitty graphics and iTerm2 inline images decoded in the core to RGBA, kept as a positioned list with an image and placement split and a quota with LRU eviction. The frame carries placements; the platform uploads textures. Done when each protocol has golden tests and the decoders have fuzz targets.
 
-Execution plan (split to fit the 500-line budget; this run does T19.1–T19.3, T19.4 waits for T9):
+Execution plan (split to fit the 500-line budget into `plan/T19.1` to `plan/T19.4`; the Rust crate names below are the original wording, the subtasks say what the Kotlin port does):
 
 - T19.1 New leaf crate `scull-image` (no workspace dependencies): `Image` (RGBA8, width, height, generation) behind an `Arc`, `Placement` (image id, cell anchor, cell size, pixel crop, z-index) kept apart from images, and an `ImageStore` with a byte quota and LRU eviction of images that no placement uses. iTerm2 inline images (OSC 1337 `File=` with base64 payload) decoded through maintained crates (`base64`, and `png`/`zune-jpeg`/`image` or similar, whichever is best maintained and lightest), with size caps checked before allocation.
 - T19.2 Sixel decoder: streaming `put` of DCS bytes into an RGBA buffer, palette and raster attributes, with width, height and colour caps. Reuse a maintained crate if one fits; otherwise write it and say why in the commit.
