@@ -82,6 +82,10 @@ if (cHost != null) {
             val run =
                 tasks.register<Exec>("runC$name") {
                     dependsOn(compile)
+                    inputs.file("tests/c/lsan.supp")
+                    // Native locks are freed by Kotlin/Native Cleaners, after a collection the test
+                    // exits before; lsan.supp says why only they are suppressed.
+                    environment("LSAN_OPTIONS", "suppressions=${file("tests/c/lsan.supp").absolutePath}:print_suppressions=0")
                     commandLine(exe.get().asFile.absolutePath)
                 }
             cTests { dependsOn(run) }
