@@ -66,6 +66,23 @@ public class Terminal(
     /** Moves the viewport [delta] rows back into history (negative: towards the screen), clamped to what history holds. */
     public fun scrollDisplay(delta: Int): Unit = state.grid.scrollDisplay(delta)
 
+    /**
+     * Brings [frame] up to date with the viewport: the only call that copies out of the terminal, so a
+     * UI holds the terminal's lock just for it. While synchronized output holds the picture the frame
+     * is left as it is with no damage and this returns false.
+     */
+    public fun updateFrame(
+        frame: Frame,
+        now: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow(),
+    ): Boolean {
+        if (syncHeld(now)) {
+            frame.damage.clear()
+            return false
+        }
+        frame.copyFrom(this)
+        return true
+    }
+
     /** The screen shown: the alternate one while [isAltScreen]. Valid until the next [feed]. */
     public val grid: Grid get() = state.grid
 

@@ -143,6 +143,12 @@ internal inline fun String.forEachCodePoint(action: (Int) -> Unit) {
     }
 }
 
+/** The first code point of the string, decoded as [forEachCodePoint] does; 0 for an empty string. */
+public fun String.firstCodePoint(): Int {
+    forEachCodePoint { return it }
+    return 0
+}
+
 private const val SURROGATE_MASK = 0x3FF
 
 /** Appends the scalar value [cp] as one or two UTF-16 units. */
