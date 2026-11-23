@@ -1,5 +1,5 @@
-# Registers the `ci` workflow on the default branch so GitHub Actions will run on pull requests.
-# The Scull merge (#1) replaces this file with the full multi-OS workflow.
+# Gradle build of the Kotlin/Native core (PLAN.md, section 6) plus the workflow lint. Job names
+# `<os> (<target>)` are the checks to require on main (T29).
 name: ci
 
 on:
@@ -18,17 +18,109 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  check:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
+  # Workflow lint: jactionlint with .github/jactionlint.yaml and its baseline, the check the
+  # pre-push hook (hk.pkl) runs. install_args installs only jactionlint; its version matches
+  # mise.toml. shellcheck comes from the runner image.
+  jactionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          distribution: temurin
-          java-version: "21"
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
-      - name: Check
+          install_args: github:jdx/jactionlint@2.0.2
+      - run: jactionlint --color
+
+  # Which runner the macOS job uses: pyrlyn/ci's macos-runner action reads the MACOS_RUNNER
+  # variable (unset or `hosted` = the hosted label, `xcode-27-local` = the dedicated Mac).
+  macos-runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      value: ${{ steps.r.outputs.value }}
+    steps:
+      - id: r
+        uses: pyrlyn/ci/.github/actions/macos-runner@9675ff42a0e3785beabccb68b0e4fa65910de453 # main
+        with:
+          runner: ${{ vars.MACOS_RUNNER }}
+          value: '["macos-15"]'
+
+  # `docs-only` is "true" when every changed file is documentation (.github/infra.yml); it fails
+  # open, so a failed `config` runs everything.
+  config:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs-only: ${{ steps.config.outputs.docs-only }}
+    steps:
+      - id: config
+        uses: pyrlyn/ci/.github/actions/config@9675ff42a0e3785beabccb68b0e4fa65910de453 # main
+
+  # Each target builds and runs its tests on its own OS: Kotlin/Native runs test binaries only
+  # for the host it is on, and the PTY cinterop (T8) differs per OS.
+  build:
+    name: ${{ matrix.os }} (${{ matrix.target }})
+    needs: [config, macos-runner]
+    # Draft PRs skip. A docs-only change still runs the job with every step a no-op, so the
+    # required `<os> (<target>)` checks report instead of waiting.
+    if: >-
+      !cancelled()
+      && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    # Fork PRs keep the hosted macOS label; MACOS_CI_DISABLED moves the macOS job to Ubuntu as a no-op.
+    runs-on: ${{ vars.MACOS_CI_DISABLED == 'true' && startsWith(matrix.os, 'macos') && 'ubuntu-24.04' || startsWith(matrix.os, 'macos') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON(needs.macos-runner.outputs.value)[0] || matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: macosArm64
+            task: MacosArm64
+          - os: ubuntu-24.04
+            target: linuxX64
+            task: LinuxX64
+          - os: windows-2025
+            target: mingwX64
+            task: MingwX64
+    defaults:
+      run:
+        shell: bash
+    env:
+      RUN: ${{ needs.config.outputs.docs-only != 'true' && !(vars.MACOS_CI_DISABLED == 'true' && startsWith(matrix.os, 'macos')) }}
+      SKIP_TESTS: ${{ vars.SKIP_CI_TESTS == 'true' }}
+    steps:
+      - if: env.RUN == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - if: env.RUN == 'true'
+        name: Install tools (mise.toml)
+        uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
+        with:
+          install: true
+
+      - if: env.RUN == 'true'
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - if: env.RUN == 'true'
+        name: Cache the Kotlin/Native toolchain
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('gradle/libs.versions.toml') }}
+
+      - if: env.RUN == 'true' && env.SKIP_TESTS != 'true'
+        name: Check (tests and ktlint)
         run: ./gradlew check --console=plain
+
+      - if: env.RUN == 'true' && env.SKIP_TESTS == 'true'
+        name: tests skipped (SKIP_CI_TESTS)
+        run: echo "::notice title=SKIP_CI_TESTS::tests skipped by SKIP_CI_TESTS"
+
+      - if: env.RUN == 'true'
+        name: Link the scull libraries
+        run: ./gradlew :scull-ffi:linkReleaseShared${{ matrix.task }} :scull-ffi:linkReleaseStatic${{ matrix.task }} --console=plain
