@@ -135,12 +135,24 @@ class SharedTest {
     @Test
     fun theExitArrivesAfterQuietOutputWithoutEof() {
         val shared = Shared()
+        shared.pushChunk(byteArrayOf(1))
+        shared.takeBatch()
         val start = now()
         shared.setExit(ExitStatus(2u))
         assertEquals(Work.Exited(ExitStatus(2u)), shared.waitForWork(null))
         val waited = start.elapsedNow()
         assertTrue(waited >= EXIT_IDLE - 5.milliseconds, "the exit came after $waited")
         assertTrue(waited < EXIT_DRAIN_MAX, "the exit came after $waited")
+    }
+
+    @Test
+    fun theExitWaitsTheFullDrainWhenNoOutputHasArrived() {
+        val shared = Shared()
+        val start = now()
+        shared.setExit(ExitStatus(2u))
+        assertEquals(Work.Exited(ExitStatus(2u)), shared.waitForWork(null))
+        val waited = start.elapsedNow()
+        assertTrue(waited >= EXIT_DRAIN_MAX - 5.milliseconds, "the exit came after $waited")
     }
 
     @Test
