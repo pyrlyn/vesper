@@ -89,6 +89,8 @@ class SixelTest {
         assertEquals(1, decode("@-?", maxHeight = 6).height, "a band with nothing set costs nothing")
         assertFailsWith<ImageError.TooLarge> { decode("\"1;1;11;1@", maxWidth = 10) }
         assertFailsWith<ImageError.TooLarge> { decode("!100~", maxPixelBytes = 100L * 5 * RGBA) }
+        // A tall raster size and a wide row of sixels each fit, together they do not.
+        assertFailsWith<ImageError.TooLarge> { decode("\"1;1;1;100!100@", maxPixelBytes = 100L * 50 * RGBA) }
         assertEquals(100 to 6, decode("!100~", maxPixelBytes = 100L * 6 * RGBA).let { it.width to it.height })
         // A repeat count past any image saturates instead of overflowing.
         assertFailsWith<ImageError.TooLarge> { decode("!99999999999999999999@") }

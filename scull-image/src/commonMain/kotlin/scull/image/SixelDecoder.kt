@@ -140,6 +140,9 @@ public class SixelDecoder(
         val w = maxOf(width, rasterWidth)
         val h = maxOf(height, rasterHeight)
         if (w == 0 || h == 0) throw ImageError.Decode("empty sixel image")
+        // Each side passed its own cap, but a raster size on one axis and sixels on the other can
+        // still make a canvas past the byte cap.
+        if (w.toLong() * h * RGBA > maxPixelBytes) throw ImageError.TooLarge(w.toLong() * h * RGBA, maxPixelBytes)
         val out = ByteArray(w * h * RGBA)
         for (y in 0 until minOf(h, rows)) {
             pixels.copyInto(out, y * w * RGBA, y * stride * RGBA, (y * stride + minOf(w, stride)) * RGBA)
