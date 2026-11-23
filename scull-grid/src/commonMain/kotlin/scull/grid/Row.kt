@@ -247,15 +247,15 @@ public class Row(
         touch()
     }
 
-    /** Columns [start] until [end] carry no link from now on. */
+    /** Columns [start] until [end] carry no link from now on. A range that held none leaves the generation as it was. */
     public fun clearLinks(
         start: Int,
         end: Int,
     ) {
         val to = end.coerceAtMost(cols)
         val from = start.coerceIn(0, to.coerceAtLeast(0))
-        // Clearing a range that holds no links changes nothing: every plain cell write clears links,
-        // and a bump per write would force a repaint per keystroke once T9 keys damage on generations.
+        // Removing nothing leaves the frame as it was, but a bump would still read as damage to T9,
+        // which repaints every row whose generation moved.
         if (from < to && dropLinks(from, to)) touch()
     }
 

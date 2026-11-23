@@ -83,13 +83,30 @@ class RowTest {
     fun clearingLinksWhereNoneExistIsGenerationNeutral() {
         val r = row()
         val g0 = r.generation
-        r.clearLinks(0, 5)
+        r.clearLinks(0, COLS)
         assertEquals(g0, r.generation, "nothing was linked")
-        r.setLink(0, 5, LinkId(1))
+
+        r.setLink(2, 5, LinkId(1))
         val g1 = r.generation
         assertNotEquals(g0, g1, "a link was added")
-        r.clearLinks(2, 9)
-        assertNotEquals(g1, r.generation, "the link was cut short")
+        r.clearLinks(5, COLS)
+        r.clearLinks(-3, 2)
+        assertEquals(g1, r.generation, "ranges that touch the link without overlapping it hold none of it")
+        r.clearLinks(4, 4)
+        r.clearLinks(3, 1)
+        r.clearLinks(COLS, COLS + 5)
+        assertEquals(g1, r.generation, "an empty range or one past the row clears nothing")
+
+        r.clearLinks(4, 9)
+        val g2 = r.generation
+        assertNotEquals(g1, g2, "the link was cut short")
+        assertEquals(listOf(LinkSpan(2, 4, LinkId(1))), r.links)
+        r.clearLinks(0, COLS)
+        val g3 = r.generation
+        assertNotEquals(g2, g3, "the rest of the link was removed")
+        assertTrue(r.links.isEmpty())
+        r.clearLinks(0, COLS)
+        assertEquals(g3, r.generation, "a second clear finds nothing left to remove")
     }
 
     @Test
