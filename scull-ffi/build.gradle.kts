@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.konan.target.HostManager
 
 plugins {
     id("scull.library")
@@ -29,3 +30,62 @@ kotlin {
     }
 }
 
+// The C programs in tests/c, built with clang against the host's debug shared library and run under
+// ASan+UBSan and under TSan: they call through the header's own prototypes, which the Kotlin tests
+// cannot. Windows has no TSan; its host is covered by the C# tests (T17).
+val cHost =
+    when {
+        HostManager.hostIsMac -> "macosArm64"
+        HostManager.hostIsLinux -> "linuxX64"
+        else -> null
+    }
+if (cHost != null) {
+    val link = tasks.named("linkDebugShared${cHost.replaceFirstChar(Char::uppercase)}")
+    val libDir = layout.buildDirectory.dir("bin/$cHost/debugShared")
+    val cTests = tasks.register("cTests") { group = "verification" }
+    val sanitizers = mapOf("Asan" to "address,undefined", "Tsan" to "thread")
+    for (program in listOf("status", "two_threads")) {
+        for ((suffix, sanitize) in sanitizers) {
+            val name = program.split('_').joinToString("") { it.replaceFirstChar(Char::uppercase) } + suffix
+            val exe = layout.buildDirectory.file("ctest/$program-${suffix.lowercase()}")
+            val compile =
+                tasks.register<Exec>("compileC$name") {
+                    dependsOn(link)
+                    val source = file("tests/c/$program.c")
+                    inputs.file(source)
+                    inputs.dir("include")
+                    inputs.dir(libDir)
+                    outputs.file(exe)
+                    val lib = libDir.get().asFile.absolutePath
+                    commandLine(
+                        "clang",
+                        "-std=c11",
+                        "-Wall",
+                        "-Wextra",
+                        "-Werror",
+                        "-g",
+                        "-fno-omit-frame-pointer",
+                        "-fsanitize=$sanitize",
+                        "-fno-sanitize-recover=all",
+                        "-I",
+                        file("include").absolutePath,
+                        source.absolutePath,
+                        "-L",
+                        lib,
+                        "-lscull",
+                        "-lpthread",
+                        "-Wl,-rpath,$lib",
+                        "-o",
+                        exe.get().asFile.absolutePath,
+                    )
+                }
+            val run =
+                tasks.register<Exec>("runC$name") {
+                    dependsOn(compile)
+                    commandLine(exe.get().asFile.absolutePath)
+                }
+            cTests { dependsOn(run) }
+        }
+    }
+    tasks.named("check") { dependsOn(cTests) }
+}
