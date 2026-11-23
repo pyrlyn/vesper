@@ -30,7 +30,7 @@ public fun fuzzInlineImages(data: ByteArray) {
  * Throws [IllegalStateException] on a violation.
  */
 public fun fuzzImageStore(data: ByteArray) {
-    val store = ImageStore(quotaBytes = 64L * RGBA, maxImages = 5)
+    val store = ImageStore(quotaBytes = 64L * RGBA, maxImages = 5, maxPlacements = 8)
     val ids = ArrayList<Long>()
     val placements = ArrayList<Long>()
     var i = 0
