@@ -13,11 +13,16 @@ private const val WORD_MASK = Long.SIZE_BITS - 1
 /** The id [Interner.intern] returns when the table is full. */
 internal const val FULL = -1
 
-/** One bit per id: which entries a sweep must keep. */
+/**
+ * One bit per id: which entries a sweep must keep. Take the set from the table, mark every id in use,
+ * then sweep, with no intern in between. A sweep with marks taken before the latest intern frees
+ * nothing, so a missed mark can delay reclaim but never free a live entry.
+ */
 public class Marks internal constructor(
     size: Int,
     // The table's insert count when the set was made: an id handed out after that is live but
-    // unmarked, so a sweep with these marks must not run.
+    // unmarked, so a sweep with these marks must not run. Checking the set's length would not do:
+    // a freed id handed out again lies inside it.
     internal val stamp: Long,
 ) {
     /** A blank set for ids below [size], for tables the terminal layer keeps itself (link ids). */

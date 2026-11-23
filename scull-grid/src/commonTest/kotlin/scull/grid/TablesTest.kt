@@ -3,6 +3,7 @@ package scull.grid
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 private const val FAMILY = "👨‍👩‍👧"
@@ -87,6 +88,41 @@ class TablesTest {
         t.intern("á")
         t.intern("é")
         assertEquals(2, assertFailsWith<GridException.ClusterTableFull> { t.intern("ó") }.cap)
+    }
+
+    @Test
+    fun aStyleInternedBetweenMarksAndSweepSurvivesTheSweep() {
+        val t = StyleTable()
+        val kept = t.intern(red(1))
+        val unused = t.intern(red(2))
+        val live = t.marks()
+        live.mark(kept.value)
+        val late = t.intern(red(3))
+        assertEquals(0, t.sweep(live), "marks taken before an intern free nothing")
+        assertEquals(red(3), t[late])
+        assertEquals(red(2), t[unused], "reclaim waits for the next sweep")
+
+        val fresh = t.marks()
+        fresh.mark(kept.value)
+        fresh.mark(late.value)
+        assertEquals(1, t.sweep(fresh), "fresh marks sweep as before")
+        assertNull(t[unused])
+        assertEquals(red(3), t[late])
+        assertEquals(Style.DEFAULT, t[StyleId.DEFAULT], "the default style is never swept")
+    }
+
+    @Test
+    fun aClusterReusingAFreedIdBetweenMarksAndSweepSurvivesTheSweep() {
+        val t = ClusterTable()
+        val gone = t.intern("a\u0301")
+        assertEquals(1, t.sweep(t.marks()))
+        val live = t.marks()
+        val reused = t.intern(FAMILY)
+        assertEquals(gone, reused, "the freed id is handed out again, inside the marks' length")
+        assertEquals(0, t.sweep(live), "marks taken before an intern free nothing")
+        assertEquals(FAMILY, t[reused])
+        assertEquals(0, t.sweep(t.marks().also { it.mark(reused.value) }))
+        assertEquals(FAMILY, t[reused])
     }
 
     @Test
