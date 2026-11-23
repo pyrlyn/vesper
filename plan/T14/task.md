@@ -1,9 +1,9 @@
 ---
-status: todo
+status: in progress
 priority: P0
 complexity: 5
-readiness: 0%
-agent:
+readiness: 10%
+agent: Claude Code / claude-opus-5-5
 ---
 
 # T14. macOS app: first light
@@ -15,6 +15,26 @@ Before the app: the terminal stores the input modes the encoders need (mouse tra
 The removed Swift app in `macos/` at eaeb20f is the reference for the AppKit side. The execution plan is written at claim time and split into slices of at most 500 lines.
 
 Check: `./gradlew check`; the app runs the user's shell in one window, and a screenshot after typing `ls` shows the output.
+
+Execution plan:
+
+1. Session layer, new module `vesper-session` (it sees both the terminal and the PTY, which never
+   see each other). `Session` owns a `Terminal`, the `FairLock` and the `Pty`; its `Sink` is the
+   adapter the removed C ABI had (`TermHandle` at eaeb20f): feed, replies, sync-held wakeups, and a
+   throwing terminal stops only this session. One coalesced wakeup until the host reads the frame.
+   Calls: `update(frame)`, `key`, `text`, `mouse`, `paste`, `focus`, `scrollDisplay`, `resize`,
+   `pauseOutput`/`resumeOutput`, `pollEvent` (OSC 52 reads answered with a denial), `exitStatus`,
+   `close`. Input that does not fit the PTY's write queue waits in an outbox flushed on the next
+   call. Tests (Unix PTY): output reaches the frame; typed text comes back through `cat`; a
+   clipboard read is denied; resize reaches the frame.
+2. Host, new module `vesper-macos`: pure parts in `commonMain` so every runner tests them (xterm
+   palette and style colours, Mac virtual key codes and modifier flags to `KeyEvent`, pixel to
+   cell); AppKit in `macosMain`: `NSApplication`, one window, an `NSView` that draws runs with
+   CoreText (backgrounds, cursor, wide cells), key, text, mouse and scroll input, live resize with
+   output paused, the wakeup posted to the main queue, title, directory and OSC 52 writes to
+   `NSPasteboard.general`. An executable for `macosArm64`.
+3. Wire `settings.gradle.kts`, README, PLAN; gate with `./gradlew ktlintFormat check` and the Linux
+   tests in Colima; run the app, type `ls`, take a screenshot.
 
 Acceptance:
 - [ ] The work described above is implemented in Kotlin/Native.
