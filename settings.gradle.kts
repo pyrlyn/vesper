@@ -29,6 +29,8 @@ include(
     ":vesper-png",
     // Images and their placements under a byte quota, and the protocol decoders (T19).
     ":vesper-image",
+    // A terminal and the child it runs: what each host window holds (T14).
+    ":vesper-session",
     // Test and measurement tools; nothing in the shipped library depends on them.
     ":vesper-harness",
     ":vesper-bench",
