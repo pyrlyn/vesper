@@ -139,6 +139,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 ### Phase 6: macOS app
 
 - [ ] **T14.** First light: a window running the user's shell.
+- [x] **T14.1.** Input through the C ABI: key, text, paste, focus, mouse and viewport scrolling.
 - [ ] **T15.** Metal renderer, CoreText atlas, measurements.
 - [ ] **T16.** Input method and accessibility.
 - [ ] **T13.4.** Selection, copy and find UI.
