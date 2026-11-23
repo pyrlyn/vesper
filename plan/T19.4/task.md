@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 4
-readiness: 10%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -76,5 +76,5 @@ Done when golden tests cover each protocol end to end and `./gradlew check` pass
 5. Tests:
    - `ImagesTest` in `scull-term`: a golden run per protocol, cursor moves, scroll and eviction, ED 2 and ED 3, the alternate screen, reflow, RIS, the kitty replies and frame placements;
    - an FFI test in Kotlin;
-   - `tests/c/images.c` under ASan+UBSan and TSan.
+   - no new host program: native code is written in Zig first, and the Zig host harness (T901, PR #23) is not on this branch's base yet. The existing C programs still build against the new header under both sanitizers, and the export of `tt_image_pixels` is checked with `nm`. An `images.zig` host test follows once both are in `main`.
 6. Verify: `./gradlew ktlintFormat`, then `./gradlew check` on macOS, and the scull-term, scull-image and scull-ffi tests on Linux in Colima.
