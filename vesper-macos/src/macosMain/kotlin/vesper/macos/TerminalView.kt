@@ -15,6 +15,7 @@ import platform.AppKit.NSTrackingArea
 import platform.AppKit.NSTrackingInVisibleRect
 import platform.AppKit.NSTrackingMouseMoved
 import platform.AppKit.NSView
+import platform.AppKit.NSViewLayerContentsRedrawOnSetNeedsDisplay
 import platform.CoreGraphics.CGAffineTransformMakeScale
 import platform.CoreGraphics.CGContextFillRect
 import platform.CoreGraphics.CGContextRef
@@ -27,6 +28,7 @@ import platform.CoreGraphics.CGRectMake
 import platform.CoreGraphics.CGSize
 import platform.Foundation.NSHomeDirectory
 import platform.Foundation.NSURL
+import platform.QuartzCore.CALayer
 import platform.darwin.NSObject
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
@@ -64,6 +66,30 @@ internal class TerminalView(
     private var focused = false
     private var lastMotion: Cells? = null
     private var scrollLines = 0.0
+
+    /** Null without a Metal device (a VM, a CI runner): the view then draws with CoreText. */
+    internal val renderer = MetalRenderer.create(text, palette)
+    private val sources = RowSources()
+
+    init {
+        if (renderer != null) {
+            wantsLayer = true
+            layerContentsRedrawPolicy = NSViewLayerContentsRedrawOnSetNeedsDisplay
+        }
+    }
+
+    override fun makeBackingLayer(): CALayer = renderer?.layer ?: super.makeBackingLayer()
+
+    override fun wantsUpdateLayer(): Boolean = renderer != null
+
+    override fun updateLayer() {
+        val metal = renderer ?: return
+        bounds.useContents { metal.draw(screen, sources, size.width, size.height, window?.backingScaleFactor ?: 1.0, focused) }
+    }
+
+    /** Renders the current frame offscreen at [scale] and waits for it; null without Metal. */
+    fun snapshot(scale: Double): Bitmap? =
+        renderer?.let { metal -> bounds.useContents { metal.render(screen, sources, size.width, size.height, scale, focused) } }
 
     /** The window's title and directory follow the program; the app closes the window when the child exits. */
     var onTitle: (String) -> Unit = {}
@@ -103,7 +129,10 @@ internal class TerminalView(
     /** Reads the new frame and the events since the last look; runs on the main queue. */
     fun refresh() {
         val current = session ?: return
-        if (current.update(screen)) needsDisplay = true
+        if (current.update(screen)) {
+            sources.absorb(screen.damage, screen.rows)
+            needsDisplay = true
+        }
         while (true) {
             when (val event = current.pollEvent() ?: break) {
                 Event.Bell -> NSBeep()

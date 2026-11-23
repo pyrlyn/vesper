@@ -41,7 +41,7 @@ private val KEY_CODES =
 
 /**
  * The whole path in one view, offscreen: synthetic key events through the key map and the
- * session to a shell, its output back through the frame, and CoreText drawing the result to a PNG
+ * session to a shell, its output back through the frame, and the renderer drawing the result to a PNG
  * (the T14 check's screenshot, under build/reports/first-light).
  */
 class FirstLightTest {
@@ -90,6 +90,8 @@ class FirstLightTest {
     }
 
     private fun savePng(view: TerminalView) {
+        // With a GPU the picture is what Metal draws; without one, the CoreText fallback.
+        view.snapshot(2.0)?.let { return savePng(it, "first-light.png") }
         val bounds = view.bounds
         val image = view.bitmapImageRepForCachingDisplayInRect(bounds) ?: fail("no bitmap")
         view.cacheDisplayInRect(bounds, image)
