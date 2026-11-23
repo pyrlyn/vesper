@@ -13,8 +13,7 @@ kotlin {
         }
     }
 
-    // posix_spawn feeds a reference terminal on macOS and Linux; Windows has its own bench in
-    // windows/Scull.Bench.
+    // posix_spawn feeds a reference terminal on macOS and Linux; Windows has no headless feed yet.
     applyDefaultHierarchyTemplate()
     sourceSets {
         val posixMain by creating { dependsOn(nativeMain.get()) }

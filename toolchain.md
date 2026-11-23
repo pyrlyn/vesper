@@ -13,10 +13,6 @@
 | hk | mise (`mise.toml` pins 2.5.0) | Runs jactionlint as a pre-push hook (`hk.pkl`) | https://github.com/jdx/hk |
 | shellcheck | mise (`mise.toml` pins 0.11.0; CI uses the runner image's copy) | Checks `run:` scripts inside jactionlint | https://github.com/koalaman/shellcheck |
 | clang | system (Xcode Command Line Tools; the `clang` package on Linux, preinstalled on the CI image) | Builds `scull-ffi/tests/c` against the shared library and runs it under ASan+UBSan and TSan (`:scull-ffi:cTests`, part of `check` on macOS and Linux) | https://github.com/llvm/llvm-project |
-| Xcode (Swift 6.4, SwiftPM, AppKit/SwiftUI SDK) | Mac App Store or developer.apple.com (27.0) | Build and test the macOS app in `macos/` (arm64 only) | https://developer.apple.com/xcode/ |
-| codesign | system (Xcode) | Ad-hoc signs `Scull.app` so it launches locally | https://developer.apple.com/documentation/security/code-signing-services |
-| .NET SDK (`dotnet`, C# compiler, MSBuild) | https://dot.net (pinned to 10.0.401 in `windows/global.json`; CI: `actions/setup-dotnet`) | Build and test the C# projects in `windows/` | https://github.com/dotnet/sdk |
-| Direct3D 11 (with WARP), DirectWrite, `d3dcompiler_47.dll` | ship with Windows (whether the last is guaranteed: `research.md` §9) | `windows/Scull.Render`: draws frames, rasterises glyphs, compiles the HLSL at start-up; WARP renders the tests with no GPU | https://learn.microsoft.com/en-us/windows/win32/direct3d11/atoc-dx-graphics-direct3d-11 |
 
 The PTY bindings (POSIX PTY, ConPTY) need no package: `scull-pty` declares them in its own cinterop `.def` files, compiled by the clang that ships with Kotlin/Native (`plan/T8/task.md` says why). A fuzz/property-test runner is chosen and recorded here in T25.
 
@@ -35,22 +31,8 @@ The PTY bindings (POSIX PTY, ConPTY) need no package: `scull-pty` declares them 
 | org.jetbrains.kotlin:kotlin-test | local (every module's `commonTest`, version from the Kotlin plugin) | https://github.com/JetBrains/kotlin | Test API of the native tests |
 | com.squareup.okio:okio 3.18.2 | local (`scull-harness`, `scull-bench`) | https://github.com/square/okio | Multiplatform file access: the harness reads the golden frames and the conformance fixtures in `tests/`, the bench writes `docs/benchmarks/baseline.md`; Kotlin/Native has no `java.io` |
 
-## Bundled files
-
-| Package | Where | Source | Why here |
-| --- | --- | --- | --- |
-| Symbols Nerd Font Mono 3.5.1 (MIT, `NerdFontsSymbolsOnly.tar.xz`) | local (`macos/Resources/`, also shipped by `windows/Scull.Render` under `Fonts/`) | https://github.com/ryanoasis/nerd-fonts/releases/tag/v3.5.1 | Powerline separators and Nerd Font icons in shell prompts when the face lacks them, on macOS and Windows |
-
-## NuGet
-
-| Package | Where | Source | Why here |
-| --- | --- | --- | --- |
-| MSTest | local (`windows/Scull.Core.Tests`, `windows/Scull.Render.Tests`) | https://github.com/microsoft/testfx | Test framework of the C# core; the default of `dotnet new mstest` (the `xunit` template pins the deprecated xunit 2.9.3) |
-| Microsoft.Windows.CsWin32 | local (`windows/Scull.Render` and `windows/Scull.App`, exactly 0.3.358; build-time source generator, nothing ships) | https://github.com/microsoft/CsWin32 | Direct3D 11, DXGI, DirectWrite, TSF and UIA from C# as blittable structs (`allowMarshaling: false`); only the APIs in `NativeMethods.txt` are generated; the comparison is in `research.md` §6.1 |
-| Microsoft.WindowsAppSDK | local (`windows/Scull.App`, 2.5.1, self-contained: the runtime ships beside the executable) | https://github.com/microsoft/WindowsAppSDK | WinUI 3 for the Windows shell: the window and the `SwapChainPanel` the renderer's swap chain is shown in |
-
 ## Linkers
 
-- **Windows:** the Kotlin/Native `mingwX64` toolchain linker for the core library; MSVC for the C# host.
+- **Windows:** the Kotlin/Native `mingwX64` toolchain linker.
 - **Linux:** the Kotlin/Native `linuxX64` linker.
-- **macOS:** Apple's native linker, used both by Kotlin/Native (`macosArm64`) and by the Swift package.
+- **macOS:** Apple's native linker, used by Kotlin/Native (`macosArm64`).

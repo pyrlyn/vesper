@@ -23,8 +23,7 @@ private const val BYTES_PER_MIB = 1024.0 * 1024.0
 
 /**
  * The fixed payload: [INPUT_BYTES] of a repeating `A`..`Z` pattern with a line feed closing every
- * [COLUMNS] bytes. Built here so the repository does not store it; `windows/Scull.Bench` builds
- * the same bytes and both pin their FNV-1a hash.
+ * [COLUMNS] bytes. Built here so the repository does not store it; the test pins its FNV-1a hash.
  */
 internal fun fixedInput(): ByteArray {
     var letter = 0

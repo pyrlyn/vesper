@@ -7,9 +7,9 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class BaselineTest {
-    // FNV-1a over the payload; windows/Scull.Bench pins the same value for its C# copy.
+    // FNV-1a over the payload, so a change to the generator changes every recorded baseline.
     @Test
-    fun fixedInputMatchesTheWindowsBenchCopy() {
+    fun fixedInputHashIsPinned() {
         val input = fixedInput()
         assertEquals(INPUT_BYTES, input.size)
         var hash = 0xCBF29CE484222325uL

@@ -2,7 +2,7 @@ package scull.bench
 
 import kotlin.time.Duration
 
-// The Windows renderer and input numbers come from windows/Scull.Bench, which owns its children.
+// ConPTY spawning for the bench belongs to the Windows host; until then the row reports a failure.
 internal actual fun feedStdin(
     program: String,
     args: List<String>,
