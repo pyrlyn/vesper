@@ -71,10 +71,8 @@ static int32_t scull_conpty_spawn(
         error = (int32_t)GetLastError();
         free(list);
         list = NULL;
-    /* lpValue is a pointer to the HPCON; passing `pc` would copy from the console
-     * object itself, the child would not attach, and its output would go to the
-     * parent's console instead of the pipe. */
-    } else if (!UpdateProcThreadAttribute(list, 0, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, &pc, sizeof(pc), NULL, NULL)) {
+    /* The ConPTY docs take lpValue as the HPCON itself, not a pointer to it. */
+    } else if (!UpdateProcThreadAttribute(list, 0, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, pc, sizeof(pc), NULL, NULL)) {
         error = (int32_t)GetLastError();
     } else {
         memcpy(line, command_line, line_length * sizeof(wchar_t));
@@ -82,7 +80,9 @@ static int32_t scull_conpty_spawn(
         memset(&startup, 0, sizeof(startup));
         startup.StartupInfo.cb = sizeof(startup);
         startup.lpAttributeList = list;
-        DWORD flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT;
+        /* Without CREATE_NO_WINDOW a console child can stay on the parent's
+         * console, so its output never appears on the ConPTY pipe. */
+        DWORD flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW;
         if (!CreateProcessW(NULL, line, NULL, NULL, FALSE, flags, (LPVOID)environment, cwd, &startup.StartupInfo, &info)) {
             error = (int32_t)GetLastError();
         }
