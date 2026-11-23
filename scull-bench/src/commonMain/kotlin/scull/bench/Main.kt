@@ -8,13 +8,14 @@ import kotlin.system.exitProcess
 
 /**
  * Writes `docs/benchmarks/baseline.md` (or the path in the first argument) and prints the table.
- * With `parser` or `grid` as the argument it prints the parser throughput table or the grid
- * memory and scroll tables instead.
+ * With `parser`, `grid` or `term` as the argument it prints the parser throughput table, the grid
+ * memory and scroll tables or the terminal throughput table instead.
  */
 fun main(args: Array<String>) {
     when (args.firstOrNull()) {
         "parser" -> return print(parserMarkdown())
         "grid" -> return print(gridMarkdown())
+        "term" -> return print(termMarkdown())
     }
     val path = (args.firstOrNull() ?: "docs/benchmarks/baseline.md").toPath()
     val text = baselineMarkdown()
