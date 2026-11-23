@@ -63,6 +63,9 @@ public class Terminal(
         sync.reset()
     }
 
+    /** Moves the viewport [delta] rows back into history (negative: towards the screen), clamped to what history holds. */
+    public fun scrollDisplay(delta: Int): Unit = state.grid.scrollDisplay(delta)
+
     /** The screen shown: the alternate one while [isAltScreen]. Valid until the next [feed]. */
     public val grid: Grid get() = state.grid
 
