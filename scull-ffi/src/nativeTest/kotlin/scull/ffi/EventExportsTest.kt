@@ -71,7 +71,7 @@ class EventExportsTest {
         val title = poll(term)!!
         memScoped {
             val len = alloc<ULongVar>()
-            assertEquals(TT_INVALID, ttTermEventText(term, title.serial, 1u, null, 0u, len.ptr))
+            assertEquals(TT_INVALID, ttTermEventText(term, title.serial, 2u, null, 0u, len.ptr))
         }
         ttTermFree(term)
     }

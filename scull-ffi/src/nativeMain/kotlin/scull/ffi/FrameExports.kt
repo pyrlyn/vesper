@@ -23,6 +23,7 @@ import scull.ffi.c.TT_COLOR_INDEXED
 import scull.ffi.c.TT_COLOR_RGB
 import scull.ffi.c.TT_INVALID
 import scull.ffi.c.tt_frame_view
+import scull.ffi.c.tt_link_span
 import scull.ffi.c.tt_row
 import scull.ffi.c.tt_run
 import scull.ffi.c.tt_scroll
@@ -75,6 +76,7 @@ internal class FrameHandle {
     private val dirty = Grow<UShortVar> { nativeHeap.allocArray(it) }
     private val runs = ArrayList<Grow<tt_run>>()
     private val texts = ArrayList<Grow<UByteVar>>()
+    private val links = ArrayList<Grow<tt_link_span>>()
 
     /** Copies the rows [frame]'s last update changed into the C buffers and describes them in [view]. */
     fun fill(
@@ -89,6 +91,7 @@ internal class FrameHandle {
         while (runs.size < rows) {
             runs += Grow { nativeHeap.allocArray(it) }
             texts += Grow { nativeHeap.allocArray(it) }
+            links += Grow { nativeHeap.allocArray(it) }
         }
         // A scrolled row is rewritten rather than moved: the Kotlin frame already moved it, and a
         // copy costs the same as a move here.
@@ -151,6 +154,16 @@ internal class FrameHandle {
         if (row != null) writeRuns(row, runOut)
         line.runs = runOut
         line.runs_len = runList.size.toULong()
+        val linkList = row?.links.orEmpty()
+        val linkOut = links[r].ensure(linkList.size)
+        linkList.forEachIndexed { i, span ->
+            val o = linkOut!![i]
+            o.id = span.link.value.toUInt()
+            o.col = span.start.toUShort()
+            o.cols = (span.end - span.start).toUShort()
+        }
+        line.links = linkOut
+        line.links_len = linkList.size.toULong()
     }
 
     /** Runs with their text as UTF-8 byte ranges; the Kotlin frame counts UTF-16 units. */
@@ -198,6 +211,7 @@ internal class FrameHandle {
         listOf(cells, lines, styles, scrolls, dirty).forEach { it.free() }
         runs.forEach { it.free() }
         texts.forEach { it.free() }
+        links.forEach { it.free() }
     }
 }
 

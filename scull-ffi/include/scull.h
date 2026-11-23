@@ -28,11 +28,11 @@
 
 // Additions (new functions, fields appended to a struct) bump the minor. While the major is 0 every
 // minor may break, so the minor must match too.
-#define TT_ABI_VERSION_MINOR 1
+#define TT_ABI_VERSION_MINOR 2
 
 // The version a host was built against, `major << 16 | minor`; pass it in
 // `tt_term_options.abi_version`.
-#define TT_ABI_VERSION 1
+#define TT_ABI_VERSION 2
 
 // `tt_event.kind`: BEL arrived. Bells between two polls arrive as one.
 #define TT_EVENT_BELL 1
@@ -54,8 +54,51 @@
 // The window title (OSC 2).
 #define TT_TITLE_WINDOW 2
 
+// `tt_event.kind`: the shell's working directory changed (OSC 7). The `file://` URI is part
+// `TT_EVENT_TEXT_BODY`.
+#define TT_EVENT_DIRECTORY 4
+
+// `tt_event.kind`: a shell integration mark (OSC 133). `detail` is a `TT_SHELL_*`; for
+// `TT_SHELL_COMMAND_FINISHED`, `exit_code` is the command's, or `TT_EXIT_CODE_UNKNOWN` when the
+// shell sent none.
+#define TT_EVENT_SHELL_MARK 5
+
+// `tt_event.kind`: the program writes the clipboard (OSC 52). The data, decoded and not necessarily
+// UTF-8, is part `TT_EVENT_TEXT_BODY`; the selections it names are part `TT_EVENT_TEXT_TITLE`. The
+// host decides whether a program may write the clipboard at all.
+#define TT_EVENT_CLIPBOARD_WRITE 6
+
+// `tt_event.kind`: the program asks for the clipboard (OSC 52). The selections are part
+// `TT_EVENT_TEXT_TITLE`. Answer with `tt_term_clipboard_reply` or `tt_term_clipboard_deny`: the
+// program waits for one of them.
+#define TT_EVENT_CLIPBOARD_READ 7
+
+// `tt_event.kind`: cells now carry a link id the host has not seen (OSC 8). `id` is the link id, its
+// URI part `TT_EVENT_TEXT_BODY`. An id the core freed may come back with another URI in a new event.
+#define TT_EVENT_LINK 8
+
+// `tt_event.kind`: a desktop notification (OSC 9, OSC 777 `notify`). The body is part
+// `TT_EVENT_TEXT_BODY`, the title part `TT_EVENT_TEXT_TITLE`, empty for OSC 9.
+#define TT_EVENT_NOTIFICATION 9
+
+// `tt_event.detail` of `TT_EVENT_SHELL_MARK`: the prompt starts (A).
+#define TT_SHELL_PROMPT_START 0
+
+// The prompt ends and the command line starts (B).
+#define TT_SHELL_COMMAND_START 1
+
+// The command runs; its output follows (C).
+#define TT_SHELL_COMMAND_EXECUTED 2
+
+// The command finished (D).
+#define TT_SHELL_COMMAND_FINISHED 3
+
 // `tt_term_event_text` part: the event's main text.
 #define TT_EVENT_TEXT_BODY 0
+
+// `tt_term_event_text` part: the second text, a notification's title or the selections a clipboard
+// event names (xterm's letters `c p q s 0`-`7`).
+#define TT_EVENT_TEXT_TITLE 1
 
 // `tt_event.exit_code` when the system could not tell.
 #define TT_EXIT_CODE_UNKNOWN 4294967295u
@@ -154,19 +197,20 @@ typedef struct tt_event {
   uint32_t struct_size;
   // One of `TT_EVENT_*`; skip kinds you do not know.
   uint32_t kind;
-  // `TT_EVENT_CHILD_EXITED`: the exit code, or `TT_EXIT_CODE_UNKNOWN`.
+  // `TT_EVENT_CHILD_EXITED` and a finished command's `TT_EVENT_SHELL_MARK`: the exit code, or
+  // `TT_EXIT_CODE_UNKNOWN`.
   uint32_t exit_code;
   // `TT_EVENT_CHILD_EXITED`: 1 when a signal ended the child.
   uint8_t signaled;
   // Names this event to `tt_term_event_text`; never 0.
   uint64_t serial;
-  // Reserved for request and link ids; 0 for every kind so far.
+  // `TT_EVENT_LINK`: the link id, as `tt_link_span.id` holds it; 0 for every other kind.
   uint64_t id;
-  // Per kind: a `TT_TITLE_*`; 0 otherwise.
+  // Per kind: a `TT_TITLE_*` or a `TT_SHELL_*`; 0 otherwise.
   uint32_t detail;
   // Bytes of the text (`TT_EVENT_TEXT_BODY`); 0 when there is none.
   uint32_t text_len;
-  // Reserved for a second text; 0 for every kind so far.
+  // Bytes of the second text (`TT_EVENT_TEXT_TITLE`); 0 when there is none.
   uint32_t title_len;
 } tt_event;
 
@@ -207,6 +251,13 @@ typedef struct tt_run {
   uint32_t text_len;
 } tt_run;
 
+// Columns `col..col + cols` of a row lead to link `id`; `tt_term_link_uri` reads where.
+typedef struct tt_link_span {
+  uint32_t id;
+  uint16_t col;
+  uint16_t cols;
+} tt_link_span;
+
 // One viewport row: the line it shows and its text.
 typedef struct tt_row {
   // The line shown; stays with the line as it scrolls, so it keys a cache of shaped rows.
@@ -219,6 +270,9 @@ typedef struct tt_row {
   // UTF-8 text of all runs, not NUL-terminated.
   const uint8_t *text;
   size_t text_len;
+  // The row's link spans, left to right.
+  const struct tt_link_span *links;
+  size_t links_len;
 } tt_row;
 
 // A style as SGR set it; palette and reverse video are not resolved yet.
@@ -359,6 +413,23 @@ tt_status tt_term_poll_event(const struct tt_term *term, struct tt_event *event)
 tt_status tt_term_event_text(const struct tt_term *term, uint64_t serial, uint32_t part, uint8_t *buf,
                              size_t cap, size_t *len);
 
+// Answers a `TT_EVENT_CLIPBOARD_READ` with `len` bytes of `data` for the selections `targets`
+// (`targets_len` bytes, as the event named them), written to the child at once and whole.
+// `TT_FULL` when the child's input queue lacks room now: call again later. `TT_INVALID` for targets
+// that are not OSC 52 selections, or data too large for the queue ever to hold (about 190 KiB); deny
+// those instead. `TT_CLOSED` when there is no child.
+tt_status tt_term_clipboard_reply(const struct tt_term *term, const uint8_t *targets, size_t targets_len,
+                                  const uint8_t *data, size_t len);
+
+// Refuses a `TT_EVENT_CLIPBOARD_READ`: the child gets an empty selection, so it does not wait for an
+// answer. Statuses as for `tt_term_clipboard_reply`.
+tt_status tt_term_clipboard_deny(const struct tt_term *term, const uint8_t *targets, size_t targets_len);
+
+// Copies the URI of link `id` (from `TT_EVENT_LINK` or a `tt_link_span`) into `buf`, as
+// `tt_term_event_text` copies text. `TT_EMPTY` when no cell holds the id any more and the core freed
+// it.
+tt_status tt_term_link_uri(const struct tt_term *term, uint32_t id, uint8_t *buf, size_t cap, size_t *len);
+
 // Frees the terminal. Also valid on a poisoned terminal; `NULL` is a no-op. No other call may use
 // `term` during or after this one.
 void tt_term_free(struct tt_term *term);
@@ -384,9 +455,11 @@ void tt_frame_free(struct tt_frame *frame);
 #ifdef __cplusplus
 static_assert(sizeof(tt_cell) == 8, "tt_cell layout");
 static_assert(sizeof(tt_run) == 16, "tt_run layout");
+static_assert(sizeof(tt_link_span) == 8, "tt_link_span layout");
 #else
 _Static_assert(sizeof(tt_cell) == 8, "tt_cell layout");
 _Static_assert(sizeof(tt_run) == 16, "tt_run layout");
+_Static_assert(sizeof(tt_link_span) == 8, "tt_link_span layout");
 #endif
 
 #endif // SCULL_H
