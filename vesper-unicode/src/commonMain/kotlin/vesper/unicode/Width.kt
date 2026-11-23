@@ -124,11 +124,13 @@ public fun clusterWidth(
     return acc.width
 }
 
-private const val SURROGATE_BITS = 10
-private const val SUPPLEMENTARY_FIRST = 0x10000
+@PublishedApi
+internal const val SURROGATE_BITS: Int = 10
+@PublishedApi
+internal const val SUPPLEMENTARY_FIRST: Int = 0x10000
 
 /** Calls [action] with each code point of the string; an unpaired surrogate is passed as itself. */
-internal inline fun String.forEachCodePoint(action: (Int) -> Unit) {
+public inline fun String.forEachCodePoint(action: (Int) -> Unit) {
     var i = 0
     while (i < length) {
         val high = this[i]

@@ -57,7 +57,8 @@ private const val ITALIC = 2
  * serves every colour. CoreText falls back to other fonts for characters this one lacks.
  */
 internal class TextStyle {
-    private val faces: List<CTFontRef?>
+    /** Regular, bold, italic and bold italic, indexed by [face]. */
+    val faces: List<CTFontRef?>
     private val attributes: List<CFDictionaryRef?>
 
     /** The cell, from the advance of `M` and the line height. */
@@ -91,9 +92,8 @@ internal class TextStyle {
         bold: Boolean,
         italic: Boolean,
     ) {
-        val face = (if (bold) BOLD else 0) or (if (italic) ITALIC else 0)
         val string = CFStringCreateWithCString(null, text, kCFStringEncodingUTF8) ?: return
-        val attributed = CFAttributedStringCreate(null, string, attributes[face])
+        val attributed = CFAttributedStringCreate(null, string, attributes[face(bold, italic)])
         val line = CTLineCreateWithAttributedString(attributed)
         CGContextSetTextPosition(context, x, baseline)
         CTLineDraw(line, context)
@@ -130,6 +130,12 @@ internal class TextStyle {
                 ?: FONT_SIZE * FALLBACK_ADVANCE
         }
 }
+
+/** The index in [TextStyle.faces] of a style's face. */
+internal fun face(
+    bold: Boolean,
+    italic: Boolean,
+): Int = (if (bold) BOLD else 0) or (if (italic) ITALIC else 0)
 
 /** The text of one code point, for a cell drawn on its own. */
 internal fun codePointText(codePoint: Int): String =

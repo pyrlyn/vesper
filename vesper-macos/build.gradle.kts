@@ -19,6 +19,7 @@ kotlin {
         }
         macosMain.dependencies {
             implementation(projects.vesperSession)
+            implementation(projects.vesperUnicode)
         }
         all { languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi") }
     }
