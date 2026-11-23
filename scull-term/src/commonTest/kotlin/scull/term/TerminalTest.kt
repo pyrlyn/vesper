@@ -49,7 +49,9 @@ class TerminalTest {
         val term = Terminal(5, 3, 0)
         term.feed("abcd中")
         assertTrue(term.cell(0, 4).hasFlags(CellFlags.LEADING_SPACER))
+        assertTrue(term.cell(0, 4).isEmpty)
         assertTrue(checkNotNull(term.grid.screenRow(0)).wrapped)
+        assertEquals(listOf("abcd.", "中...", "....."), term.screenText())
         assertTrue(term.cell(1, 0).hasFlags(CellFlags.WIDE))
         assertTrue(term.cell(1, 1).hasFlags(CellFlags.SPACER))
         assertEquals(Cursor(row = 1, col = 2), term.cursor)
@@ -60,7 +62,8 @@ class TerminalTest {
         val term = Terminal(5, 3, 0)
         term.feed("abcde中")
         assertEquals('e'.code, term.cell(0, 4).codePoint)
-        assertFalse(term.cell(0, 4).hasFlags(CellFlags.LEADING_SPACER))
+        assertTrue((0 until 5).none { term.cell(0, it).hasFlags(CellFlags.LEADING_SPACER) })
+        assertTrue(checkNotNull(term.grid.screenRow(0)).wrapped)
         assertTrue(term.cell(1, 0).hasFlags(CellFlags.WIDE))
     }
 
@@ -70,6 +73,8 @@ class TerminalTest {
         term.feed("$CSI?7labcde中")
         assertEquals(listOf("abc中", ".....", "....."), term.screenText())
         assertTrue(term.cell(0, 3).hasFlags(CellFlags.WIDE))
+        assertTrue((0 until 5).none { term.cell(0, it).hasFlags(CellFlags.LEADING_SPACER) })
+        assertFalse(checkNotNull(term.grid.screenRow(0)).wrapped)
         assertEquals(Cursor(row = 0, col = 4), term.cursor)
     }
 
