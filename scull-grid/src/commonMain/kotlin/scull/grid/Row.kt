@@ -16,6 +16,7 @@ package scull.grid
 public const val MAX_COLS: Int = 0xFFFF
 
 private val NO_CELLS = LongArray(0)
+private const val ASCII_MASK = 0x7FL
 
 /** Identity of a logical row, unique within one grid. */
 public value class RowId(
@@ -118,6 +119,31 @@ public class Row(
         materialize(end)
         cells[col] = (if (wide) cell.withFlags(CellFlags.WIDE) else cell.withoutFlags(CellFlags.WIDE)).bits
         if (wide) cells[col + 1] = Cell.spacer(cell.style).bits
+        touch()
+    }
+
+    /**
+     * Writes [count] one-cell characters at [col], one per byte of [bytes] from [from], all drawn with
+     * [style]: what [put] does for each, in one call, because the terminal prints text in runs and a
+     * call per cell costs more than the write (docs/benchmarks/grid.md). Only the low seven bits of a
+     * byte are stored, so a byte that is not ASCII cannot reach the style or the flags.
+     */
+    public fun putAscii(
+        col: Int,
+        bytes: ByteArray,
+        from: Int,
+        count: Int,
+        style: StyleId,
+    ) {
+        if (count <= 0) return
+        checkColumn(col)
+        val end = col + count
+        if (end > cols) throw IndexOutOfBoundsException("$count characters at column $col of a row of $cols columns")
+        if (from < 0 || from + count > bytes.size) throw IndexOutOfBoundsException("bytes $from until ${from + count} of ${bytes.size}")
+        breakWideEdges(col, end)
+        materialize(end)
+        val styled = Cell.blank(style).bits
+        for (i in 0 until count) cells[col + i] = styled or (bytes[from + i].toLong() and ASCII_MASK)
         touch()
     }
 
