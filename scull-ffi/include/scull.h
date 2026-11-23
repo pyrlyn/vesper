@@ -1,0 +1,392 @@
+/*
+ * The C ABI of the scull core.
+ *
+ * Written by hand and the source of truth: the Kotlin exports compile against this file through
+ * cinterop (scull-ffi/src/nativeInterop/cinterop/scull.def), so a layout that drifts from it does
+ * not build. The C# bindings are generated from it (`just bindings`).
+ *
+ * Rules:
+ * - Every function is safe to call from any thread with respect to the core's own threads. Calls on
+ *   one `tt_term` may come from several host threads; the core serializes them on the terminal's
+ *   lock. A `tt_frame` is used by one thread at a time.
+ * - Every struct a host passes or receives starts with `struct_size`: the core reads or writes only
+ *   `min(struct_size, sizeof)` bytes, so fields are only ever appended.
+ * - Constants and enum values are append-only; skip an event kind you do not know.
+ * - Text is UTF-8 with an explicit length, never NUL-terminated. Structs hold no `bool`.
+ * - An exception inside the core never crosses this boundary: the call answers `TT_PANIC` and the
+ *   terminal is poisoned, so every later call on it answers `TT_POISONED` until `tt_term_free`.
+ */
+
+#ifndef SCULL_H
+#define SCULL_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+// Breaking changes bump the major version; a host refuses to run on another major.
+#define TT_ABI_VERSION_MAJOR 0
+
+// Additions (new functions, fields appended to a struct) bump the minor. While the major is 0 every
+// minor may break, so the minor must match too.
+#define TT_ABI_VERSION_MINOR 1
+
+// The version a host was built against, `major << 16 | minor`; pass it in
+// `tt_term_options.abi_version`.
+#define TT_ABI_VERSION 1
+
+// `tt_event.kind`: BEL arrived. Bells between two polls arrive as one.
+#define TT_EVENT_BELL 1
+
+// `tt_event.kind`: the child ended; `exit_code` and `signaled` say how. The last event of a
+// terminal.
+#define TT_EVENT_CHILD_EXITED 2
+
+// `tt_event.kind`: the program set a title (OSC 0, 1 or 2). `detail` is a `TT_TITLE_*`; the text is
+// part `TT_EVENT_TEXT_BODY`.
+#define TT_EVENT_TITLE 3
+
+// `tt_event.detail` of `TT_EVENT_TITLE`: both the icon and the window title (OSC 0).
+#define TT_TITLE_BOTH 0
+
+// The icon title (OSC 1).
+#define TT_TITLE_ICON 1
+
+// The window title (OSC 2).
+#define TT_TITLE_WINDOW 2
+
+// `tt_term_event_text` part: the event's main text.
+#define TT_EVENT_TEXT_BODY 0
+
+// `tt_event.exit_code` when the system could not tell.
+#define TT_EXIT_CODE_UNKNOWN 4294967295u
+
+// `tt_cell.flags`: the cell holds a cluster of several code points; `codepoint` is its first and
+// the run's text has all of it.
+#define TT_CELL_CLUSTER 1
+
+// `tt_style` colours: the terminal's default colour.
+#define TT_COLOR_DEFAULT 0
+
+// A palette entry: the low byte is its index.
+#define TT_COLOR_INDEXED 16777216u
+
+// A direct colour: `0xRRGGBB` in the low three bytes.
+#define TT_COLOR_RGB 33554432u
+
+// Masks the kind (`TT_COLOR_DEFAULT`, `TT_COLOR_INDEXED`, `TT_COLOR_RGB`) out of a colour.
+#define TT_COLOR_KIND_MASK 4278190080u
+
+// `tt_style.attrs` bits.
+#define TT_ATTR_BOLD 1
+#define TT_ATTR_DIM 2
+#define TT_ATTR_ITALIC 4
+#define TT_ATTR_BLINK 8
+#define TT_ATTR_INVERSE 16
+#define TT_ATTR_HIDDEN 32
+#define TT_ATTR_STRIKE 64
+#define TT_ATTR_OVERLINE 128
+
+// `tt_style.underline` values.
+#define TT_UNDERLINE_NONE 0
+#define TT_UNDERLINE_SINGLE 1
+#define TT_UNDERLINE_DOUBLE 2
+#define TT_UNDERLINE_CURLY 3
+#define TT_UNDERLINE_DOTTED 4
+#define TT_UNDERLINE_DASHED 5
+
+// What a call reports. Passed as a plain `int32_t`, so a value added later is one an older host can
+// still hold.
+enum tt_status
+#if defined(__cplusplus) || __STDC_VERSION__ >= 202311L
+  : int32_t
+#endif
+{
+  // Done.
+  TT_OK = 0,
+  // A `NULL` handle or pointer, a `struct_size` too small, a size of zero, or text that is not UTF-8.
+  TT_INVALID = 1,
+  // The host was built against another ABI version.
+  TT_ABI_MISMATCH = 2,
+  // An earlier call threw inside this terminal; only `tt_term_free` is left to call.
+  TT_POISONED = 3,
+  // This call threw inside the core; the terminal is now poisoned.
+  TT_PANIC = 4,
+  // Nothing to report: the event queue is empty, or the event text asked for is no longer held.
+  TT_EMPTY = 5,
+  // The terminal has no child to talk to: it was made by `tt_term_new`, or its child has gone.
+  TT_CLOSED = 6,
+  // The operating system refused: no PTY, a program that does not start, a size the PTY rejects.
+  TT_IO = 7,
+  // The buffer is too small; nothing was copied.
+  TT_FULL = 8,
+};
+// cinterop takes the enum's constants and would declare the type twice.
+#if !defined(__cplusplus) && !defined(TT_TYPES_ONLY)
+#if __STDC_VERSION__ >= 202311L
+typedef enum tt_status tt_status;
+#else
+typedef int32_t tt_status;
+#endif
+#endif
+
+// A UI-owned frame. Opaque to the host; one per view, used from one thread at a time.
+typedef struct tt_frame tt_frame;
+
+// One terminal. Opaque to the host.
+typedef struct tt_term tt_term;
+
+// UTF-8 text the host owns: `len` bytes at `ptr`, no terminator. `ptr` may be `NULL` when `len` is 0.
+typedef struct tt_str {
+  const uint8_t *ptr;
+  size_t len;
+} tt_str;
+
+// Called with the `userdata` given at spawn when the terminal has something new: output to draw or
+// an event to poll. It runs on a core thread and must not block, unwind or call any `tt_*`
+// function: post a redraw to the UI thread and return. It is not called again until the host calls
+// `tt_frame_update` or `tt_term_poll_event` on the terminal, and never after `tt_term_free` returns.
+typedef void (*tt_wakeup_fn)(void *userdata);
+
+// One event. A `uint32_t` kind rather than an enum, so a kind added later is a value an older host
+// skips, not undefined behaviour.
+typedef struct tt_event {
+  // `sizeof(tt_event)` as the host knows it.
+  uint32_t struct_size;
+  // One of `TT_EVENT_*`; skip kinds you do not know.
+  uint32_t kind;
+  // `TT_EVENT_CHILD_EXITED`: the exit code, or `TT_EXIT_CODE_UNKNOWN`.
+  uint32_t exit_code;
+  // `TT_EVENT_CHILD_EXITED`: 1 when a signal ended the child.
+  uint8_t signaled;
+  // Names this event to `tt_term_event_text`; never 0.
+  uint64_t serial;
+  // Reserved for request and link ids; 0 for every kind so far.
+  uint64_t id;
+  // Per kind: a `TT_TITLE_*`; 0 otherwise.
+  uint32_t detail;
+  // Bytes of the text (`TT_EVENT_TEXT_BODY`); 0 when there is none.
+  uint32_t text_len;
+  // Reserved for a second text; 0 for every kind so far.
+  uint32_t title_len;
+} tt_event;
+
+// The cursor in viewport rows.
+typedef struct tt_cursor {
+  uint16_t row;
+  uint16_t col;
+  // 0 when hidden or scrolled out of the viewport.
+  uint8_t visible;
+} tt_cursor;
+
+// One cell: 8 bytes, row after row, `cols * rows` of them.
+typedef struct tt_cell {
+  // The first code point of the cell's text; 0 when it shows none.
+  uint32_t codepoint;
+  // Index into `tt_frame_view.styles`.
+  uint16_t style;
+  // Columns covered: 1, 2 for a wide character, 0 for the cell behind it.
+  uint8_t width;
+  // `TT_CELL_*` bits.
+  uint8_t flags;
+} tt_cell;
+
+// Neighbouring cells of one style and width with their text, the unit the platform shaper takes.
+// Blank cells belong to no run.
+typedef struct tt_run {
+  // First column.
+  uint16_t col;
+  // Columns covered, wide spacers included.
+  uint16_t cols;
+  // Index into `tt_frame_view.styles`.
+  uint16_t style;
+  // Columns per character: 1 or 2.
+  uint8_t width;
+  // Byte offset of the run's text in its row's `text`.
+  uint32_t text_start;
+  // Byte length of the run's text.
+  uint32_t text_len;
+} tt_run;
+
+// One viewport row: the line it shows and its text.
+typedef struct tt_row {
+  // The line shown; stays with the line as it scrolls, so it keys a cache of shaped rows.
+  uint64_t id;
+  // Bumped by every change to the line.
+  uint32_t generation;
+  // The row's text runs, left to right.
+  const struct tt_run *runs;
+  size_t runs_len;
+  // UTF-8 text of all runs, not NUL-terminated.
+  const uint8_t *text;
+  size_t text_len;
+} tt_row;
+
+// A style as SGR set it; palette and reverse video are not resolved yet.
+typedef struct tt_style {
+  uint32_t fg;
+  uint32_t bg;
+  // `TT_COLOR_DEFAULT` follows the foreground.
+  uint32_t underline_color;
+  // `TT_ATTR_*` bits.
+  uint16_t attrs;
+  // A `TT_UNDERLINE_*` value.
+  uint8_t underline;
+} tt_style;
+
+// Rows `start..end` are, unchanged, the rows from `from` of the previous picture: blit them before
+// repainting the dirty rows.
+typedef struct tt_scroll {
+  // First row moved into.
+  uint16_t start;
+  // One past the last row moved into.
+  uint16_t end;
+  // Where `start` was in the previous picture.
+  uint16_t from;
+} tt_scroll;
+
+// What `tt_frame_update` hands back. Set `struct_size` before the call. Every pointer stays valid
+// until the next update or free of the same frame.
+typedef struct tt_frame_view {
+  // `sizeof(tt_frame_view)` as the host knows it; on return, the bytes the core filled in.
+  uint32_t struct_size;
+  uint16_t cols;
+  uint16_t rows;
+  // 0 while synchronized output (mode 2026) holds the picture: nothing changed and there is no
+  // damage; keep showing the last frame.
+  uint8_t updated;
+  // 1 when every row must be repainted (first frame, resize, other screen); every row is then also
+  // listed in `dirty`.
+  uint8_t full;
+  struct tt_cursor cursor;
+  // `cols * rows` cells, row-major.
+  const struct tt_cell *cells;
+  size_t cells_len;
+  // One entry per viewport row.
+  const struct tt_row *lines;
+  size_t lines_len;
+  // The style table that cells and runs index; entry 0 is the default.
+  const struct tt_style *styles;
+  size_t styles_len;
+  // Rows to blit from the previous picture, applied before `dirty`.
+  const struct tt_scroll *scrolls;
+  size_t scrolls_len;
+  // Rows to repaint, top to bottom.
+  const uint16_t *dirty;
+  size_t dirty_len;
+} tt_frame_view;
+
+// How to create a terminal. Fields a host does not know read as zero; `tt_term_new` reads only up to
+// `scrollback`.
+typedef struct tt_term_options {
+  // `sizeof(tt_term_options)` as the host knows it.
+  uint32_t struct_size;
+  // `TT_ABI_VERSION` as the host was built with it.
+  uint32_t abi_version;
+  // Columns, at least 1.
+  uint16_t cols;
+  // Rows, at least 1.
+  uint16_t rows;
+  // History rows to keep; the core clamps it.
+  uint32_t scrollback;
+  // The program, searched on `PATH`; empty runs the user's shell.
+  struct tt_str program;
+  // `args_len` arguments; ignored for the user's shell.
+  const struct tt_str *args;
+  size_t args_len;
+  // Working directory; empty keeps the host's.
+  struct tt_str cwd;
+  // `env_len` `NAME=value` entries added to the host's environment.
+  const struct tt_str *env;
+  size_t env_len;
+  // Called from a core thread when there is something new to draw or poll; `NULL` for none. See
+  // `tt_wakeup_fn`.
+  tt_wakeup_fn wakeup;
+  // Passed to `wakeup` as is.
+  void *userdata;
+} tt_term_options;
+
+// cinterop reads this header for the types only: the functions below are the Kotlin exports
+// themselves.
+#ifndef TT_TYPES_ONLY
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// The ABI version of this library, `major << 16 | minor`. Call it before anything else.
+uint32_t tt_abi_version(void);
+
+// Creates a terminal with no child process: bytes reach it only through `tt_term_feed`. On `TT_OK`
+// `*out` holds the handle; free it with `tt_term_free`.
+tt_status tt_term_new(const struct tt_term_options *options, struct tt_term **out);
+
+// Creates a terminal running a child on a new PTY: `options.program` with its arguments, or the
+// user's shell. Output is parsed on core threads; `options.wakeup` says when to look. On `TT_OK`
+// `*out` holds the handle; free it with `tt_term_free`, which ends the child. The strings and arrays
+// in `*options` are read during this call only.
+tt_status tt_term_spawn(const struct tt_term_options *options, struct tt_term **out);
+
+// Parses `len` bytes of program output into the terminal, as if the child had written them. `bytes`
+// may be `NULL` when `len` is 0.
+tt_status tt_term_feed(const struct tt_term *term, const uint8_t *bytes, size_t len);
+
+// Queues `len` bytes of input (keys, paste) for the child without blocking. `*written` gets how many
+// leading bytes were taken: fewer than `len` when the child is not reading; offer the rest later.
+// `TT_CLOSED` when there is no child or it has gone.
+tt_status tt_term_write(const struct tt_term *term, const uint8_t *bytes, size_t len, size_t *written);
+
+// Starts an interactive resize: the child's output is held back, so the host keeps drawing the last
+// frame, until `tt_term_resize` with the final size. Without it every intermediate size would
+// rewrap the history.
+tt_status tt_term_resize_begin(const struct tt_term *term);
+
+// Resizes the terminal to `cols` x `rows` cells: the primary screen and its history are rewrapped,
+// the alternate screen is cut or padded. The child, if any, is told the new size (`width_px` and
+// `height_px` are the view's size in pixels, 0 if unknown), and output paused by
+// `tt_term_resize_begin` flows again, whatever the outcome.
+tt_status tt_term_resize(const struct tt_term *term, uint16_t cols, uint16_t rows, uint16_t width_px,
+                         uint16_t height_px);
+
+// Takes the next event into `*event`: `TT_OK` with one, `TT_EMPTY` when there is none. Call it until
+// `TT_EMPTY` after every wakeup. The event's text stays readable through `tt_term_event_text` until
+// the next poll.
+tt_status tt_term_poll_event(const struct tt_term *term, struct tt_event *event);
+
+// Copies part `part` (`TT_EVENT_TEXT_*`) of the text of event `serial` into `buf`: `*len` becomes
+// its length, and `TT_FULL` with nothing copied when that is more than `cap` (pass `cap` 0 to ask
+// for the length). Only the event polled last is held: an older `serial` answers `TT_EMPTY`.
+// `TT_INVALID` for an unknown part, a `NULL` `len`, or a `NULL` `buf` with a `cap`.
+tt_status tt_term_event_text(const struct tt_term *term, uint64_t serial, uint32_t part, uint8_t *buf,
+                             size_t cap, size_t *len);
+
+// Frees the terminal. Also valid on a poisoned terminal; `NULL` is a no-op. No other call may use
+// `term` during or after this one.
+void tt_term_free(struct tt_term *term);
+
+// A new, empty frame; the first update fills it. `NULL` only if the core failed. Free it with
+// `tt_frame_free`.
+struct tt_frame *tt_frame_new(void);
+
+// Brings `frame` up to date with `term`'s viewport and describes it in `*view`. Holds the terminal
+// lock only while it copies the rows that changed.
+tt_status tt_frame_update(struct tt_frame *frame, const struct tt_term *term, struct tt_frame_view *view);
+
+// Frees the frame and every buffer its views pointed to. `NULL` is a no-op.
+void tt_frame_free(struct tt_frame *frame);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // TT_TYPES_ONLY
+
+// The frame is read in place, so these layouts are the core's own.
+#ifdef __cplusplus
+static_assert(sizeof(tt_cell) == 8, "tt_cell layout");
+static_assert(sizeof(tt_run) == 16, "tt_run layout");
+#else
+_Static_assert(sizeof(tt_cell) == 8, "tt_cell layout");
+_Static_assert(sizeof(tt_run) == 16, "tt_run layout");
+#endif
+
+#endif // SCULL_H
