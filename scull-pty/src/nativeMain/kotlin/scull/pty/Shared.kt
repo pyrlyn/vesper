@@ -60,7 +60,9 @@ internal class Shared {
     private var readerDone = false
     private var exit: ExitStatus? = null
     private var exitAt: Instant? = null
-    private var lastData = now()
+
+    /** Instant of the last queued chunk; null until the first one. */
+    private var lastData: Instant? = null
     private val outbox = ByteRing(MAX_PENDING_WRITE_BYTES)
     private var writerFailed = false
     private var stopped = false
@@ -113,8 +115,10 @@ internal class Shared {
     /**
      * Blocks until there is something for the loop to do, or [deadline] (the sink's) passes.
      * Output always comes before the exit, and the exit is held back until the output is drained:
-     * EOF, or quiet for [EXIT_IDLE], or [EXIT_DRAIN_MAX] after the exit. While paused, output and
-     * the exit behind it wait.
+     * EOF, or quiet for [EXIT_IDLE] after the last chunk, or [EXIT_DRAIN_MAX] after the exit.
+     * If no chunk has arrived yet, only [EXIT_DRAIN_MAX] applies: ConPTY never sends EOF, and the
+     * first bytes can land after the process handle already says the child has ended. While paused,
+     * output and the exit behind it wait.
      */
     fun waitForWork(deadline: Instant?): Work {
         monitor.lock()
@@ -127,7 +131,13 @@ internal class Shared {
                 var exitBy: Instant? = null
                 val at = exitAt
                 if (at != null && queued == 0) {
-                    val by = minOf(maxOf(lastData, at) + EXIT_IDLE, at + EXIT_DRAIN_MAX)
+                    val last = lastData
+                    val by =
+                        if (last == null) {
+                            at + EXIT_DRAIN_MAX
+                        } else {
+                            minOf(maxOf(last, at) + EXIT_IDLE, at + EXIT_DRAIN_MAX)
+                        }
                     val status = exit
                     if ((readerDone || now >= by) && status != null) return Work.Exited(status)
                     exitBy = by

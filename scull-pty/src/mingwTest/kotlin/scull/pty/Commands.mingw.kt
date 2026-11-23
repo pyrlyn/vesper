@@ -5,4 +5,7 @@ internal actual fun echoAndExit(): SpawnOptions = SpawnOptions.command("cmd.exe"
 // ping waits a second between echo requests; it never reads its input.
 internal actual fun runForMinutes(): SpawnOptions = SpawnOptions.command("ping", "-n", "600", "127.0.0.1")
 
-internal actual fun flood(): SpawnOptions = SpawnOptions.command("cmd.exe", "/C", "for /L %i in (1,0,2) do @echo flood flood flood")
+// A counted infinite `for /L` with a zero step is not reliable across cmd versions. A goto
+// loop keeps writing until the test closes the console.
+internal actual fun flood(): SpawnOptions =
+    SpawnOptions.command("cmd.exe", "/C", "echo off & :loop & echo flood flood flood flood flood flood flood & goto loop")
