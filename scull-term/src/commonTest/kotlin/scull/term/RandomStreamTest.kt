@@ -10,94 +10,9 @@ import kotlin.test.assertTrue
 // the margins off the screen, or leave half a wide character behind.
 private const val SEED = 0x5C011
 private const val CASES = 1500
-private const val MAX_PIECES = 400
 private const val MAX_COLS = 24
 private const val MAX_SCREEN_ROWS = 8
 private const val SCROLLBACK = 4
-
-/** Pieces that reach deep into the dispatch table. */
-private val FRAGMENTS: List<ByteArray> =
-    listOf(
-        "$CSI",
-        ESC,
-        ";",
-        ":",
-        "0",
-        "1",
-        "2",
-        "3",
-        "5",
-        "9",
-        "65535",
-        "99999",
-        "@",
-        "A",
-        "B",
-        "C",
-        "D",
-        "E",
-        "F",
-        "G",
-        "H",
-        "I",
-        "J",
-        "K",
-        "L",
-        "M",
-        "P",
-        "S",
-        "T",
-        "X",
-        "Z",
-        "a",
-        "b",
-        "d",
-        "e",
-        "g",
-        "m",
-        "r",
-        "#8",
-        "?",
-        ">",
-        "!p",
-        "\$p",
-        "h",
-        "l",
-        "n",
-        "c",
-        "s",
-        "u",
-        "4",
-        "6",
-        "7",
-        "8",
-        "20",
-        "47",
-        "69",
-        "1049",
-        "2027",
-        "(0",
-        ")0",
-        "\u000E",
-        "\u000F",
-        "\r",
-        "\n",
-        "\t",
-        "\b",
-        "中",
-        "́",
-        "‍",
-        "👨",
-        "️",
-    ).map { it.encodeToByteArray() }
-
-private fun Random.stream(): ByteArray {
-    var out = ByteArray(0)
-    repeat(nextInt(MAX_PIECES)) {
-        out += if (nextBoolean()) byteArrayOf(nextInt(256).toByte()) else FRAGMENTS[nextInt(FRAGMENTS.size)]
-    }
-    return out
-}
 
 private fun assertSound(
     term: Terminal,
