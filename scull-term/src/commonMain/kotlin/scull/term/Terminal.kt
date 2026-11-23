@@ -3,6 +3,10 @@ package scull.term
 import scull.grid.Grid
 import scull.grid.LinkId
 import scull.grid.Style
+import scull.input.ByteSink
+import scull.input.KeyEvent
+import scull.input.KeyModes
+import scull.input.encodeKey
 import scull.parser.Parser
 import scull.unicode.WidthOptions
 import kotlin.time.TimeSource
@@ -276,4 +280,22 @@ public class Terminal(
         selected?.let { grid.selectionMarks(it, out) }
         search?.let { grid.searchMarks(it, out) }
     }
+
+    /** The modes key encoding reads now, with the kitty flags of the screen shown. */
+    public fun keyModes(): KeyModes = state.modes.keyModes(state.altActive)
+
+    /** Appends what the program gets for [event]: nothing for a release in legacy mode or a key being composed. */
+    public fun encodeKey(
+        event: KeyEvent,
+        out: ByteSink,
+    ): Unit = encodeKey(event, keyModes(), out)
+
+    /**
+     * Appends text an input method committed, without control characters: text is not a key, so it
+     * must not type an escape sequence or a line break the user never pressed.
+     */
+    public fun encodeText(
+        text: String,
+        out: ByteSink,
+    ): Unit = scull.input.encodeText(text, out)
 }
