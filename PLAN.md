@@ -60,6 +60,7 @@ Not in scope until they move from [`ideas.md`](ideas.md) to [`roadmap.md`](roadm
    scull-unicode  generated width and grapheme tables
    scull-parser   bulk scanner + sequence machine → typed actions
    scull-pty      PTY, reader thread, back-pressure
+   scull-image    images and placements under a byte quota; iTerm2, sixel and kitty decoders
    scull-png      header-first PNG decode under a caller-set allocation cap
 ```
 
@@ -128,6 +129,10 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 - [x] **T13.** OSC 8/52/7/133 and notifications in the core (selection and search are T13.2).
 - [x] **T13.2.** Selection and scrollback search, with frame marks.
 - [ ] **T19.** Images (kitty, iTerm2, sixel) with quotas.
+- [x] **T19.1.** Image store with a byte quota and LRU eviction; iTerm2 inline images.
+- [ ] **T19.2.** Sixel decoder.
+- [ ] **T19.3.** Kitty graphics protocol.
+- [ ] **T19.4.** Images in the terminal, the frame and the C ABI.
 - [x] **T34.** Allocation-capped shared PNG decoder.
 - [ ] **T30.** Config watcher never misses a reload under load.
 
