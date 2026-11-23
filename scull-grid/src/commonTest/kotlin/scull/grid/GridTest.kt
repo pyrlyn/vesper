@@ -58,6 +58,28 @@ class GridTest {
         assertEquals(10, g.historyLimit, "the limit is not rounded up")
     }
 
+    // The terminal leaves this cell when a wide character does not fit at the row end (scull-term
+    // Print.kt). It is a blank that differs from the fill only by its flag, which is what a trim of
+    // trailing blanks on the way into history must not drop.
+    @Test
+    fun aLeadingSpacerAtTheRowEndSurvivesTheMoveIntoHistory() {
+        val g = grid(history = 4)
+        val top = g.screenRow(0)!!
+        "abcdefg".forEachIndexed { col, c -> top.put(col, ch(c)) }
+        top.set(GRID_COLS - 1, Cell.EMPTY.withFlags(CellFlags.LEADING_SPACER))
+        top.wrapped = true
+        g.scrollUp(SCREEN)
+
+        val kept = g.row(0)!!
+        assertEquals(top.id, kept.id)
+        val spacer = kept.cell(GRID_COLS - 1)
+        assertTrue(spacer.hasFlags(CellFlags.LEADING_SPACER))
+        assertTrue(spacer.isEmpty)
+        assertTrue(kept.wrapped)
+        assertEquals("abcdefg", (0 until GRID_COLS - 1).map { kept.cell(it).codePoint.toChar() }.joinToString(""))
+        assertEquals(GRID_COLS, kept.cellCapacity, "the spacer is the last stored cell")
+    }
+
     @Test
     fun scrollingAFullRingIsAnOffsetChange() {
         // Screen 3 plus history 5 fills a ring of 8 exactly.
