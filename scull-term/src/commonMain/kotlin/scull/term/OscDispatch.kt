@@ -156,14 +156,14 @@ internal fun clipboardTargets(targets: String): String? =
     }
 
 /** The OSC 52 reply carrying [data] for [targets], ended the way the last read was. */
-internal fun State.answerClipboard(
+internal fun State.clipboardReply(
     targets: String,
     data: ByteArray,
-): Boolean {
+): ByteArray {
     val valid = requireNotNull(clipboardTargets(targets)) { "not OSC 52 targets: $targets" }
     require(data.size <= MAX_CLIPBOARD_BYTES) { "${data.size} clipboard bytes, at most $MAX_CLIPBOARD_BYTES" }
     val end = if (clipboardReadBell) "\u0007" else "\u001B\\"
-    return replies.pushAnswer("\u001B]52;$valid;${Base64.Default.encode(data)}$end".encodeToByteArray())
+    return "\u001B]52;$valid;${Base64.Default.encode(data)}$end".encodeToByteArray()
 }
 
 /** The base64 length of [bytes] bytes, padded. */

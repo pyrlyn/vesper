@@ -3,6 +3,9 @@ package scull.term
 import scull.input.KeyModes
 import scull.input.KittyKeyboard
 import scull.input.ModifyOtherKeys
+import scull.input.MouseEncoding
+import scull.input.MouseModes
+import scull.input.MouseTracking
 
 // Terminal modes: the flags SM, RM, DECSET and DECRST switch, and the state DECRQM reports.
 // Setting by number lives here too, because switching some modes moves the cursor or changes
@@ -10,7 +13,9 @@ import scull.input.ModifyOtherKeys
 //
 // Side effects follow xterm's ctlseqs: DECOM homes the cursor both ways; resetting DECAWM drops a
 // pending wrap (DEC STD 070 "last column flag"); resetting DECLRMM removes the left and right
-// margins.
+// margins. Resetting any mouse tracking mode turns tracking off and resetting any encoding goes
+// back to the default one, whichever was set: xterm and Ghostty do the same, so a program that
+// leaves with the wrong reset still frees the mouse.
 
 /** ANSI modes (SM, RM). */
 private const val IRM = 4
@@ -18,12 +23,21 @@ private const val LNM = 20
 
 /** DEC private modes (DECSET, DECRST). */
 private const val DECCKM = 1
+private const val X10_MOUSE = 9
 private const val DECOM = 6
 private const val DECAWM = 7
 private const val DECTCEM = 25
 private const val ALT_SCREEN = 47
 private const val DECLRMM = 69
+private const val NORMAL_MOUSE = 1000
+private const val BUTTON_MOUSE = 1002
+private const val ANY_MOUSE = 1003
 private const val FOCUS_EVENTS = 1004
+private const val UTF8_MOUSE = 1005
+private const val SGR_MOUSE = 1006
+private const val ALTERNATE_SCROLL = 1007
+private const val URXVT_MOUSE = 1015
+private const val SGR_PIXEL_MOUSE = 1016
 private const val ALT_SCREEN_CLEAR = 1047
 private const val SAVE_CURSOR = 1048
 private const val ALT_SCREEN_SAVE_CURSOR = 1049
@@ -79,6 +93,14 @@ public class Modes internal constructor() {
     public var focusEvents: Boolean = false
         internal set
 
+    /** Mouse tracking (`?9`, `?1000`–`?1003`) and its encoding (`?1005`, `?1006`, `?1015`, `?1016`). */
+    public var mouse: MouseModes = MouseModes()
+        internal set
+
+    /** Mode `?1007`: on the alternate screen the wheel sends cursor keys while the mouse is not tracked. On at power-on, as in xterm. */
+    public var alternateScroll: Boolean = true
+        internal set
+
     /** Mode `?2004`: the host brackets pasted text. */
     public var bracketedPaste: Boolean = false
         internal set
@@ -120,6 +142,8 @@ public class Modes internal constructor() {
         cursorVisible = true
         leftRightMargins = false
         focusEvents = false
+        mouse = MouseModes()
+        alternateScroll = true
         bracketedPaste = false
         synchronizedOutput = false
         modifyOtherKeys = ModifyOtherKeys.Off
@@ -175,6 +199,18 @@ internal fun State.setDecMode(
             }
         }
 
+        X10_MOUSE, NORMAL_MOUSE, BUTTON_MOUSE, ANY_MOUSE -> {
+            modes.mouse = modes.mouse.copy(tracking = if (on) mouseTracking(code) else MouseTracking.Off)
+        }
+
+        UTF8_MOUSE, SGR_MOUSE, URXVT_MOUSE, SGR_PIXEL_MOUSE -> {
+            modes.mouse = modes.mouse.copy(encoding = if (on) mouseEncoding(code) else MouseEncoding.Default)
+        }
+
+        ALTERNATE_SCROLL -> {
+            modes.alternateScroll = on
+        }
+
         FOCUS_EVENTS -> {
             modes.focusEvents = on
         }
@@ -215,6 +251,22 @@ internal fun State.setDecMode(
     }
 }
 
+private fun mouseTracking(code: Int): MouseTracking =
+    when (code) {
+        X10_MOUSE -> MouseTracking.X10
+        NORMAL_MOUSE -> MouseTracking.Normal
+        BUTTON_MOUSE -> MouseTracking.ButtonEvent
+        else -> MouseTracking.AnyEvent
+    }
+
+private fun mouseEncoding(code: Int): MouseEncoding =
+    when (code) {
+        UTF8_MOUSE -> MouseEncoding.Utf8
+        SGR_MOUSE -> MouseEncoding.Sgr
+        URXVT_MOUSE -> MouseEncoding.Urxvt
+        else -> MouseEncoding.SgrPixels
+    }
+
 private fun status(on: Boolean): Int = if (on) SET else RESET
 
 /** The DECRQM answer for an ANSI mode. */
@@ -234,6 +286,9 @@ internal fun State.decModeStatus(code: Int): Int =
         DECTCEM -> status(modes.cursorVisible)
         ALT_SCREEN, ALT_SCREEN_CLEAR, ALT_SCREEN_SAVE_CURSOR -> status(altActive)
         DECLRMM -> status(modes.leftRightMargins)
+        X10_MOUSE, NORMAL_MOUSE, BUTTON_MOUSE, ANY_MOUSE -> status(modes.mouse.tracking == mouseTracking(code))
+        UTF8_MOUSE, SGR_MOUSE, URXVT_MOUSE, SGR_PIXEL_MOUSE -> status(modes.mouse.encoding == mouseEncoding(code))
+        ALTERNATE_SCROLL -> status(modes.alternateScroll)
         FOCUS_EVENTS -> status(modes.focusEvents)
         SAVE_CURSOR -> RESET
         BRACKETED_PASTE -> status(modes.bracketedPaste)

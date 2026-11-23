@@ -119,15 +119,15 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 ### Phase 4: C ABI
 
 - [x] **T10.** Opaque handles, frame API, wakeup, polled events, exception poisoning, committed header, C tests under sanitizers (the C# bindings moved to T17).
-- [ ] **T13.3.** Events (title, directory, shell marks, clipboard, links, notifications) over the C ABI.
+- [x] **T13.3.** Events (title, directory, shell marks, clipboard, links, notifications) over the C ABI.
 
 ### Phase 5: input, selection, images, config core
 
-- [ ] **T12.** Input encoding (legacy, kitty keyboard, win32-input-mode, mouse, paste, focus).
+- [x] **T12.** Input encoding (legacy, kitty keyboard, win32-input-mode, mouse, paste, focus).
 - [x] **T12.1.** Key encoding: legacy xterm, the kitty keyboard protocol with its per-screen flag stack, win32-input-mode.
-- [ ] **T12.2.** Mouse (all tracking modes and encodings, SGR-pixel included), bracketed paste and focus reports.
+- [x] **T12.2.** Mouse (all tracking modes and encodings, SGR-pixel included), bracketed paste and focus reports.
 - [x] **T13.** OSC 8/52/7/133 and notifications in the core (selection and search are T13.2).
-- [ ] **T13.2.** Selection and scrollback search, with frame marks.
+- [x] **T13.2.** Selection and scrollback search, with frame marks.
 - [ ] **T19.** Images (kitty, iTerm2, sixel) with quotas.
 - [x] **T19.1.** Image store with a byte quota and LRU eviction; iTerm2 inline images.
 - [ ] **T19.2.** Sixel decoder.
