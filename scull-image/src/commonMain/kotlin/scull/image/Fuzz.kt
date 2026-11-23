@@ -77,3 +77,27 @@ public fun fuzzImageStore(data: ByteArray) {
         store.checkInvariants()
     }
 }
+
+private const val FUZZ_SIXEL_SIDE = 64
+
+/**
+ * The sixel decoder's fuzz target: [data] as one DCS payload, decoded whole and cut into pieces
+ * whose length comes from the data itself. Both must give the same image or the same error, only
+ * [ImageError]s may escape, and the image must fit the caps. Throws [IllegalStateException] on a
+ * violation.
+ */
+public fun fuzzSixel(data: ByteArray) {
+    fun decode(step: Int): String =
+        try {
+            val decoder = SixelDecoder(data.isNotEmpty() && data[0] < 0, FUZZ_SIXEL_SIDE, FUZZ_SIXEL_SIDE, FUZZ_PIXEL_BYTES / 64)
+            for (from in data.indices step step) decoder.put(data, from, minOf(from + step, data.size))
+            val image = decoder.finish()
+            check(image.width <= FUZZ_SIXEL_SIDE && image.height <= FUZZ_SIXEL_SIDE) { "image past the size cap" }
+            "${image.width}x${image.height} ${image.rgba.contentHashCode()}"
+        } catch (e: ImageError) {
+            "${e::class.simpleName} ${e.message}"
+        }
+    val whole = decode(maxOf(data.size, 1))
+    val step = if (data.isEmpty()) 1 else (data[data.size - 1].toInt() and 7) + 1
+    check(decode(step) == whole) { "cutting the stream changed the image" }
+}
