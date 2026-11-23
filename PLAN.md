@@ -134,7 +134,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 - [ ] **T19.3.** Kitty graphics protocol.
 - [ ] **T19.4.** Images in the terminal, the frame and the C ABI.
 - [x] **T34.** Allocation-capped shared PNG decoder.
-- [ ] **T30.** Config watcher never misses a reload under load.
+- [x] **T30.** Config watcher never misses a reload under load (moved into T20.3).
 
 ### Phase 6: macOS app
 
