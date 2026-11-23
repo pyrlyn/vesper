@@ -27,7 +27,7 @@ The cinterop bindings (POSIX PTY, ConPTY) and a fuzz/property-test runner are ch
 | org.jetbrains.kotlin:kotlin-gradle-plugin 2.4.21 | local (`gradle/libs.versions.toml`, used by `build-logic`) | https://github.com/JetBrains/kotlin | Kotlin Multiplatform and the Kotlin/Native compiler for every module |
 | org.jlleitschuh.gradle:ktlint-gradle 14.2.0 | local (`gradle/libs.versions.toml`, used by `build-logic`) | https://github.com/JLLeitschuh/ktlint-gradle | Runs ktlint 1.8.0 as part of `check` |
 | org.jetbrains.kotlin:kotlin-test | local (every module's `commonTest`, version from the Kotlin plugin) | https://github.com/JetBrains/kotlin | Test API of the native tests |
-| com.squareup.okio:okio 3.18.2 | local (`scull-harness` tests, `scull-bench`) | https://github.com/square/okio | Multiplatform file access: the harness reads the golden frames in `tests/`, the bench writes `docs/benchmarks/baseline.md`; Kotlin/Native has no `java.io` |
+| com.squareup.okio:okio 3.18.2 | local (`scull-harness`, `scull-bench`) | https://github.com/square/okio | Multiplatform file access: the harness reads the golden frames and the conformance fixtures in `tests/`, the bench writes `docs/benchmarks/baseline.md`; Kotlin/Native has no `java.io` |
 
 ## Bundled files
 

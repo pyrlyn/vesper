@@ -35,7 +35,6 @@ import platform.posix.errno
 import platform.posix.execvp
 import platform.posix.fcntl
 import platform.posix.fork
-import platform.posix.getenv
 import platform.posix.kill
 import platform.posix.open
 import platform.posix.pipe
@@ -48,8 +47,6 @@ import kotlin.time.TimeSource
 
 private const val POLL_MICROS = 10_000u
 private const val CHUNK = 64 * 1024
-
-internal actual fun environment(name: String): String? = getenv(name)?.toKString()
 
 internal actual fun feedStdin(
     program: String,

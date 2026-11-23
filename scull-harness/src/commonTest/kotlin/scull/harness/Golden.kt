@@ -1,8 +1,5 @@
 package scull.harness
 
-import okio.FileSystem
-import okio.Path.Companion.toPath
-import okio.SYSTEM
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -12,12 +9,6 @@ internal fun render(stub: Stub): String =
         append("${stub.cols} ${stub.rows}\n")
         stub.lines().forEach { append(it).append('\n') }
     }
-
-/** Reads `tests/<relative>` from the repository; Gradle passes its path in `SCULL_TESTS_DIR`. */
-internal fun readFixture(relative: String): String {
-    val root = checkNotNull(environment("SCULL_TESTS_DIR")) { "SCULL_TESTS_DIR is not set; run the tests through Gradle" }
-    return FileSystem.SYSTEM.read(root.toPath() / relative) { readUtf8() }
-}
 
 /** Feeds [bytes] to a stub of the fixture's size and compares the whole frame with the fixture. */
 internal fun assertGolden(
@@ -36,5 +27,3 @@ internal fun assertGolden(
     stub.feed(bytes)
     assertEquals(snapshot, render(stub), fixture)
 }
-
-internal expect fun environment(name: String): String?
