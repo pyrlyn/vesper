@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 4
-readiness: 10%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -45,5 +45,5 @@ The first half of T12. A host hands the core a platform-neutral key event and ge
 
 ## Acceptance
 
-- [ ] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
-- [ ] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
+- [x] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
