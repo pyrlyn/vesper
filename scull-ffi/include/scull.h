@@ -28,11 +28,11 @@
 
 // Additions (new functions, fields appended to a struct) bump the minor. While the major is 0 every
 // minor may break, so the minor must match too.
-#define TT_ABI_VERSION_MINOR 2
+#define TT_ABI_VERSION_MINOR 3
 
 // The version a host was built against, `major << 16 | minor`; pass it in
 // `tt_term_options.abi_version`.
-#define TT_ABI_VERSION 2
+#define TT_ABI_VERSION 3
 
 // `tt_event.kind`: BEL arrived. Bells between two polls arrive as one.
 #define TT_EVENT_BELL 1
@@ -106,6 +106,40 @@
 // `tt_cell.flags`: the cell holds a cluster of several code points; `codepoint` is its first and
 // the run's text has all of it.
 #define TT_CELL_CLUSTER 1
+
+// `tt_cell.flags`: the cell is selected.
+#define TT_CELL_SELECTED 2
+
+// `tt_cell.flags`: the cell is part of a search match.
+#define TT_CELL_MATCH 4
+
+// `tt_cell.flags`: the cell is part of the match `tt_term_search_step` went to last; `TT_CELL_MATCH`
+// is set too.
+#define TT_CELL_CURRENT_MATCH 8
+
+// `tt_term_select_start` kinds: cell by cell, for a drag.
+#define TT_SELECT_CELL 0
+
+// Whole words, for a double click.
+#define TT_SELECT_WORD 1
+
+// Whole lines, soft wraps included, for a triple click.
+#define TT_SELECT_LINE 2
+
+// A rectangle of columns.
+#define TT_SELECT_BLOCK 3
+
+// `tt_term_search_set` flag: fold case.
+#define TT_SEARCH_IGNORE_CASE 1
+
+// The longest pattern, in bytes, `tt_term_search_set` takes.
+#define TT_MAX_SEARCH_PATTERN 256
+
+// The most matches `tt_term_search_count` counts.
+#define TT_MAX_SEARCH_MATCHES 10000
+
+// The most bytes `tt_term_selection_text` hands out; longer text is cut on a character boundary.
+#define TT_MAX_SELECTION_BYTES 16777216
 
 // `tt_style` colours: the terminal's default colour.
 #define TT_COLOR_DEFAULT 0
@@ -329,6 +363,21 @@ typedef struct tt_frame_view {
   size_t dirty_len;
 } tt_frame_view;
 
+// A search match: its first and last cell, both included. Lines are absolute, counted from the first
+// line the terminal ever showed, so a match keeps its numbers while the text scrolls.
+typedef struct tt_match {
+  // `sizeof(tt_match)` as the host knows it.
+  uint32_t struct_size;
+  // Column of the first cell.
+  uint16_t start_col;
+  // Column of the last cell; a wide character's right half included.
+  uint16_t end_col;
+  // Line of the first cell.
+  uint64_t start_line;
+  // Line of the last cell.
+  uint64_t end_line;
+} tt_match;
+
 // How to create a terminal. Fields a host does not know read as zero; `tt_term_new` reads only up to
 // `scrollback`.
 typedef struct tt_term_options {
@@ -429,6 +478,41 @@ tt_status tt_term_clipboard_deny(const struct tt_term *term, const uint8_t *targ
 // `tt_term_event_text` copies text. `TT_EMPTY` when no cell holds the id any more and the core freed
 // it.
 tt_status tt_term_link_uri(const struct tt_term *term, uint32_t id, uint8_t *buf, size_t cap, size_t *len);
+
+// Starts a selection of `kind` (`TT_SELECT_*`) at viewport cell `row`, `col` (clamped), replacing any
+// other. It covers that cell, word or line until extended; clear it on a click that did not drag.
+// Output that rewrites its rows, a resize and a screen switch drop it. The frame marks its cells
+// `TT_CELL_SELECTED`. `TT_INVALID` for an unknown kind.
+tt_status tt_term_select_start(const struct tt_term *term, uint32_t kind, uint16_t row, uint16_t col);
+
+// Moves the selection's free end to viewport cell `row`, `col` (clamped). No selection is no change.
+tt_status tt_term_select_extend(const struct tt_term *term, uint16_t row, uint16_t col);
+
+// Drops the selection.
+tt_status tt_term_select_clear(const struct tt_term *term);
+
+// Copies the selected text into `buf` as `tt_term_event_text` copies text: soft-wrapped rows joined,
+// hard line ends as `\n`, wide characters once, blank and concealed cells as spaces, trailing spaces
+// trimmed per line, at most `TT_MAX_SELECTION_BYTES`. `TT_EMPTY` with `*len` 0 when nothing is
+// selected.
+tt_status tt_term_selection_text(const struct tt_term *term, uint8_t *buf, size_t cap, size_t *len);
+
+// Searches the history and the screen for `pattern_len` bytes of `pattern`, literal UTF-8, with
+// `flags` (`TT_SEARCH_IGNORE_CASE` or 0), replacing any earlier search; the frame marks the matches
+// in the viewport `TT_CELL_MATCH`. An empty pattern ends the search. `TT_INVALID`, also ending the
+// search, for text that is not UTF-8, is longer than `TT_MAX_SEARCH_PATTERN` bytes, or an unknown
+// flag.
+tt_status tt_term_search_set(const struct tt_term *term, const uint8_t *pattern, size_t pattern_len,
+                             uint32_t flags);
+
+// Steps to the next match (`forward` 1) or the previous one (0): from the current match, or else from
+// the top (bottom) of the viewport, wrapping round at the ends. The viewport scrolls to show it and
+// the frame marks it `TT_CELL_CURRENT_MATCH`. `TT_OK` with the match in `*found`, which may be `NULL`;
+// `TT_EMPTY` when there is no search or no match.
+tt_status tt_term_search_step(const struct tt_term *term, uint8_t forward, struct tt_match *found);
+
+// Writes how many matches there are, up to `TT_MAX_SEARCH_MATCHES`, to `*count`; 0 without a search.
+tt_status tt_term_search_count(const struct tt_term *term, size_t *count);
 
 // Frees the terminal. Also valid on a poisoned terminal; `NULL` is a no-op. No other call may use
 // `term` during or after this one.
