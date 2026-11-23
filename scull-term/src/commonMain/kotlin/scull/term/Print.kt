@@ -95,12 +95,15 @@ private fun State.printAscii(
         val count = minOf(lineEnd() - col + 1, to - at)
         // Asked for after the wrap: its scroll may intern the erase style and sweep the pen's id.
         val style = pen.textId(grid)
-        cursorRow().putAscii(col, bytes, at, count, style)
+        val row = cursorRow()
+        row.putAscii(col, bytes, at, count, style)
+        stampLink(row, col, col + count)
         advance(col, count)
         at += count
         if (at < to && !modes.autowrap) {
             // Without autowrap the rest of the run overwrites the last column, so only its last byte shows.
-            cursorRow().putAscii(col, bytes, to - 1, 1, style)
+            row.putAscii(col, bytes, to - 1, 1, style)
+            stampLink(row, col, col + 1)
             at = to
         }
     }
@@ -123,7 +126,11 @@ private fun State.place(
     if (pendingWrap && modes.autowrap) wrap()
     if (col + cells - 1 > lineEnd()) {
         if (modes.autowrap) {
-            cursorRow().set(col, blank().withFlags(CellFlags.LEADING_SPACER))
+            cursorRow().let {
+                it.set(col, blank().withFlags(CellFlags.LEADING_SPACER))
+                // The spacer is padding, not part of whatever link the cell held.
+                it.clearLinks(col, col + 1)
+            }
             wrap()
         } else {
             col = (lineEnd() - (cells - 1)).coerceAtLeast(0)
@@ -133,7 +140,9 @@ private fun State.place(
     }
     if (modes.insert) insertChars(cells)
     val at = col
-    cursorRow().put(at, Cell.char(ch, pen.textId(grid)), cells == WIDE)
+    val row = cursorRow()
+    row.put(at, Cell.char(ch, pen.textId(grid)), cells == WIDE)
+    stampLink(row, at, at + cells)
     advance(at, cells)
     lastChar = ch
 }
@@ -190,6 +199,8 @@ private fun State.join(ch: Int) {
     val fitsWide = wasWide || at < lineEnd()
     val wide = fitsWide && clusterWidth(text, width, policy) == WIDE
     row.put(at, Cell.cluster(id, cell.style), wide)
+    // A cluster that grew wide takes its head's link onto the cell it now covers.
+    if (wide && !wasWide) row.linkAt(at)?.let { row.setLink(at, at + WIDE, it) } ?: row.clearLinks(at, at + WIDE)
     if (wide != wasWide) advance(at, if (wide) WIDE else 1)
 }
 

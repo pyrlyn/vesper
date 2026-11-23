@@ -1,0 +1,7 @@
+# The types of include/scull.h, so the exports write the very layouts the host reads. TT_TYPES_ONLY
+# hides the prototypes: those functions are the Kotlin exports themselves.
+package = scull.ffi.c
+headers = scull.h
+headerFilter = scull.h
+compilerOpts = -DTT_TYPES_ONLY
+nonStrictEnums = tt_status

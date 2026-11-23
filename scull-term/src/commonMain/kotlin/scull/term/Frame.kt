@@ -3,6 +3,7 @@ package scull.term
 import scull.grid.Cell
 import scull.grid.CellFlags
 import scull.grid.Grid
+import scull.grid.LinkSpan
 import scull.grid.Style
 import scull.grid.StyleId
 import scull.unicode.appendCodePoint
@@ -18,9 +19,15 @@ import scull.unicode.firstCodePoint
 // DirectWrite) takes, since the core decides widths and the platform only shapes.
 
 /** Drawn for a cluster id the table no longer has: rows keep their clusters alive, so this marks a broken invariant. */
-private const val MISSING_CLUSTER = "�"
+internal const val MISSING_CLUSTER: String = "\uFFFD"
 
 private const val WIDE_COLS = 2
+
+private const val UINT_MASK = 0xFFFF_FFFFL
+private const val BYTE_MASK = 0xFFL
+private const val STYLE_SHIFT = 32
+private const val WIDTH_SHIFT = 48
+private const val FLAGS_SHIFT = 56
 
 /** One cell as the UI paints it. */
 public data class FrameCell(
@@ -30,14 +37,31 @@ public data class FrameCell(
     val style: Int,
     /** Columns the character covers: 1, 2 for a wide head, 0 for the spacer behind it. */
     val width: Int,
-    /** [CLUSTER] or 0. */
+    /** [CLUSTER], [SELECTED], [MATCH] and [CURRENT_MATCH] bits. */
     val flags: Int,
 ) {
     public companion object {
         /** The text has more code points than [codePoint]; the whole cluster is in the row's runs. */
         public const val CLUSTER: Int = 1
+
+        /** The cell is selected. */
+        public const val SELECTED: Int = 2
+
+        /** The cell is part of a search match. */
+        public const val MATCH: Int = 4
+
+        /** The cell is part of the current search match (also [MATCH]). */
+        public const val CURRENT_MATCH: Int = 8
     }
 }
+
+/** Flags laid over columns [start] until [end] of viewport row [row]: a selection or search highlight. */
+internal data class Mark(
+    val row: Int,
+    val start: Int,
+    val end: Int,
+    val flags: Int,
+)
 
 /**
  * Neighbouring cells of one style and one width, with their text, for the platform to shape. Cells
@@ -69,6 +93,11 @@ public class FrameRow internal constructor() {
     /** The runs, left to right. */
     public val runs: List<TextRun> get() = runList
 
+    private val linkList = ArrayList<LinkSpan>()
+
+    /** The OSC 8 link spans, by column; [Terminal.linkUri] reads their URIs. */
+    public val links: List<LinkSpan> get() = linkList
+
     /** The text of [run], empty for a run of another row. */
     public fun runText(run: TextRun): String =
         if (run.textStart in 0..text.length && run.textLength in 0..text.length - run.textStart) {
@@ -80,10 +109,13 @@ public class FrameRow internal constructor() {
     internal fun set(
         text: String,
         runs: List<TextRun>,
+        links: List<LinkSpan>,
     ) {
         this.text = text
         runList.clear()
         runList.addAll(runs)
+        linkList.clear()
+        linkList.addAll(links)
     }
 }
 
@@ -110,6 +142,12 @@ public class Frame {
     private var lines = ArrayList<FrameRow>()
     private var stamps = ArrayList<RowStamp>()
     private var oldStamps = ArrayList<RowStamp>()
+
+    // Selection and search highlights by row. A row whose marks changed is repainted even when its
+    // text did not, and one that moved keeps its scroll only if its marks moved with it.
+    private var marks: List<List<Mark>> = emptyList()
+    private var oldMarks: List<List<Mark>> = emptyList()
+    private val collected = ArrayList<Mark>()
     private val styles = ArrayList<Style>()
 
     /** The cursor; null when hidden or outside the viewport. */
@@ -132,6 +170,26 @@ public class Frame {
         val at = row * cols + col
         return FrameCell(codePoints[at], styleIds[at], widths[at].toInt(), cellFlags[at].toInt())
     }
+
+    /**
+     * The cell at [row], [col] packed into one Long: code point in bits 0-31, style 32-47, width
+     * 48-55, flags 56-63. Read without an object per cell; it is also the byte layout of the C ABI's
+     * `tt_cell` on a little-endian machine, so a copy out is one store per cell.
+     */
+    public fun packedCell(
+        row: Int,
+        col: Int,
+    ): Long {
+        require(row in 0 until rows && col in 0 until cols) { "cell $row,$col of a $cols by $rows frame" }
+        val at = row * cols + col
+        return (codePoints[at].toLong() and UINT_MASK) or
+            (styleIds[at].toLong() shl STYLE_SHIFT) or
+            ((widths[at].toLong() and BYTE_MASK) shl WIDTH_SHIFT) or
+            ((cellFlags[at].toLong() and BYTE_MASK) shl FLAGS_SHIFT)
+    }
+
+    /** Entries in the style table that cell and run style ids index. */
+    public val styleCount: Int get() = styles.size
 
     /** The text and runs of row [row]. */
     public fun row(row: Int): FrameRow? = lines.getOrNull(row)
@@ -163,10 +221,41 @@ public class Frame {
         oldStamps = stamps.also { stamps = oldStamps }
         stamps.clear()
         for (r in 0 until rows) stamps += grid.visibleRow(r)?.let(RowStamp::of) ?: RowStamp.NONE
-        damage.compute(oldStamps, stamps, full)
+        oldMarks = marks
+        marks = collectMarks(term)
+        damage.compute(oldStamps, stamps, full) { from, to -> sameSpans(oldMarks[from], marks[to]) }
         applyScrolls()
-        for (r in damage.dirty) paint(grid, r)
+        for (r in damage.dirty) {
+            paint(grid, r)
+            applyMarks(r)
+        }
         cursor = cursorIn(term)
+    }
+
+    private fun collectMarks(term: Terminal): List<List<Mark>> {
+        collected.clear()
+        term.marks(collected)
+        if (collected.isEmpty()) return List(rows) { emptyList() }
+        val byRow = arrayOfNulls<ArrayList<Mark>>(rows)
+        for (m in collected) {
+            if (m.row in 0 until rows) (byRow[m.row] ?: ArrayList<Mark>().also { byRow[m.row] = it }) += m
+        }
+        return byRow.map { it ?: emptyList() }
+    }
+
+    /** Whether two rows carry the same highlights, ignoring the row each mark names: a row that moved keeps them. */
+    private fun sameSpans(
+        a: List<Mark>,
+        b: List<Mark>,
+    ): Boolean = a.size == b.size && a.indices.all { a[it].start == b[it].start && a[it].end == b[it].end && a[it].flags == b[it].flags }
+
+    private fun applyMarks(r: Int) {
+        for (m in marks[r]) {
+            for (col in m.start.coerceAtLeast(0) until minOf(m.end, cols)) {
+                val at = r * cols + col
+                cellFlags[at] = (cellFlags[at].toInt() or m.flags).toByte()
+            }
+        }
     }
 
     /** Moves the rows the damage says moved. Every scroll reads the previous picture, so all sources are copied before any is written. */
@@ -226,7 +315,7 @@ public class Frame {
             }
             push(at, col, cell, grid)
         }
-        line.set(text.toString(), runs)
+        line.set(text.toString(), runs, row?.links.orEmpty())
     }
 
     private fun setCell(

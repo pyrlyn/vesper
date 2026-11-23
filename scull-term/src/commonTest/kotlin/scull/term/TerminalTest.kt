@@ -173,16 +173,16 @@ class TerminalTest {
         val term = Terminal(10, 5, 0)
         term.feed("$ESC]2;" + "x".repeat(MAX_EVENT_TEXT + 1) + "\u0007")
         term.feed("$ESC]2;".encodeToByteArray() + byteArrayOf(0xC3.toByte(), 0x28, 0x07))
-        term.feed("$ESC]7;file:///tmp\u0007")
+        term.feed("$ESC]1337;File=x\u0007")
         assertEquals(null, term.pollEvent())
         term.feed("$ESC]1;" + "x".repeat(MAX_EVENT_TEXT) + "$ESC\\")
         assertEquals(Event.Title(TitleTarget.Icon, "x".repeat(MAX_EVENT_TEXT)), term.pollEvent())
     }
 
     @Test
-    fun mouseAndKeyboardModesAreNotRecognisedYet() {
+    fun mouseModesAreRecognised() {
         val term = Terminal(10, 5, 0)
         term.feed("$CSI?1000h$CSI?1000\$p$CSI?1006\$p$CSI?2027\$p")
-        assertEquals("$CSI?1000;0\$y$CSI?1006;0\$y$CSI?2027;2\$y", term.takeReplies().decodeToString())
+        assertEquals("$CSI?1000;1\$y$CSI?1006;2\$y$CSI?2027;2\$y", term.takeReplies().decodeToString())
     }
 }

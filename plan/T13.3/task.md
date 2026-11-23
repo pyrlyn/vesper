@@ -1,11 +1,57 @@
+---
+status: in progress
+priority: P1
+complexity: 3
+readiness: 100%
+agent: Claude Code / claude-opus-5-5
+---
+
 # T13.3. Events over the C ABI
 
-Status: not started
+The shell-integration events T13 added to the core reach a C host:
 
-OSC 9 and OSC 777 notifications into the queue; `tt_term_poll_event` kinds for title, directory, shell mark, clipboard read and write, link and notification, with their text copied out by a sized call; exports to answer or deny a clipboard read and to resolve a link id; link ids reclaimed by a sweep of ids no row holds, so OSC 8 keeps working past 1024 targets. macOS `TerminalSession` sets the window title and writes OSC 52 writes to the pasteboard; reads are denied until a setting allows them. Verify: Kotlin/Native and C tests, `./gradlew check`, the C ABI sanitizer test, `swift test` in `macos/`.
+- `tt_term_poll_event` kinds for:
+  - directory and shell mark;
+  - clipboard write and read;
+  - link and notification.
+- Their text comes through `tt_term_event_text`, a notification's title as a second part.
+- New calls answer or deny a clipboard read and resolve a link id.
+- Each frame row lists its link spans.
 
-Plan: (a) the OSC handler: OSC 9 text (ConEmu `9;N` subcommands ignored) and OSC 777 `notify;title;body` become `Event::Notification`; golden cases in `shell.txt`. (b) `Links` keeps freed slots: when no id is free and enough opens passed since the last sweep, the ids held by any row of either screen (and the open link) are marked with `scull_grid::Marks` and the rest freed. (c) `scull-ffi` events: append-only `TT_EVENT_*` kinds, `tt_event` gains `serial`, `id`, `detail`, `text_len`, `title_len`; the last polled event's text stays in the handle and `tt_term_event_text(serial, part, ...)` copies it with the `tt_term_read_text` sized pattern (one shared helper); `tt_term_clipboard_reply` / `_deny` hand the answer to the child; `tt_term_link_uri`. ABI minor 6, the bindings generator, a new `tests/c/events.c` under ASan/UBSan and TSan. (d) macOS: `TerminalSession` keeps title and working directory, writes OSC 52 to a pasteboard (`NSPasteboard.general` by default), denies reads; `TerminalView` puts the title on its window; Swift tests on a named pasteboard.
+The core events (notifications included) and the link-id sweep are T13; the macOS part moved to T14.
 
-Acceptance:
-- [ ] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
-- [ ] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
+## Findings
+
+- **What exists to build on.**
+  - `tt_event` already reserves `id` and `title_len` for these kinds (T10).
+  - `EventExports.kt` skips the new events with `else -> continue`.
+  - `Frame` copies no link spans yet.
+- **Answers must not wait for the child.**
+  - Replies queued in the terminal reach the PTY only when the child writes again.
+  - A program waiting for its OSC 52 answer writes nothing, so it would never get one.
+  - So an answer goes straight to the PTY input queue, whole or not at all (`writeInputWhole`).
+  - That queue holds 256 KiB, so a larger answer can never be sent; the host denies instead.
+
+## Execution plan
+
+1. **Core: `Terminal.clipboardReply(targets, data)`.**
+   - It builds the answer bytes without queueing them; `answerClipboard` uses it.
+   - `FrameRow.links` copies the row's link spans when the row is painted.
+2. **`scull.h`, ABI 0.2.** The new constants, all appended:
+   - `TT_EVENT_DIRECTORY`, `_SHELL_MARK`, `_CLIPBOARD_WRITE`, `_CLIPBOARD_READ`, `_LINK`, `_NOTIFICATION`;
+   - `TT_SHELL_*`;
+   - `TT_EVENT_TEXT_TITLE`, the second part (a notification's title, or the clipboard targets).
+3. **`scull.h`, fields and calls.**
+   - `tt_event.id` is the link id. `exit_code` is D's exit code, or `TT_EXIT_CODE_UNKNOWN` when D carries none.
+   - `tt_link_span` and `tt_row.links` / `links_len`.
+   - `tt_term_clipboard_reply`, `tt_term_clipboard_deny` and `tt_term_link_uri`.
+4. **Exports** in `EventExports.kt` and `FrameExports.kt`; the skip goes.
+5. **Verify.**
+   - Kotlin/Native tests: every kind and its text parts, reply/deny on a spawned child that reads the answer, `TT_CLOSED` without a child, `TT_FULL`/`TT_INVALID`, link URIs, and frame link spans.
+   - `tests/c/events.c` under ASan+UBSan and TSan.
+   - `./gradlew ktlintFormat check`, and Linux in Colima.
+
+## Acceptance
+
+- [x] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
+- [x] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
