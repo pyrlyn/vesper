@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 4
-readiness: 10%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -27,7 +27,7 @@ Row damage and scroll damage; mode 2026 with byte and time caps; a UI-owned fram
 
 ## Acceptance
 
-- [ ] Damage and synchronized output are implemented in `scull-term`.
-- [ ] The frame snapshot copies only changed rows and moves scrolled ones.
-- [ ] The property test holds: repainting the damage over the last picture equals a full repaint.
-- [ ] `./gradlew check` passes.
+- [x] Damage and synchronized output are implemented in `scull-term`.
+- [x] The frame snapshot copies only changed rows and moves scrolled ones.
+- [x] The property test holds: repainting the damage over the last picture equals a full repaint.
+- [x] `./gradlew check` passes.
