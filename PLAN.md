@@ -60,6 +60,7 @@ Not in scope until they move from [`ideas.md`](ideas.md) to [`roadmap.md`](roadm
    scull-unicode  generated width and grapheme tables
    scull-parser   bulk scanner + sequence machine → typed actions
    scull-pty      PTY, reader thread, back-pressure
+   scull-png      header-first PNG decode under a caller-set allocation cap
 ```
 
 Build: Gradle with the Kotlin Multiplatform plugin. The core is Kotlin/Native.
@@ -71,8 +72,8 @@ Build: Gradle with the Kotlin Multiplatform plugin. The core is Kotlin/Native.
 | `mingwX64` | shared library loaded by the C# host |
 
 cinterop: POSIX PTY (`posix_openpt`, `fork`/`exec`, `winsize`) on Unix; ConPTY on Windows.
-No other native libraries are required for the core. Image codecs (PNG, JPEG, zlib) are
-Kotlin or cinterop, chosen in T19/T34.
+No other native libraries are required for the core. PNG is decoded in Kotlin over zlib
+(`platform.zlib`, shipped with Kotlin/Native; T34); other image codecs are chosen in T19.
 
 Rules of the boundary (research.md §7, `docs/research/ffi-native-ui.md` Part 4):
 
@@ -127,7 +128,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 - [ ] **T13.** Selection, search, OSC 8/52/7/133 in the core.
 - [ ] **T13.2.** Selection and scrollback search, with frame marks.
 - [ ] **T19.** Images (kitty, iTerm2, sixel) with quotas.
-- [ ] **T34.** Allocation-capped shared PNG decoder.
+- [x] **T34.** Allocation-capped shared PNG decoder.
 - [ ] **T30.** Config watcher never misses a reload under load.
 
 ### Phase 6: macOS app
