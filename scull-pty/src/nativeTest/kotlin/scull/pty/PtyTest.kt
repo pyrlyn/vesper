@@ -22,12 +22,20 @@ class PtyTest {
         val sink = Recorder()
         spawn(echoAndExit(), sink).use {
             val status = sink.awaitExit()
-            assertEquals(ExitStatus(3u), status)
-            assertTrue("hi" in sink.text(), "output: ${sink.text()}")
+            val text = sink.text()
+            val bytes = text.encodeToByteArray().joinToString(" ") { b -> b.toUByte().toString(16).padStart(2, '0') }
+            // ConPTY may deliver UTF-16LE, which would put a NUL between each ASCII character.
+            val hasHi = "hi" in text || "h\u0000i" in text
+            assertEquals(
+                ExitStatus(3u),
+                status,
+                "status=$status output=$text bytes=$bytes",
+            )
+            assertTrue(hasHi, "output: $text bytes=$bytes")
             // Nothing may be fed once the exit is out.
             sleep(50.milliseconds)
-            assertFalse(sink.fedAfterExit)
-            assertNull(it.failure)
+            assertFalse(sink.fedAfterExit, "late output: ${sink.text()} bytes=$bytes")
+            assertNull(it.failure, "failure=${it.failure}")
         }
     }
 
