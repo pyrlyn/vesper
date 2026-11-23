@@ -18,36 +18,46 @@ import platform.zlib.Z_FINISH
 import platform.zlib.Z_NO_FLUSH
 import platform.zlib.Z_OK
 import platform.zlib.Z_STREAM_END
-import platform.zlib.deflateBound
 import platform.zlib.deflateEnd
 import platform.zlib.deflateInit_
 import platform.zlib.inflateEnd
 import platform.zlib.inflateInit_
 import platform.zlib.z_stream
-import platform.zlib.crc32 as zcrc32
 import platform.zlib.deflate as zdeflate
 import platform.zlib.inflate as zinflate
 
 // zlib from the Kotlin/Native platform libraries: the system's on macOS and Linux, a static copy on
 // Windows. Its window and state are a fixed few tens of KiB whatever the image.
 
+// zlib's crc32 and deflateBound take and return uLong, 32 bits on Windows and 64 elsewhere, which
+// shared native code cannot convert to; so the CRC is computed here and the bound is compressBound's.
+
+private val CRC_TABLE =
+    IntArray(256) { n ->
+        var c = n
+        repeat(8) { c = if (c and 1 != 0) 0xEDB88320.toInt() xor (c ushr 1) else c ushr 1 }
+        c
+    }
+
 /** CRC-32 of [len] bytes of [bytes] from [from]. */
 internal fun crc32(
     bytes: ByteArray,
     from: Int,
     len: Int,
-): UInt =
-    bytes
-        .usePinned {
-            zcrc32(0u.convert(), it.addressOf(from).reinterpret(), len.convert())
-        }.convert()
+): UInt {
+    var c = -1
+    for (i in from until from + len) c = CRC_TABLE[(c xor bytes[i].toInt()) and 0xFF] xor (c ushr 8)
+    return c.inv().toUInt()
+}
 
 /** [raw] as a zlib stream. */
 internal fun deflate(raw: ByteArray): ByteArray {
     val stream = nativeHeap.alloc<z_stream>()
     try {
         check(deflateInit_(stream.ptr, Z_DEFAULT_COMPRESSION, ZLIB_VERSION, sizeOf<z_stream>().toInt()) == Z_OK)
-        val out = ByteArray(deflateBound(stream.ptr, raw.size.convert()).convert<Long>().toInt())
+        // zlib's compressBound: the worst case of stored blocks plus the header and trailer.
+        val n = raw.size.toLong()
+        val out = ByteArray((n + (n shr 12) + (n shr 14) + (n shr 25) + 13).toInt())
         raw.usePinned { input ->
             out.usePinned { output ->
                 stream.next_in = if (raw.isEmpty()) null else input.addressOf(0).reinterpret()
