@@ -37,6 +37,25 @@ class GridTest {
     private fun style(n: Int) = Style(fg = Color.indexed(n))
 
     @Test
+    fun evictedCountsEveryRowThatLeftTheRing() {
+        val g = grid(2)
+        repeat(2) { emit(g, 'a') }
+        assertEquals(0, g.evicted, "history still had room")
+        repeat(3) { emit(g, 'b') }
+        assertEquals(3, g.evicted)
+        g.clearHistory()
+        assertEquals(5, g.evicted)
+        val alt = grid(0)
+        alt.scrollUp(2)
+        assertEquals(2, alt.evicted, "a screen without history evicts every scrolled row")
+        emit(g, 'c')
+        emit(g, 'd')
+        g.resize(GRID_COLS, 1, Reflow.REWRAP, TrackPoint(g.historyLength + SCREEN - 1, 0))
+        // Five rows (b, b, c, d and the cursor's blank one) in one screen row and two of history.
+        assertEquals(7, g.evicted)
+    }
+
+    @Test
     fun gridNeedsARowAndAColumn() {
         assertFailsWith<IllegalArgumentException> { Grid(0, 1, 0) }
         assertFailsWith<IllegalArgumentException> { Grid(1, 0, 0) }

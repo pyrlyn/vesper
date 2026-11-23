@@ -1,5 +1,6 @@
-// The shell-integration events, link URIs, link spans and clipboard answers, called through the
-// prototypes of scull.h, with the sanitizers watching every buffer the host hands over.
+// The shell-integration events, link URIs, link spans, clipboard answers, selection and search,
+// called through the prototypes of scull.h, with the sanitizers watching every buffer the host hands
+// over.
 
 #define _POSIX_C_SOURCE 200809L
 
@@ -191,11 +192,54 @@ static void a_waiting_child_gets_the_answer(void) {
   tt_term_free(term);
 }
 
+static void select_and_search(void) {
+  tt_term_options o = options(10, 3);
+  tt_term *term = NULL;
+  CHECK(tt_term_new(&o, &term) == TT_OK);
+  feed(term, "one two\r\nthree");
+
+  char buf[16];
+  size_t len = 99;
+  CHECK(tt_term_selection_text(term, (uint8_t *)buf, sizeof buf, &len) == TT_EMPTY && len == 0);
+  CHECK(tt_term_select_start(term, TT_SELECT_WORD, 0, 5) == TT_OK);
+  CHECK(tt_term_selection_text(term, (uint8_t *)buf, sizeof buf, &len) == TT_OK);
+  CHECK(len == 3 && memcmp(buf, "two", 3) == 0);
+  CHECK(tt_term_select_extend(term, 1, 1) == TT_OK);
+  CHECK(tt_term_selection_text(term, (uint8_t *)buf, 2, &len) == TT_FULL && len == 9);  // "two\nthree": words stay whole
+  CHECK(tt_term_select_start(term, 99, 0, 0) == TT_INVALID);
+
+  tt_str pattern = text("O");
+  size_t count = 0;
+  CHECK(tt_term_search_set(term, pattern.ptr, pattern.len, 0) == TT_OK);
+  CHECK(tt_term_search_count(term, &count) == TT_OK && count == 0);
+  CHECK(tt_term_search_set(term, pattern.ptr, pattern.len, TT_SEARCH_IGNORE_CASE) == TT_OK);
+  CHECK(tt_term_search_count(term, &count) == TT_OK && count == 2);
+  tt_match m;
+  memset(&m, 0, sizeof m);
+  m.struct_size = sizeof m;
+  CHECK(tt_term_search_step(term, 0, &m) == TT_OK);
+  CHECK(m.start_line == 0 && m.start_col == 6 && m.end_col == 6);
+  CHECK(tt_term_search_step(term, 1, NULL) == TT_OK);
+  CHECK(tt_term_search_set(term, pattern.ptr, pattern.len, 2) == TT_INVALID);
+  CHECK(tt_term_search_step(term, 1, &m) == TT_EMPTY);
+
+  tt_frame *frame = tt_frame_new();
+  CHECK(frame != NULL);
+  tt_frame_view view;
+  memset(&view, 0, sizeof view);
+  view.struct_size = sizeof view;
+  CHECK(tt_frame_update(frame, term, &view) == TT_OK);
+  CHECK(view.cells[4].flags == TT_CELL_SELECTED && view.cells[3].flags == 0);
+  tt_frame_free(frame);
+  tt_term_free(term);
+}
+
 int main(void) {
   CHECK(tt_abi_version() == TT_ABI_VERSION);
   every_kind();
   links();
   clipboard_without_a_child();
+  select_and_search();
   a_waiting_child_gets_the_answer();
   printf("events: ok\n");
   return 0;

@@ -239,7 +239,7 @@ private fun TermHandle.sendClipboard(
 }
 
 /** The out-parameter rules every sized copy shares: a `len`, and a `buf` whenever there is a `cap`. */
-private fun checkOut(
+internal fun checkOut(
     buf: CPointer<ByteVar>?,
     cap: ULong,
     len: CPointer<ULongVar>?,
@@ -248,7 +248,7 @@ private fun checkOut(
 }
 
 /** Reports [bytes]' length in [len] and copies them into [buf], or answers `TT_FULL` with nothing copied when [cap] is short. */
-private fun copyOut(
+internal fun copyOut(
     bytes: ByteArray,
     buf: CPointer<ByteVar>?,
     cap: ULong,
