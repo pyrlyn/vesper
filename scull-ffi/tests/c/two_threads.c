@@ -133,7 +133,8 @@ static void fed_from_another_thread(void) {
 
   tt_frame_view view = update(frame, term);
   drain(term, &bells, &titles);
-  CHECK(bells == LINES / EVERY);
+  // Bells the UI has not polled yet coalesce into one, so a feeder that outruns it rings fewer.
+  CHECK(bells >= 1 && bells <= LINES / EVERY);
   CHECK(titles == LINES / EVERY);
   CHECK(row_starts(&view, "line 1999 h\xc3\xa9llo \xe4\xb8\x96"));
   printf("fed %d lines over %d frames\n", LINES, frames);
