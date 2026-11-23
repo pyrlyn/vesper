@@ -105,7 +105,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 - [x] **T7.** Terminal state: modes, cursor, SGR, alt screen, device reports.
 - [x] **T22.** No-op link clears are generation-neutral.
 - [x] **T23.** Interner marks/sweep contract.
-- [ ] **T24.** Harness wrap vs xterm deferred DECAWM.
+- [x] **T24.** Harness wrap vs xterm deferred DECAWM.
 - [ ] **T26.** Grid-layer test gaps.
 
 ### Phase 3: I/O and frames
