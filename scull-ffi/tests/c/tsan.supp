@@ -1,0 +1,8 @@
+# ThreadSanitizer suppressions for the C tests.
+#
+# The Kotlin/Native runtime is not built with TSan, so the collector's sweep (on the "Main GC
+# thread") clearing freed blocks under its own lock looks like a race with the later allocation
+# that reuses them. Only reports with a page sweep on one side are suppressed; a race between the
+# host's threads and the core still fails the test.
+# Each allocator page kind has its own Sweep (FixedBlockPage, NextFitPage, ...).
+race:kotlin::alloc::*Page::Sweep

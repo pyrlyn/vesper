@@ -13,7 +13,7 @@ import kotlin.test.fail
 // screen text, cursor, styles, history, replies and events. The cases, their esctest2 and vttest
 // sources and the fixture format are described in tests/README.md.
 
-/** The files T7 answers for; `shell.txt` and `selection.txt` wait for their tasks. */
+/** The files the core answers for. */
 private val FILES =
     listOf(
         "charsets",
@@ -26,7 +26,9 @@ private val FILES =
         "reset",
         "screens",
         "scroll",
+        "selection",
         "sgr",
+        "shell",
         "tabs",
         "unicode",
         "wrap",
@@ -51,9 +53,23 @@ private class Case(
     var history: Int? = null
     var replies: ByteArray? = null
     var events: List<String>? = null
+    var links: List<String>? = null
+
+    /** `kind row,col row,col`: a selection made after [input], from one 1-based viewport cell to another. */
+    var select: String? = null
+
+    /** Fed after the selection is made. */
+    var then = ByteArray(0)
+    var selection: List<String>? = null
+
+    /** The pattern and whether the search is case-sensitive. */
+    var search: Pair<String, Boolean>? = null
+    var matches: List<String>? = null
 
     val checksSomething: Boolean
-        get() = cursor != null || screen != null || styles.isNotEmpty() || history != null || replies != null || events != null
+        get() =
+            cursor != null || screen != null || styles.isNotEmpty() || history != null || replies != null || events != null ||
+                links != null || selection != null || matches != null
 }
 
 private fun unescape(text: String): ByteArray {
@@ -191,6 +207,30 @@ private fun parse(
                 case.events = pipes()
             }
 
+            "links" -> {
+                case.links = pipes()
+            }
+
+            "select" -> {
+                case.select = value
+            }
+
+            "then" -> {
+                case.then += unescape(value)
+            }
+
+            "selection" -> {
+                case.selection = pipes()
+            }
+
+            "search", "isearch" -> {
+                case.search = unescape(value).decodeToString() to (key == "search")
+            }
+
+            "matches" -> {
+                case.matches = pipes()
+            }
+
             else -> {
                 error("$file: unknown field $key")
             }
@@ -203,6 +243,12 @@ private fun showEvent(event: Event): String =
     when (event) {
         Event.Bell -> "bell"
         is Event.Title -> "title ${event.target.code} ${event.text}"
+        is Event.Directory -> "cwd ${event.uri}"
+        is Event.ShellMark -> listOfNotNull("shell", event.kind.letter, event.exitCode).joinToString(" ")
+        is Event.ClipboardWrite -> "clip write ${event.targets} ${event.data.decodeToString()}"
+        is Event.ClipboardRead -> "clip read ${event.targets}"
+        is Event.Notification -> "notify ${event.title}|${event.body}"
+        is Event.Link -> "link ${event.id.value} ${event.uri}"
     }
 
 private fun color(c: Color): String =
@@ -233,11 +279,33 @@ private fun styleText(style: Style): String {
     return if (parts.isEmpty()) "default" else parts.joinToString(" ")
 }
 
+/** Makes the selection `kind row,col row,col` names, in 1-based viewport cells. */
+private fun Terminal.select(spec: String) {
+    val (kind, from, to) = spec.split(' ')
+
+    fun point(cell: String) = viewportPoint(cell.substringBefore(',').toInt() - 1, cell.substringAfter(',').toInt() - 1)
+    selectStart(SelectionKind.entries.first { it.name.equals(kind, ignoreCase = true) }, point(from))
+    selectExtend(point(to))
+}
+
+private fun showMatch(m: Match): String = "${m.start.line},${m.start.col}-${m.end.line},${m.end.col}"
+
 /** Runs one case; returns a description of every mismatch. */
 private fun check(case: Case): String =
     buildString {
         val term = Terminal(case.cols, case.rows, case.scrollback)
         term.feed(case.input)
+        case.select?.let(term::select)
+        term.feed(case.then)
+        case.selection?.let { want ->
+            val got = term.selectionText().let { if (it.isEmpty()) emptyList() else it.split('\n') }
+            if (got != want) append("  selection:\n    want $want\n    got  $got\n")
+        }
+        case.search?.let { (pattern, caseSensitive) -> term.searchSet(pattern, caseSensitive) }
+        case.matches?.let { want ->
+            val got = term.searchMatches().map(::showMatch)
+            if (got != want) append("  matches:\n    want $want\n    got  $got\n")
+        }
         case.replies?.let { want ->
             val got = term.takeReplies()
             if (!got.contentEquals(want)) append("  replies: want ${want.decodeToString()}, got ${got.decodeToString()}\n")
@@ -262,6 +330,13 @@ private fun check(case: Case): String =
         case.events?.let { want ->
             val got = generateSequence(term::pollEvent).map(::showEvent).toList()
             if (got != want) append("  events:\n    want $want\n    got  $got\n")
+        }
+        case.links?.let { want ->
+            val got =
+                (0 until term.grid.screenRows).flatMap { r ->
+                    checkNotNull(term.grid.screenRow(r)).links.map { "${r + 1} ${it.start}..${it.end}=${it.link.value}" }
+                }
+            if (got != want) append("  links:\n    want $want\n    got  $got\n")
         }
     }
 

@@ -55,6 +55,26 @@ public class ByteSink(
         bytes[size++] = byte.toByte()
     }
 
+    internal fun pushAll(bytes: ByteArray) {
+        for (b in bytes) push(b.toInt())
+    }
+
+    /** Whether the bytes from [from] on end with [suffix]. */
+    internal fun endsWith(
+        from: Int,
+        suffix: ByteArray,
+    ): Boolean {
+        val start = size - suffix.size
+        if (start < from) return false
+        for (i in suffix.indices) if (bytes[start + i] != suffix[i]) return false
+        return true
+    }
+
+    /** Drops the last [count] bytes. */
+    internal fun dropLast(count: Int) {
+        size -= count
+    }
+
     internal fun csi() {
         push(ESC)
         push(CSI_SECOND)

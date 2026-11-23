@@ -72,6 +72,14 @@ public class Damage {
         old: List<RowStamp>,
         new: List<RowStamp>,
         full: Boolean,
+    ): Unit = compute(old, new, full) { _, _ -> true }
+
+    /** As [compute], with row [from] of [old] standing for row `to` of [new] only when [sameMarks] says their highlights match. */
+    internal fun compute(
+        old: List<RowStamp>,
+        new: List<RowStamp>,
+        full: Boolean,
+        sameMarks: (from: Int, to: Int) -> Boolean,
     ) {
         clear()
         if (full || old.size != new.size) {
@@ -82,8 +90,8 @@ public class Damage {
         index.clear()
         old.forEachIndexed { row, stamp -> index[stamp.id] = row }
         new.forEachIndexed { row, stamp ->
-            if (old[row] == stamp) return@forEachIndexed
-            val from = index[stamp.id]?.takeIf { old[it] == stamp }
+            if (old[row] == stamp && sameMarks(row, row)) return@forEachIndexed
+            val from = index[stamp.id]?.takeIf { old[it] == stamp && sameMarks(it, row) }
             if (from == null) dirtyList += row else pushScroll(row, from)
         }
     }

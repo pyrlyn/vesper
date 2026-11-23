@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 4
-readiness: 50%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -17,7 +17,7 @@ Execution plan:
 4. Verify with `./gradlew check`. Split at claim: T12.1 keys (legacy + kitty + win32); T12.2 mouse, paste and focus.
 
 Acceptance:
-- [ ] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
-- [ ] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
+- [x] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
 
 Split at claim: [T12.1](../T12.1/task.md) keys, [T12.2](../T12.2/task.md) mouse, paste and focus. T12 closes when both have.

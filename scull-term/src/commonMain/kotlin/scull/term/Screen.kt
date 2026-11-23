@@ -90,6 +90,7 @@ internal fun State.fullReset() {
     charsets.reset()
     saved.fill(null)
     lastChar = NO_CHAR
+    links.open = null
 }
 
 /**

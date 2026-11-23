@@ -165,4 +165,58 @@ class FrameTest {
         t.scrollDisplay(1)
         assertNull(t.fresh().cursor)
     }
+
+    @Test
+    fun selectedCellsAreFlaggedAndRepaintedAlone() {
+        val t = term()
+        t.feed("abc\r\nxyz")
+        val f = t.fresh()
+        t.selectStart(SelectionKind.Cell, t.viewportPoint(1, 1))
+        t.selectExtend(t.viewportPoint(1, 2))
+        t.updated(f)
+        assertEquals(listOf(1), f.damage.dirty, "the text did not change, the highlight did")
+        assertEquals(listOf(0, FrameCell.SELECTED, FrameCell.SELECTED, 0), (0 until 4).map { f.cell(1, it).flags })
+        t.selectClear()
+        t.updated(f)
+        assertEquals(listOf(1), f.damage.dirty)
+        assertEquals(listOf(0, 0, 0, 0), (0 until 4).map { f.cell(1, it).flags })
+    }
+
+    @Test
+    fun aSelectionThatScrollsWithItsTextKeepsTheScroll() {
+        val t = term()
+        t.feed("a\r\nb\r\nc\r\nd")
+        t.selectStart(SelectionKind.Line, t.viewportPoint(1, 0))
+        val f = t.fresh()
+        t.feed("\r\ne")
+        t.updated(f)
+        assertEquals(listOf(Scroll(0, 3, 1)), f.damage.scrolls)
+        assertEquals(listOf(3), f.damage.dirty)
+        assertEquals(FrameCell.SELECTED, f.cell(0, 0).flags, "b moved up with its highlight")
+        assertEquals(0, f.cell(1, 0).flags)
+    }
+
+    @Test
+    fun matchesAreFlaggedAndTheCurrentOneStandsOut() {
+        val t = term()
+        t.feed("ab 中 ab")
+        assertTrue(t.searchSet("ab", true))
+        val f = t.fresh()
+        assertEquals(FrameCell.MATCH, f.cell(0, 0).flags and FrameCell.MATCH)
+        assertEquals(0, f.cell(0, 2).flags)
+        t.searchNext()
+        t.updated(f)
+        val current = FrameCell.MATCH or FrameCell.CURRENT_MATCH
+        assertEquals(listOf(current, current, 0, 0, 0, 0, FrameCell.MATCH, FrameCell.MATCH), (0 until COLS).map { f.cell(0, it).flags })
+    }
+
+    @Test
+    fun aMatchThatStartsAboveTheViewportIsFlagged() {
+        val t = term()
+        t.feed("abcdefghij\r\n1\r\n2\r\n3")
+        assertEquals(1, t.grid.historyLength)
+        assertTrue(t.searchSet("abcdefghij", true))
+        val f = t.fresh()
+        assertEquals(listOf(FrameCell.MATCH, FrameCell.MATCH, 0), (0 until 3).map { f.cell(0, it).flags })
+    }
 }

@@ -12,7 +12,7 @@
 | jactionlint | mise (`mise.toml` pins `github:jdx/jactionlint` 2.0.2) | Lint the workflows (the `jactionlint` CI job, the pre-push hook and `mise x -- jactionlint`) | https://github.com/jdx/jactionlint |
 | hk | mise (`mise.toml` pins 2.5.0) | Runs jactionlint as a pre-push hook (`hk.pkl`) | https://github.com/jdx/hk |
 | shellcheck | mise (`mise.toml` pins 0.11.0; CI uses the runner image's copy) | Checks `run:` scripts inside jactionlint | https://github.com/koalaman/shellcheck |
-| cc (clang or gcc) | system (Xcode Command Line Tools, distro package) | The C ABI test under ASan, UBSan and TSan (Unix only) | https://github.com/llvm/llvm-project |
+| clang | system (Xcode Command Line Tools; the `clang` package on Linux, preinstalled on the CI image) | Builds `scull-ffi/tests/c` against the shared library and runs it under ASan+UBSan and TSan (`:scull-ffi:cTests`, part of `check` on macOS and Linux) | https://github.com/llvm/llvm-project |
 | Xcode (Swift 6.4, SwiftPM, AppKit/SwiftUI SDK) | Mac App Store or developer.apple.com (27.0) | Build and test the macOS app in `macos/` (arm64 only) | https://developer.apple.com/xcode/ |
 | codesign | system (Xcode) | Ad-hoc signs `Scull.app` so it launches locally | https://developer.apple.com/documentation/security/code-signing-services |
 | .NET SDK (`dotnet`, C# compiler, MSBuild) | https://dot.net (pinned to 10.0.401 in `windows/global.json`; CI: `actions/setup-dotnet`) | Build and test the C# projects in `windows/` | https://github.com/dotnet/sdk |
