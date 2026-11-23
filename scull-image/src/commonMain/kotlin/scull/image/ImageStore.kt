@@ -29,7 +29,8 @@ public class Crop(
 /**
  * Where an image is shown: its top-left cell at [column] of absolute [line] (rows ever evicted
  * plus the ring index, so scrolling does not move it), scaled to [columns] by [rows] cells, drawn
- * by [z] (below text when negative) and, for equal [z], in placement order.
+ * by [z] (below text when negative) and, for equal [z], in placement order. [offsetX] and
+ * [offsetY] move it right and down inside its first cell, in pixels.
  */
 public class Placement(
     public val imageId: Long,
@@ -39,9 +40,12 @@ public class Placement(
     public val rows: Int,
     public val crop: Crop? = null,
     public val z: Int = 0,
+    public val offsetX: Int = 0,
+    public val offsetY: Int = 0,
 ) {
     init {
         require(column >= 0 && columns > 0 && rows > 0) { "bad placement at $column over ${columns}x$rows cells" }
+        require(offsetX >= 0 && offsetY >= 0) { "bad offset $offsetX,$offsetY" }
     }
 }
 

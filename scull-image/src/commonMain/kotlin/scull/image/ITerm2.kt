@@ -1,7 +1,5 @@
 package scull.image
 
-import kotlin.io.encoding.Base64
-
 // iTerm2's inline images, from https://iterm2.com/documentation-images.html:
 //   OSC 1337 ; File=<key=value;...> : <base64 file> ST
 //   OSC 1337 ; MultipartFile=<key=value;...> ST, then FilePart=<base64> ..., then FileEnd
@@ -37,7 +35,6 @@ public class InlineImage(
     public val preserveAspectRatio: Boolean,
 )
 
-private val BASE64 = Base64.withPadding(Base64.PaddingOption.PRESENT_OPTIONAL)
 private val PREFIX = "1337;".encodeToByteArray()
 private val FILE = "File=".encodeToByteArray()
 private val MULTIPART = "MultipartFile=".encodeToByteArray()
@@ -65,11 +62,7 @@ public class ITerm2Images(
     private val maxPixelBytes: Long,
 ) {
     private var pending: Args? = null
-    private var parts = ByteArray(0)
-    private var partsSize = 0
-
-    /** Base64 characters that decode to at most [maxFileBytes]. */
-    private val maxEncoded = (maxFileBytes.toLong() + 2) / 3 * 4
+    private val parts = Base64Parts(maxFileBytes)
 
     /**
      * Takes the whole payload of one OSC. Returns the image a `File=` or `FileEnd` completes;
@@ -89,7 +82,7 @@ public class ITerm2Images(
                 if (colon < 0) throw ImageError.Malformed("no ':' before the file")
                 val args = parseArgs(payload, at + FILE.size, colon)
                 checkSize(args)
-                if (!args.inline) null else image(args, decodeBase64(payload, colon + 1, payload.size))
+                if (!args.inline) null else image(args, decodeBase64(payload, colon + 1, payload.size, maxFileBytes))
             }
 
             payload.startsWith(MULTIPART, at) -> {
@@ -97,20 +90,26 @@ public class ITerm2Images(
                 val args = parseArgs(payload, at + MULTIPART.size, payload.size)
                 checkSize(args)
                 pending = args
-                partsSize = 0
+                parts.clear()
                 null
             }
 
             payload.startsWith(PART, at) -> {
-                if (pending != null) appendPart(payload, at + PART.size)
+                if (pending != null) {
+                    try {
+                        parts.append(payload, at + PART.size, payload.size)
+                    } catch (e: ImageError) {
+                        pending = null
+                        throw e
+                    }
+                }
                 null
             }
 
             payload.size == at + END.size && payload.startsWith(END, at) -> {
                 val args = pending ?: return null
                 pending = null
-                val file = decodeBase64(parts, 0, partsSize)
-                parts = ByteArray(0)
+                val file = parts.decode()
                 if (!args.inline) null else image(args, file)
             }
 
@@ -123,34 +122,6 @@ public class ITerm2Images(
     private fun checkSize(args: Args) {
         val size = args.size ?: return
         if (size > maxFileBytes) throw ImageError.TooLarge(size, maxFileBytes.toLong())
-    }
-
-    private fun appendPart(
-        payload: ByteArray,
-        from: Int,
-    ) {
-        val needed = partsSize.toLong() + payload.size - from
-        if (needed > maxEncoded) {
-            pending = null
-            parts = ByteArray(0)
-            throw ImageError.TooLarge(needed / 4 * 3, maxFileBytes.toLong())
-        }
-        if (needed > parts.size) parts = parts.copyOf(maxOf(needed.toInt(), minOf(parts.size * 2L, maxEncoded).toInt()))
-        payload.copyInto(parts, partsSize, from, payload.size)
-        partsSize = needed.toInt()
-    }
-
-    private fun decodeBase64(
-        bytes: ByteArray,
-        from: Int,
-        to: Int,
-    ): ByteArray {
-        if (to - from > maxEncoded) throw ImageError.TooLarge((to - from).toLong() / 4 * 3, maxFileBytes.toLong())
-        return try {
-            BASE64.decode(bytes, from, to)
-        } catch (e: IllegalArgumentException) {
-            throw ImageError.Malformed("bad base64: ${e.message}")
-        }
     }
 
     private fun image(

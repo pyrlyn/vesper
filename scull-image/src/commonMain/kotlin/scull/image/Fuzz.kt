@@ -101,3 +101,28 @@ public fun fuzzSixel(data: ByteArray) {
     val step = if (data.isEmpty()) 1 else (data[data.size - 1].toInt() and 7) + 1
     check(decode(step) == whole) { "cutting the stream changed the image" }
 }
+
+private const val ESC = 0x1B.toByte()
+
+/**
+ * The kitty decoder's fuzz target: [data] cut at ESC into APC payloads, all fed to one decoder over
+ * a small store. Nothing may escape [KittyGraphics.accept], every reply must be one APC, the
+ * cursor may only move forward, and the store's and decoder's bookkeeping are rechecked after
+ * each payload. Throws [IllegalStateException] on a violation.
+ */
+public fun fuzzKitty(data: ByteArray) {
+    val store = ImageStore(quotaBytes = FUZZ_PIXEL_BYTES, maxImages = 6)
+    val kitty = KittyGraphics(store, FUZZ_FILE_BYTES, FUZZ_PIXEL_BYTES / 4)
+    val context = KittyContext(column = 3, line = 40, cellWidth = 4, cellHeight = 8, top = 38, columns = 20, rows = 6)
+    var start = 0
+    for (i in 0..data.size) {
+        if (i < data.size && data[i] != ESC) continue
+        val outcome = kitty.accept(data.copyOfRange(start, i), context)
+        val reply = outcome.reply
+        check(reply == null || (reply.startsWith("\u001b_G") && reply.endsWith("\u001b\\"))) { "not an APC reply: $reply" }
+        check(outcome.cursorColumns >= 0 && outcome.cursorRows >= 0) { "the cursor moved back" }
+        store.checkInvariants()
+        kitty.checkInvariants()
+        start = i + 1
+    }
+}

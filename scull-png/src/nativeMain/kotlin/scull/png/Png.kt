@@ -99,7 +99,7 @@ public object Png {
         require(rgba.size.toLong() == stride * height) { "${rgba.size} bytes for $width x $height RGBA" }
         val raw = ByteArray(((stride + 1) * height).toInt())
         for (y in 0 until height) rgba.copyInto(raw, y * (stride.toInt() + 1) + 1, y * stride.toInt(), (y + 1) * stride.toInt())
-        return pngFile(ihdr(width, height, bitDepth = 8, colorType = COLOR_RGBA), listOf("IDAT" to deflate(raw)))
+        return pngFile(ihdr(width, height, bitDepth = 8, colorType = COLOR_RGBA), listOf("IDAT" to Zlib.deflate(raw)))
     }
 }
 
