@@ -31,6 +31,8 @@ include(
     ":vesper-image",
     // A terminal and the child it runs: what each host window holds (T14).
     ":vesper-session",
+    // The macOS app: Kotlin/Native over AppKit and CoreText (T14).
+    ":vesper-macos",
     // Test and measurement tools; nothing in the shipped library depends on them.
     ":vesper-harness",
     ":vesper-bench",

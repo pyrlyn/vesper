@@ -79,9 +79,6 @@ public class Session private constructor(
         return guarded(false) { terminal.updateFrame(frame) }
     }
 
-    /** True once per bell rung since the last call. */
-    public fun takeBell(): Boolean = guarded(false) { terminal.takeBell() }
-
     /**
      * The next event, or null. A clipboard read (OSC 52 `?`) never comes out: it hands the user's
      * clipboard to whatever the shell runs, a remote host included, so it is answered with an
