@@ -110,7 +110,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 
 ### Phase 3: I/O and frames
 
-- [ ] **T8.** PTY and reader thread (cinterop; ConPTY on Windows); back-pressure so a flooding child cannot starve a frame read.
+- [x] **T8.** PTY and reader thread (cinterop; ConPTY on Windows); back-pressure so a flooding child cannot starve a frame read.
 - [ ] **T9.** Damage, synchronized output (mode 2026), UI-owned frame snapshot.
 - [ ] **T11.** One-pass reflow with tracking points.
 

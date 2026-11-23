@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 4
-readiness: 20%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -29,7 +29,7 @@ agent: Claude Code / claude-opus-5-5
 
 ## Acceptance
 
-- [ ] The PTY layer above is implemented in Kotlin/Native with C only for the fork-to-exec path and OS calls.
-- [ ] A flooding child cannot starve a concurrent frame read (starvation test on macOS and Linux).
-- [ ] A shell runs, echoes and exits with its status on macOS and Linux; the Windows path compiles.
-- [ ] `./gradlew check` passes.
+- [x] The PTY layer above is implemented in Kotlin/Native with C only for the fork-to-exec path and OS calls.
+- [x] A flooding child cannot starve a concurrent frame read (starvation test on macOS and Linux).
+- [x] A shell runs, echoes and exits with its status on macOS and Linux; the Windows path compiles.
+- [x] `./gradlew check` passes.
