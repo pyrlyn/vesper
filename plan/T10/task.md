@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 5
-readiness: 5%
+readiness: 85%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -56,6 +56,13 @@ agent: Claude Code / claude-opus-5-5
    - Kotlin/Native tests for every status path, for poisoning and for the struct-size rules.
    - `./gradlew ktlintFormat check`.
    - The C programs on macOS, and on Linux in Colima.
+
+## Status
+
+- Steps 1, 2 and 4 are done: 29 Kotlin/Native tests on macOS and Linux, the gate green.
+- `tests/c/two_threads.c` and `tests/c/status.c` pass under ASan+UBSan and TSan on macOS (`:scull-ffi:cTests`, part of `check`).
+  - On Linux they pass without sanitizers in Colima: its amd64 emulation kills even an empty sanitized program. CI runs them natively.
+- Open: the C# bindings. Generating them needs ClangSharpPInvokeGenerator as a dotnet tool, which waits for the creator's decision.
 
 ## Acceptance
 
