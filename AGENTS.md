@@ -46,10 +46,10 @@ mise x -- jactionlint --baseline-write # refresh the baseline after fixing findi
 mise x -- hk install --mise            # install the pre-push hook once per clone
 ./gradlew check                        # merge gate: ktlint and the native tests of the host's targets
 ./gradlew :scull-ffi:linkReleaseSharedMacosArm64   # libscull for a host (also Static, LinuxX64, MingwX64)
-./gradlew :scull-bench:runReleaseExecutableMacosArm64  # rewrite docs/benchmarks/baseline.md
-./gradlew :scull-bench:runReleaseExecutableMacosArm64 --args=parser  # parser throughput table (docs/benchmarks/parser.md)
-./gradlew :scull-bench:runReleaseExecutableMacosArm64 --args=grid    # grid memory and scroll tables (docs/benchmarks/grid.md)
-./gradlew :scull-bench:runReleaseExecutableMacosArm64 --args=term    # terminal throughput table (docs/benchmarks/term.md)
-./gradlew :scull-unicode:generateUcd   # regenerate the Unicode tables from the pinned data files (downloads once)
-./gradlew :scull-unicode:checkUcd      # fail when the committed Unicode tables are stale; not in check, it needs unicode.org
+./gradlew :vesper-bench:runReleaseExecutableMacosArm64  # rewrite docs/benchmarks/baseline.md
+./gradlew :vesper-bench:runReleaseExecutableMacosArm64 --args=parser  # parser throughput table (docs/benchmarks/parser.md)
+./gradlew :vesper-bench:runReleaseExecutableMacosArm64 --args=grid    # grid memory and scroll tables (docs/benchmarks/grid.md)
+./gradlew :vesper-bench:runReleaseExecutableMacosArm64 --args=term    # terminal throughput table (docs/benchmarks/term.md)
+./gradlew :vesper-unicode:generateUcd   # regenerate the Unicode tables from the pinned data files (downloads once)
+./gradlew :vesper-unicode:checkUcd      # fail when the committed Unicode tables are stale; not in check, it needs unicode.org
 ```

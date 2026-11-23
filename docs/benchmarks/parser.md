@@ -1,6 +1,6 @@
 # Parser throughput
 
-T4 measures the Kotlin/Native `scull-parser` against `vte` 0.15.0, the parser Alacritty uses. Both parse the same three inputs on the same machine:
+T4 measures the Kotlin/Native `vesper-parser` against `vte` 0.15.0, the parser Alacritty uses. Both parse the same three inputs on the same machine:
 
 - **ASCII lines:** `lorem ipsum …`, broken into 80-column lines with CR LF.
 - **UTF-8 lines:** Cyrillic, CJK, Hangul, Greek, accented Latin and emoji words, broken the same way.
@@ -18,15 +18,15 @@ Machine: Apple M3 Max, macOS 27.0.1, Kotlin/Native 2.4.21 release build, Rust 1.
 
 Scull times are medians of 21 feeds after a warm-up, from two runs taken just before and just after the `vte` run. `vte` times are divan medians of 100 samples.
 
-The Rust `scull-parser` that this one ports scanned ASCII eight bytes at a time and ran the same input in 364 µs. The Kotlin port checks one byte per step. A word-at-a-time scan (`ByteArray.getLongAt` in a native source set) is the next step if ASCII throughput matters more than it does at this margin.
+The Rust `vesper-parser` that this one ports scanned ASCII eight bytes at a time and ran the same input in 364 µs. The Kotlin port checks one byte per step. A word-at-a-time scan (`ByteArray.getLongAt` in a native source set) is the next step if ASCII throughput matters more than it does at this margin.
 
 ## How to reproduce
 
 Scull:
 
 ```bash
-./gradlew :scull-bench:linkReleaseExecutableMacosArm64
-./scull-bench/build/bin/macosArm64/releaseExecutable/scull-bench.kexe parser
+./gradlew :vesper-bench:linkReleaseExecutableMacosArm64
+./vesper-bench/build/bin/macosArm64/releaseExecutable/vesper-bench.kexe parser
 ```
 
-`vte`: check out 69d9be4 (the last Rust tree), then run `cargo bench -p scull-parser --bench throughput`. Its `benches/throughput.rs` generates the same three inputs and runs the Rust `scull-parser` next to `vte`.
+`vte`: check out 69d9be4 (the last Rust tree), then run `cargo bench -p vesper-parser --bench throughput`. Its `benches/throughput.rs` generates the same three inputs and runs the Rust `vesper-parser` next to `vte`.

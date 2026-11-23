@@ -167,18 +167,18 @@ Two facts narrow what the library has to cover, both from the Windows App SDK re
               └────────── C ABI (scull.h) ───────────┘
                                │
    scull-ffi      handles, frame snapshot, event queue, panic guard
-   scull-term     session: screens, modes, cursor, selection, search
-   scull-input    key, mouse, paste, focus encoders
-   scull-grid     cells, rows, ring, reflow, damage, images, links
-   scull-unicode  generated width and grapheme tables
-   scull-parser   bulk scanner + sequence machine → typed actions
-   scull-pty      PTY, reader thread, back-pressure
+   vesper-term     session: screens, modes, cursor, selection, search
+   vesper-input    key, mouse, paste, focus encoders
+   vesper-grid     cells, rows, ring, reflow, damage, images, links
+   vesper-unicode  generated width and grapheme tables
+   vesper-parser   bulk scanner + sequence machine → typed actions
+   vesper-pty      PTY, reader thread, back-pressure
 ```
 
 Rules of the boundary (ffi-native-ui.md Part 4):
 
 - **Threads.** The core owns one reader thread per terminal. The UI owns the main and render threads. The core never calls into the UI except one wakeup callback, and never while holding a lock.
-- **Frames.** The UI owns a frame object. `scull_frame_update(frame, term)` copies only changed rows into flat buffers under a short lock. Buffers: fixed-size cells, a style table with resolved colours, per-row stable id and generation, text runs for shaping, selection and search highlights, preedit, image placements.
+- **Frames.** The UI owns a frame object. `vesper_frame_update(frame, term)` copies only changed rows into flat buffers under a short lock. Buffers: fixed-size cells, a style table with resolved colours, per-row stable id and generation, text runs for shaping, selection and search highlights, preedit, image placements.
 - **Shaping.** The platform shapes. The core alone decides cell widths.
 - **Events.** One coalesced wakeup, then a polled queue: title, bell, clipboard read and write (with reply or deny), URL, notification, child exit.
 - **Input.** A key struct with physical key, modifiers, consumed modifiers, text, unshifted code point and composing flag. The core encodes bytes.

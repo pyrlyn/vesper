@@ -11,7 +11,7 @@ agent: Claude Code / claude-opus-5-5
 PNG decode for iTerm2 images and kitty `f=100` goes through one shared decoder: read the header first, compute the RGBA length from the size before allocating a pixel buffer, then decode with a hard allocation cap. Errors map to `ImageError.Decode`. Test fixtures can encode through the same helper; grey and palette PNGs stay covered.
 
 Acceptance:
-- [x] Header-first, size-capped PNG decode lives in a shared module used by `scull-image` (`scull-png`; `scull-image` is created by T19 and depends on it).
+- [x] Header-first, size-capped PNG decode lives in a shared module used by `vesper-image` (`vesper-png`; `vesper-image` is created by T19 and depends on it).
 - [x] Tests cover cap failures, grey and palette fixtures, and sRGB output.
 - [x] `./gradlew check` passes.
 
@@ -30,7 +30,7 @@ Acceptance:
   - **korlibs-image** brings the KorGE I/O and coroutine stack for one codec.
   - **libspng** (https://github.com/randy408/libspng, 0.7.4) has the right limit API (`spng_set_image_limits`). But it is C: it would need cross-built static libraries for three targets, and the creator's rule is Zig before C for native code.
   - A Kotlin decoder over `platform.zlib` is a few hundred lines. It allocates only what the cap allows.
-- **`scull-image` does not exist yet;** T19 creates it. This task adds the shared module `scull-png`. `ImageError.Decode` is T19's, which will map `PngException` to it.
+- **`vesper-image` does not exist yet;** T19 creates it. This task adds the shared module `vesper-png`. `ImageError.Decode` is T19's, which will map `PngException` to it.
 - **"sRGB output" means 8-bit sRGB RGBA, straight alpha.**
   - Samples are taken as sRGB and the colour chunks (`gAMA`, `cHRM`, `sRGB`, `iCCP`) are ignored, as terminals do.
   - 16-bit samples are scaled with rounding.
@@ -38,7 +38,7 @@ Acceptance:
 
 ## Execution plan
 
-1. **Module.** A new `scull-png` module (`scull.library`, `nativeMain`) that depends on nothing in the repository.
+1. **Module.** A new `vesper-png` module (`vesper.library`, `nativeMain`) that depends on nothing in the repository.
 2. **`PngHeader`.** `Png.header(bytes)` checks the signature and IHDR (size, depth and colour type, compression, filter, interlace), and gives `rgbaBytes` without allocating.
 3. **`Png.decode(bytes, maxBytes)`.**
    - **Cap check.** `PngTooLargeException` is thrown before anything is allocated when the RGBA buffer plus two scanlines would pass `maxBytes`.

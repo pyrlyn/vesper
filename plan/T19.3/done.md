@@ -2,11 +2,11 @@
 
 ## What changed
 
-- `scull-png`: a public `Zlib` object.
+- `vesper-png`: a public `Zlib` object.
   - `deflate` is the PNG encoder's, moved there.
   - `inflate(data, maxBytes)` grows its output only as zlib fills it, so a bomb stops at the
     cap. It throws `ZlibTooLargeException` or `ZlibException`.
-- `scull-image`:
+- `vesper-image`:
   - `KittyGraphics` decodes APC `G` commands into an `ImageStore`:
     - key parsing;
     - chunked uploads, whose later chunks may change the quiet level;
@@ -40,7 +40,7 @@ Reused rather than written: zlib through the existing `platform.zlib` binding, P
 - `ZlibTest` covers the round trip, the exact cap, a 64 MiB bomb, broken streams and trailing
   bytes.
 - macOS arm64: `./gradlew ktlintFormat check` passes.
-- Linux x86_64: the `scull-png` and `scull-image` test binaries pass in Colima (`ubuntu:24.04`,
+- Linux x86_64: the `vesper-png` and `vesper-image` test binaries pass in Colima (`ubuntu:24.04`,
   amd64).
 
 ## Commits

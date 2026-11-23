@@ -52,8 +52,8 @@ This produces a DMG on macOS, an MSI on Windows, and a DEB or RPM on Linux.
 | `composeApp/src/commonMain/.../app` | App state: tabs, panes, settings, history |
 | `composeApp/src/commonMain/.../ui` | Compose UI: blocks, grid, prompt, palette, monitor, settings, hosts |
 | `composeApp/src/jvmMain` | pty4j launcher, OSHI monitor, platform services, window chrome, `Main.kt` |
-| `scull-unicode`, `scull-parser`, `scull-grid`, `scull-input`, `scull-pty`, `scull-term`, `scull-ffi` | The Kotlin/Native core, layered as `PLAN.md` section 3 describes |
-| `scull-harness`, `scull-bench` | Conformance harness and benchmarks for the core |
+| `vesper-unicode`, `vesper-parser`, `vesper-grid`, `vesper-input`, `vesper-pty`, `vesper-term`, `scull-ffi` | The Kotlin/Native core, layered as `PLAN.md` section 3 describes |
+| `vesper-harness`, `vesper-bench` | Conformance harness and benchmarks for the core |
 | `build-logic` | Gradle convention plugins and the Unicode table generator |
 | `macos/`, `windows/` | Native front ends that will link the core through the C ABI |
 | `docs/` | Design notes per screen, benchmarks, research and the config schema |

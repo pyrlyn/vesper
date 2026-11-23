@@ -3,15 +3,15 @@
 > Note: These figures predate the Kotlin/Native rewrite and must be re-measured in T17.
 
 
-Measurements of the Direct3D 11 renderer (`windows/Scull.Render`) on the T3 input, taken by `windows/Scull.Bench` on 2026-10-16 in [CI run 38888536284](https://github.com/pyrlyn/scull/actions/runs/38888536284), job `rust (windows-latest)`, step `just windows-bench`. **These are numbers from a shared GitHub Actions VM** (Windows 10.0.26100, AMD EPYC family 25, 4 logical processors), single runs, with no physical GPU known to be present. Read them as orders of magnitude, not as a regression gate, and not as what a desktop with a GPU does.
+Measurements of the Direct3D 11 renderer (`windows/Scull.Render`) on the T3 input, taken by `windows/Scull.Bench` on 2026-10-16 in [CI run 38888536284](https://github.com/pyrlyn/vesper/actions/runs/38888536284), job `rust (windows-latest)`, step `just windows-bench`. **These are numbers from a shared GitHub Actions VM** (Windows 10.0.26100, AMD EPYC family 25, 4 logical processors), single runs, with no physical GPU known to be present. Read them as orders of magnitude, not as a regression gate, and not as what a desktop with a GPU does.
 
 ## Method
 
-The same as the macOS table in [macos-renderer.md](macos-renderer.md), from `RendererBenchmark.swift`: the T3 input of [baseline.md](baseline.md) (1000000 bytes, A to Z, a line feed closing every 80 bytes) fed through the real core (release `scull_ffi.dll`: parser, grid, frame updates) into an 80 x 24 terminal in chunks. With rendering, every chunk's frame is drawn offscreen by `Scull.Render` at Consolas 28 px (14 points at a scale of 2, as on macOS), atlas and shaper warm.
+The same as the macOS table in [macos-renderer.md](macos-renderer.md), from `RendererBenchmark.swift`: the T3 input of [baseline.md](baseline.md) (1000000 bytes, A to Z, a line feed closing every 80 bytes) fed through the real core (release `vesper_ffi.dll`: parser, grid, frame updates) into an 80 x 24 terminal in chunks. With rendering, every chunk's frame is drawn offscreen by `Scull.Render` at Consolas 28 px (14 points at a scale of 2, as on macOS), atlas and shaper warm.
 
 What differs from macOS: Direct3D queues its work, so the CPU does not wait for the GPU on its own. Rows marked "queued" read the target back once at the end, which waits for all frames, so their ms per frame is throughput. Rows marked "waited each frame" read it back after every frame, which is the time of one frame from start to finish including the copy of the target to the CPU. macOS waited every frame in all render rows.
 
-Reproduce with `just windows-bench` (Windows only; the table lands in `target/windows-renderer-bench.md`). The input generator is `scull_bench::fixed_input`; `windows/Scull.Bench` holds a C# copy, and both test suites pin the same hash of it.
+Reproduce with `just windows-bench` (Windows only; the table lands in `target/windows-renderer-bench.md`). The input generator is `vesper_bench::fixed_input`; `windows/Scull.Bench` holds a C# copy, and both test suites pin the same hash of it.
 
 ## WARP (software rasteriser)
 

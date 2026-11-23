@@ -1,6 +1,6 @@
 # T13. Done
 
-Links and shell integration in the core (`scull-term`), stacked on T10.
+Links and shell integration in the core (`vesper-term`), stacked on T10.
 
 ## What was done
 
@@ -35,4 +35,4 @@ Links and shell integration in the core (`scull-term`), stacked on T10.
   - links across scroll, erase, overwrite and RIS;
   - the sweep past 1024 ids, and a table full of live ids.
 - `./gradlew ktlintFormat check` is green on macOS: 384 tests, 0 failures, and the C sanitizer runs pass.
-- On Linux in Colima, `scull-term` (98 tests) and `scull-ffi` (29 tests) pass.
+- On Linux in Colima, `vesper-term` (98 tests) and `scull-ffi` (29 tests) pass.

@@ -2,11 +2,11 @@
 
 ## What changed
 
-- `scull-image`:
+- `vesper-image`:
   - `ImageStore.move(id, column, line)` re-anchors a placement and keeps its id and order, so
     kitty's id maps stay valid across a reflow.
   - `MAX_CELL_PIXELS` is public: the terminal checks a reported cell size against it.
-- `scull-term` (new `Images.kt`, with hooks in `State`, `OscDispatch`, `Edit`, `Screen`, `Resize`
+- `vesper-term` (new `Images.kt`, with hooks in `State`, `OscDispatch`, `Edit`, `Screen`, `Resize`
   and `Terminal`):
   - DCS `q` goes to `SixelDecoder`, APC to `KittyGraphics`, OSC 1337 to `ITerm2Images`. Kitty
     replies go out through `takeReplies()`.
@@ -58,8 +58,8 @@ tests, and the frame's `Grow` buffers in the FFI.
   programs (`status`, `two_threads`, `events`) built against the new header under ASan+UBSan and
   TSan.
 - `nm -gU` on the debug dylib lists `_tt_image_pixels`.
-- In Colima (`ubuntu:24.04`, linux/amd64), the linuxX64 test binaries pass: scull-image 51,
-  scull-term 165, scull-ffi 48.
+- In Colima (`ubuntu:24.04`, linux/amd64), the linuxX64 test binaries pass: vesper-image 51,
+  vesper-term 165, scull-ffi 48.
 - New tests:
   - `ImagesTest`, 20 cases: each protocol end to end, cursor moves, scrolling and eviction,
     ED 2 / ED 3, the alternate screen, reflow, RIS, the cell size, kitty replies, and frame

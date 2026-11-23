@@ -8,11 +8,11 @@ agent: Claude Code / claude-opus-5-5
 
 # T8. PTY and I/O thread
 
-`scull-pty`: a child on a native pseudo-terminal (ConPTY on Windows), threads that move its output into a caller-supplied sink in bounded holds of a shared lock, back-pressure so a flooding child cannot starve a frame read, replies written back through a capped queue, resize, and the child's exit delivered after its last output. Done when a flooding child cannot starve a frame read and a shell runs on both platforms.
+`vesper-pty`: a child on a native pseudo-terminal (ConPTY on Windows), threads that move its output into a caller-supplied sink in bounded holds of a shared lock, back-pressure so a flooding child cannot starve a frame read, replies written back through a capped queue, resize, and the child's exit delivered after its last output. Done when a flooding child cannot starve a frame read and a shell runs on both platforms.
 
 ## Findings
 
-- The design is the Rust `scull-pty` at 69d9be4 (`crates/scull-pty`), ported: a read thread, an I/O loop thread, a write thread and a wait thread per terminal; bounded queues between them are the back-pressure; at most `MAX_LOCKED_BYTES` per lock hold; replies go through the write queue; the exit is ordered after the output (`EXIT_IDLE`, `EXIT_DRAIN_MAX`); pause and resume for interactive resize; a shutdown grace after which stuck threads are left detached.
+- The design is the Rust PTY layer at 69d9be4 (its `pty` crate), ported: a read thread, an I/O loop thread, a write thread and a wait thread per terminal; bounded queues between them are the back-pressure; at most `MAX_LOCKED_BYTES` per lock hold; replies go through the write queue; the exit is ordered after the output (`EXIT_IDLE`, `EXIT_DRAIN_MAX`); pause and resume for interactive resize; a shutdown grace after which stuck threads are left detached.
 - Binding choice (research.md §6 named `portable-pty`, which is Rust):
   - `org.jetbrains.pty4j:pty4j` is JVM-only (JNA; repository language Java, last push 2026-10-02, https://github.com/JetBrains/pty4j, checked 2026-11-23). Not usable from Kotlin/Native.
   - `io.github.ll11l1lillil1lll.kpty:kpty` 0.0.1 (one release, 2026-01-09, https://klibs.io/package/io.github.ll11l1lillil1lll.kpty/kpty, checked 2026-11-23) calls `forkpty()` from Kotlin. After `fork` in a multi-threaded process only async-signal-safe calls are allowed until `exec` (POSIX `fork`, https://pubs.opengroup.org/onlinepubs/9799919799/functions/fork.html); a Kotlin/Native child would run runtime code (allocation, GC safepoints) there. It also has no bounded I/O or exit ordering. Maintenance **unverified**.

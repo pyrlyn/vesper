@@ -54,14 +54,14 @@ Not in scope until they move from [`ideas.md`](ideas.md) to [`roadmap.md`](roadm
               └────────── C ABI (scull.h) ───────────┘
                                │
    scull-ffi      handles, frame snapshot, event queue, exception guard
-   scull-term     session: screens, modes, cursor, selection, search
-   scull-input    key, mouse, paste, focus encoders
-   scull-grid     cells, rows, ring, reflow, damage, images, links
-   scull-unicode  generated width and grapheme tables
-   scull-parser   bulk scanner + sequence machine → typed actions
-   scull-pty      PTY, reader thread, back-pressure
-   scull-image    images and placements under a byte quota; iTerm2, sixel and kitty decoders
-   scull-png      header-first PNG decode under a caller-set allocation cap
+   vesper-term     session: screens, modes, cursor, selection, search
+   vesper-input    key, mouse, paste, focus encoders
+   vesper-grid     cells, rows, ring, reflow, damage, images, links
+   vesper-unicode  generated width and grapheme tables
+   vesper-parser   bulk scanner + sequence machine → typed actions
+   vesper-pty      PTY, reader thread, back-pressure
+   vesper-image    images and placements under a byte quota; iTerm2, sixel and kitty decoders
+   vesper-png      header-first PNG decode under a caller-set allocation cap
 ```
 
 Build: Gradle with the Kotlin Multiplatform plugin. The core is Kotlin/Native.
@@ -79,7 +79,7 @@ No other native libraries are required for the core. PNG is decoded in Kotlin ov
 Rules of the boundary (research.md §7, `docs/research/ffi-native-ui.md` Part 4):
 
 - The core owns one reader thread per terminal. The UI owns the main and render threads.
-- The UI owns the frame object; `scull_frame_update` copies only changed rows under a short lock.
+- The UI owns the frame object; `vesper_frame_update` copies only changed rows under a short lock.
 - The platform shapes text. The core alone decides cell widths.
 - One coalesced wakeup, then a polled event queue.
 - Every C export catches uncaught exceptions; a poisoned terminal returns `TT_POISONED`.

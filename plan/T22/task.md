@@ -15,13 +15,13 @@ Clearing a row link that is already empty must not bump the row generation. Othe
 - T6 ported the fix of the Rust tree (b65fa68): `Row.clearLinks` bumps only when `dropLinks` removed coverage, and `RowTest.clearingLinksWhereNoneExistIsGenerationNeutral` checks a clear on a row that never had a link.
 - Not yet tested: a second clear after the link is gone, a clear next to a link that does not overlap it, and an empty or out-of-row range.
 - The other half of the Rust fix, a row narrowed so that only links fall off its tail, has no Kotlin counterpart: rows do not change width before T11 (resize and reflow), which must carry it.
-- Nothing outside `scull-grid` calls `clearLinks` or `setLink` yet; OSC 8 arrives with T13.
+- Nothing outside `vesper-grid` calls `clearLinks` or `setLink` yet; OSC 8 arrives with T13.
 
 ## Execution plan
 
-1. `scull-grid/src/commonTest/kotlin/scull/grid/RowTest.kt`: extend the test to the cases above, and check that a full clear of a real link and a new link still bump.
-2. `scull-grid/src/commonMain/kotlin/scull/grid/Row.kt`: make the comment in `clearLinks` state the reason that holds in this port.
-3. Verify: `./gradlew check` on macOS, the linuxX64 `scull-grid` test binary in a Colima container.
+1. `vesper-grid/src/commonTest/kotlin/vesper/grid/RowTest.kt`: extend the test to the cases above, and check that a full clear of a real link and a new link still bump.
+2. `vesper-grid/src/commonMain/kotlin/vesper/grid/Row.kt`: make the comment in `clearLinks` state the reason that holds in this port.
+3. Verify: `./gradlew check` on macOS, the linuxX64 `vesper-grid` test binary in a Colima container.
 
 ## Acceptance
 

@@ -2,5 +2,5 @@
 // that single classpath on the root, so each module applies Kotlin and ktlint by id and
 // the Kotlin Gradle plugin is loaded once.
 plugins {
-    id("scull.kmp") apply false
+    id("vesper.kmp") apply false
 }

@@ -16,7 +16,7 @@ agent: Claude Code / claude-opus-5-5
   - The names are `tt_*`, the version is `TT_ABI_VERSION`, and the C# bindings are `NativeMethods` in `Scull.Native`.
   - See `windows/Scull.Core/Abi.cs` and `macos/Sources/CScull/module.modulemap`.
   - The Kotlin ABI keeps those names, layouts and numbering, so T14 and T17 move the hosts over by pointing them at the new header.
-  - The placeholder export `scull_abi_version` becomes `tt_abi_version`.
+  - The placeholder export `vesper_abi_version` becomes `tt_abi_version`.
 - **The header is hand-written, not generated.**
   - Kotlin/Native cannot emit C structs from Kotlin code, so the direction of the Rust build flips: `scull-ffi/include/scull.h` is the source of truth.
   - The Kotlin exports compile against the header through cinterop, so a layout that drifts from it is a compile error, not a test failure.
@@ -30,7 +30,7 @@ agent: Claude Code / claude-opus-5-5
 - **The rest of the Rust ABI comes later.**
   - `tt_frame_view` stops after `dirty_len`. Images (T19) and preedit (T16) append their fields in the Rust order, so the final layout is the Rust one.
   - Clipboard and links come with T13.3, input with T12, selection and search with T13.2, config with T20.
-- **`scull-pty` already owns the threads, the lock and the wakeup hook.**
+- **`vesper-pty` already owns the threads, the lock and the wakeup hook.**
   - It runs the reader, I/O, writer and waiter threads, and holds the `FairLock` and the wakeup hook.
   - The FFI adds the `Sink` that drives a `Terminal`, and the coalescing flag.
 

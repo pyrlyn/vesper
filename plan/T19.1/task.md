@@ -8,7 +8,7 @@ agent: Claude Code / claude-opus-5-5
 
 # T19.1. Image store and iTerm2 inline images
 
-The first part of T19: a module `scull-image` with the decoded image, its placements and a store under a byte quota, and the iTerm2 inline image decoder. Done when the store's quota and eviction hold under random operations, iTerm2 images decode under caps checked before allocation, the decoder has a fuzz entry run by the tests, and `./gradlew check` passes.
+The first part of T19: a module `vesper-image` with the decoded image, its placements and a store under a byte quota, and the iTerm2 inline image decoder. Done when the store's quota and eviction hold under random operations, iTerm2 images decode under caps checked before allocation, the decoder has a fuzz entry run by the tests, and `./gradlew check` passes.
 
 ## Findings
 
@@ -17,9 +17,9 @@ The first part of T19: a module `scull-image` with the decoded image, its placem
   - The arguments are `key=value` pairs separated by `;`: `name` (base64), `size` (bytes, progress only), `width` and `height` (`N` cells, `Npx`, `N%`, `auto`), `preserveAspectRatio` (default 1), `inline` (default 0: download, not shown).
   - Since iTerm2 3.5 the multipart form also exists: `MultipartFile=` arguments, then `FilePart=` base64 chunks, then `FileEnd`.
   - iTerm2 shows any format macOS decodes. The core decodes PNG (T34). JPEG, GIF and the rest are refused as unsupported; a decoder for them is an idea, not this task.
-- **The parser already streams the strings.** OSC is capped at 16 MiB (about 12 MiB of file), DCS at 16 MiB, APC at 4 MiB, in `scull-parser`.
+- **The parser already streams the strings.** OSC is capped at 16 MiB (about 12 MiB of file), DCS at 16 MiB, APC at 4 MiB, in `vesper-parser`.
 - **Base64** comes from the Kotlin standard library (`kotlin.io.encoding.Base64`, stable since Kotlin 2.2), so it needs no dependency.
-- **Source set.** `scull-term` is `commonMain`, so `scull-image` is `commonMain` too and depends on `scull-png`'s `nativeMain`; with only native targets both have the same targets. That needed `scull-png` to avoid zlib's `uLong` (fixed on the T34 branch).
+- **Source set.** `vesper-term` is `commonMain`, so `vesper-image` is `commonMain` too and depends on `vesper-png`'s `nativeMain`; with only native targets both have the same targets. That needed `vesper-png` to avoid zlib's `uLong` (fixed on the T34 branch).
 
 ## Decisions
 
@@ -28,7 +28,7 @@ The first part of T19: a module `scull-image` with the decoded image, its placem
 
 ## Execution plan
 
-1. **Module.** `scull-image` (`commonMain`, `api(projects.scullPng)`), in `settings.gradle.kts`.
+1. **Module.** `vesper-image` (`commonMain`, `api(projects.vesperPng)`), in `settings.gradle.kts`.
 2. **Types.**
    - `RgbaImage` (width, height, RGBA8).
    - `ImageError`: `Malformed`, `Unsupported`, `Decode`, `TooLarge`. PNG errors map to `Decode` and `TooLarge`.

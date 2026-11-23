@@ -4,7 +4,7 @@ Branch `t34-png`; the PR is linked from the branch.
 
 ## What was done
 
-- **New module `scull-png`.** Pure Kotlin over `platform.zlib`, which ships with Kotlin/Native, so it adds no dependency and no native code of ours. The reasons for a custom decoder are in `task.md` → Findings.
+- **New module `vesper-png`.** Pure Kotlin over `platform.zlib`, which ships with Kotlin/Native, so it adds no dependency and no native code of ours. The reasons for a custom decoder are in `task.md` → Findings.
 - **`Png.header(bytes)`** checks the signature and IHDR and returns `PngHeader` with `rgbaBytes`. It allocates nothing.
 - **`Png.decode(bytes, maxBytes)`** decodes to 8-bit sRGB RGBA with straight alpha.
   - **Cap first.** It throws `PngTooLargeException(needed, limit)` before allocating when the RGBA buffer plus two scanlines pass the cap, or when they do not fit in a Kotlin array.
@@ -18,7 +18,7 @@ Branch `t34-png`; the PR is linked from the branch.
 
 ## How it was checked
 
-- **`scull-png/src/nativeTest/kotlin/scull/png/PngTest.kt`, 13 tests:**
+- **`vesper-png/src/nativeTest/kotlin/vesper/png/PngTest.kt`, 13 tests:**
   - **Fixture builder.** Most fixtures come from an in-test builder with its own forward filters and Adam7 split, independent of the decoder's.
   - **Independent encoder.** An image from macOS `sips` (ImageIO), embedded as hex, with Sub and Paeth filters plus sRGB, eXIf and pHYs chunks.
   - **Colours and depths.** Grey 1/2/4/8/16, grey with alpha 8/16, RGB 8/16 and RGBA 8/16, palette 1/2/4/8. Includes the tRNS key (compared at 16 bits) and palette alpha.
@@ -29,6 +29,6 @@ Branch `t34-png`; the PR is linked from the branch.
     - A 64 MiB zero bomb behind a one-pixel image.
   - **Malformed input.** Signature, CRCs, truncation, short and corrupt data, a bad IHDR, a missing or misplaced PLTE, an index past the palette, an unknown critical chunk, a bad filter type, and a bad tRNS.
   - **Accepted input.** IDAT split across chunks with an empty one, and ancillary chunks skipped.
-- **macOS.** `./gradlew ktlintFormat check` passes, and the scull-png tests (13) pass.
-- **Linux.** The scull-png tests (13) pass in Colima on `ubuntu:24.04` (`linuxX64`).
+- **macOS.** `./gradlew ktlintFormat check` passes, and the vesper-png tests (13) pass.
+- **Linux.** The vesper-png tests (13) pass in Colima on `ubuntu:24.04` (`linuxX64`).
 - **Windows.** `mingwX64` compiles. Its tests do not run on a macOS host.

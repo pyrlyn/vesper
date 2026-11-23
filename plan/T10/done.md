@@ -10,9 +10,9 @@ The C ABI of the Kotlin/Native core, in PR https://github.com/pyrlyn/vesper/pull
 - Exports: `tt_abi_version`, `tt_term_new`, `tt_term_spawn`, `tt_term_feed`, `tt_term_write`, `tt_term_resize_begin`, `tt_term_resize`, `tt_term_poll_event`, `tt_term_event_text`, `tt_term_free`, `tt_frame_new`, `tt_frame_update`, `tt_frame_free`.
 - One guard on every export: a refusal maps to its status, any other throw answers `TT_PANIC` and poisons the terminal.
 - `struct_size`: options are read up to `min(struct_size, sizeof)` and at least through `scrollback`; views and events need `struct_size >= sizeof`.
-- `tt_term_spawn` drives a `Terminal` from scull-pty's threads through a `Sink`. The wakeup stays coalesced until the next frame update or event poll.
+- `tt_term_spawn` drives a `Terminal` from vesper-pty's threads through a `Sink`. The wakeup stays coalesced until the next frame update or event poll.
 - `tt_frame_update` fills cells (one little-endian `u64` each), rows with UTF-8 runs, styles, scrolls and dirty rows into buffers the frame owns.
-- Reused: the threads, `FairLock` and wakeup hook of scull-pty, and the `Frame` of scull-term (which gained `packedCell` and `styleCount`).
+- Reused: the threads, `FairLock` and wakeup hook of vesper-pty, and the `Frame` of vesper-term (which gained `packedCell` and `styleCount`).
 - Not done here: the C# bindings, moved to T17.1 on the creator's word.
 
 ## Commits

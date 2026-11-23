@@ -1,0 +1,182 @@
+# The pseudo console (ConPTY) on Windows. The mingw headers declare it only for Windows 10 1809
+# (NTDDI_WIN10_RS5) and later, which the platform.windows bindings are not built for.
+package = vesper.pty.conpty
+---
+#ifndef NTDDI_VERSION
+#define NTDDI_VERSION 0x0A000006
+#endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0A00
+#endif
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <windows.h>
+
+#ifndef PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE
+#define PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE 0x00020016
+#endif
+
+static void vesper_conpty_close_handle(void* handle) {
+    if (handle != NULL && handle != INVALID_HANDLE_VALUE) CloseHandle((HANDLE)handle);
+}
+
+/*
+ * Runs `command_line` (searched on PATH) on a new pseudo console of `cols` by `rows`, with the
+ * environment block `environment` (UTF-16, or NULL to inherit) in `cwd` (or NULL). Stores the
+ * console, the process and our ends of its input and output pipes. Returns 0, or an error code
+ * with `*stage` 1 when the console could not be opened and 2 when the child could not start;
+ * nothing is left open or running then.
+ */
+static int32_t vesper_conpty_spawn(
+    const wchar_t* command_line, const wchar_t* environment, const wchar_t* cwd,
+    int16_t cols, int16_t rows,
+    void** console, void** process, void** input, void** output, int32_t* stage
+) {
+    *stage = 1;
+    HANDLE in_read = NULL, in_write = NULL, out_read = NULL, out_write = NULL;
+    HPCON pc = NULL;
+    if (!CreatePipe(&in_read, &in_write, NULL, 0)) return (int32_t)GetLastError();
+    if (!CreatePipe(&out_read, &out_write, NULL, 0)) {
+        int32_t error = (int32_t)GetLastError();
+        CloseHandle(in_read);
+        CloseHandle(in_write);
+        return error;
+    }
+    COORD size;
+    size.X = cols;
+    size.Y = rows;
+    HRESULT hr = CreatePseudoConsole(size, in_read, out_write, 0, &pc);
+    /* The console holds its own copies of these two ends. */
+    CloseHandle(in_read);
+    CloseHandle(out_write);
+    if (FAILED(hr)) {
+        CloseHandle(in_write);
+        CloseHandle(out_read);
+        return (int32_t)hr;
+    }
+    *stage = 2;
+    int32_t error = 0;
+    SIZE_T list_size = 0;
+    InitializeProcThreadAttributeList(NULL, 1, 0, &list_size);
+    LPPROC_THREAD_ATTRIBUTE_LIST list = (LPPROC_THREAD_ATTRIBUTE_LIST)malloc(list_size);
+    size_t line_length = wcslen(command_line) + 1;
+    /* CreateProcessW may write into the command line. */
+    wchar_t* line = (wchar_t*)malloc(line_length * sizeof(wchar_t));
+    PROCESS_INFORMATION info;
+    memset(&info, 0, sizeof(info));
+    if (list == NULL || line == NULL) {
+        error = ERROR_NOT_ENOUGH_MEMORY;
+    } else if (!InitializeProcThreadAttributeList(list, 1, 0, &list_size)) {
+        error = (int32_t)GetLastError();
+        free(list);
+        list = NULL;
+    /* The ConPTY docs take lpValue as the HPCON itself, not a pointer to it. */
+    } else if (!UpdateProcThreadAttribute(list, 0, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, pc, sizeof(pc), NULL, NULL)) {
+        error = (int32_t)GetLastError();
+    } else {
+        memcpy(line, command_line, line_length * sizeof(wchar_t));
+        STARTUPINFOEXW startup;
+        memset(&startup, 0, sizeof(startup));
+        startup.StartupInfo.cb = sizeof(startup);
+        /* Console standard handles are duplicated into the child even when
+         * bInheritHandles is FALSE, unless STARTF_USESTDHANDLES is set. The
+         * child would then write to the parent's console, and the pipe would
+         * only see ConPTY's own CSI handshake. Invalid handles force it onto
+         * the pseudo console. CREATE_NO_WINDOW is incompatible with ConPTY. */
+        startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+        startup.StartupInfo.hStdInput = INVALID_HANDLE_VALUE;
+        startup.StartupInfo.hStdOutput = INVALID_HANDLE_VALUE;
+        startup.StartupInfo.hStdError = INVALID_HANDLE_VALUE;
+        startup.lpAttributeList = list;
+        DWORD flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT;
+        if (!CreateProcessW(NULL, line, NULL, NULL, FALSE, flags, (LPVOID)environment, cwd, &startup.StartupInfo, &info)) {
+            error = (int32_t)GetLastError();
+        }
+    }
+    if (list != NULL) {
+        DeleteProcThreadAttributeList(list);
+        free(list);
+    }
+    free(line);
+    if (error != 0) {
+        ClosePseudoConsole(pc);
+        CloseHandle(in_write);
+        CloseHandle(out_read);
+        return error;
+    }
+    CloseHandle(info.hThread);
+    *console = pc;
+    *process = info.hProcess;
+    *input = in_write;
+    *output = out_read;
+    return 0;
+}
+
+/* Reads up to `size` bytes; 0 once the console is closed, -1 on any other error. */
+static int32_t vesper_conpty_read(void* handle, void* buffer, int32_t size) {
+    DWORD got = 0;
+    if (!ReadFile((HANDLE)handle, buffer, (DWORD)size, &got, NULL)) {
+        return GetLastError() == ERROR_BROKEN_PIPE ? 0 : -1;
+    }
+    return (int32_t)got;
+}
+
+/* Writes all `size` bytes. Returns 0, or the system's error code. */
+static int32_t vesper_conpty_write_all(void* handle, const void* buffer, int32_t size) {
+    const char* at = (const char*)buffer;
+    while (size > 0) {
+        DWORD put = 0;
+        if (!WriteFile((HANDLE)handle, at, (DWORD)size, &put, NULL)) return (int32_t)GetLastError();
+        at += put;
+        size -= (int32_t)put;
+    }
+    return 0;
+}
+
+/* Blocks until the process ends and stores its exit code. Returns 0, or the system's error code. */
+static int32_t vesper_conpty_wait(void* process, uint32_t* code) {
+    if (WaitForSingleObject((HANDLE)process, INFINITE) == WAIT_FAILED) return (int32_t)GetLastError();
+    DWORD exit_code = 0;
+    if (!GetExitCodeProcess((HANDLE)process, &exit_code)) return (int32_t)GetLastError();
+    *code = exit_code;
+    return 0;
+}
+
+static int32_t vesper_conpty_kill(void* process) {
+    return TerminateProcess((HANDLE)process, 1) ? 0 : (int32_t)GetLastError();
+}
+
+static int32_t vesper_conpty_resize(void* console, int16_t cols, int16_t rows) {
+    COORD size;
+    size.X = cols;
+    size.Y = rows;
+    return (int32_t)ResizePseudoConsole((HPCON)console, size);
+}
+
+static DWORD WINAPI vesper_conpty_closer(LPVOID console) {
+    ClosePseudoConsole((HPCON)console);
+    return 0;
+}
+
+/*
+ * Closes the console on a thread of its own: before Windows 11 ClosePseudoConsole waits until the
+ * output pipe is drained, and the reader may already have stopped. Falls back to closing here.
+ */
+static void vesper_conpty_close_console(void* console) {
+    HANDLE thread = CreateThread(NULL, 0, vesper_conpty_closer, console, 0, NULL);
+    if (thread == NULL) {
+        ClosePseudoConsole((HPCON)console);
+    } else {
+        CloseHandle(thread);
+    }
+}
+
+/* The process environment as one UTF-16 block, or NULL; release with vesper_conpty_free_environment. */
+static wchar_t* vesper_conpty_environment(void) {
+    return GetEnvironmentStringsW();
+}
+
+static void vesper_conpty_free_environment(wchar_t* block) {
+    if (block != NULL) FreeEnvironmentStringsW(block);
+}

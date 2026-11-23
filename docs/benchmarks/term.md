@@ -1,6 +1,6 @@
 # Terminal throughput
 
-T7 records how fast the Kotlin/Native `scull-term` takes PTY output: the parser plus the state behind it (cursor, wrapping, SGR, scrolling). The inputs are the three of [parser.md](parser.md), about 1 MiB each:
+T7 records how fast the Kotlin/Native `vesper-term` takes PTY output: the parser plus the state behind it (cursor, wrapping, SGR, scrolling). The inputs are the three of [parser.md](parser.md), about 1 MiB each:
 
 - **ASCII lines:** `lorem ipsum …`, broken into 80-column lines with CR LF.
 - **UTF-8 lines:** Cyrillic, CJK, Hangul, Greek, accented Latin and emoji words, broken the same way.
@@ -18,7 +18,7 @@ Machine: Apple M3 Max, macOS 27.0.1, Kotlin/Native 2.4.21 release build.
 
 Times are medians of 21 feeds after a warm-up feed, over three runs. The parser column is one run of the parser bench taken right after them.
 
-There is no Rust column: the Rust `scull-term` this port replaces had no throughput bench, and it was not measured for this task.
+There is no Rust column: the Rust `vesper-term` this port replaces had no throughput bench, and it was not measured for this task.
 
 What the numbers say:
 
@@ -32,6 +32,6 @@ The linuxX64 build passes the same tests (Ubuntu 24.04, amd64 on Colima). Its be
 ## How to reproduce
 
 ```bash
-./gradlew :scull-bench:linkReleaseExecutableMacosArm64
-./scull-bench/build/bin/macosArm64/releaseExecutable/scull-bench.kexe term
+./gradlew :vesper-bench:linkReleaseExecutableMacosArm64
+./vesper-bench/build/bin/macosArm64/releaseExecutable/vesper-bench.kexe term
 ```

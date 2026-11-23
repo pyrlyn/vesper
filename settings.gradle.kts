@@ -19,17 +19,17 @@ rootProject.name = "vesper"
 
 // The Kotlin/Native core, layered as PLAN.md section 3 says.
 include(
-    ":scull-unicode",
-    ":scull-parser",
-    ":scull-grid",
-    ":scull-input",
-    ":scull-pty",
-    ":scull-term",
+    ":vesper-unicode",
+    ":vesper-parser",
+    ":vesper-grid",
+    ":vesper-input",
+    ":vesper-pty",
+    ":vesper-term",
     // PNG decode with a caller-set allocation cap, for the image protocols (T19).
-    ":scull-png",
+    ":vesper-png",
     // Images and their placements under a byte quota, and the protocol decoders (T19).
-    ":scull-image",
+    ":vesper-image",
     // Test and measurement tools; nothing in the shipped library depends on them.
-    ":scull-harness",
-    ":scull-bench",
+    ":vesper-harness",
+    ":vesper-bench",
 )

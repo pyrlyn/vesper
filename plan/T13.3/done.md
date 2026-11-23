@@ -33,4 +33,4 @@ The T13 events, clipboard answers and link ids over the C ABI, stacked on T13.
   - A spawned `/bin/sh` that reads its answer without writing first receives both the answer and the denial.
 - `tests/c/events.c` does the same through the header's prototypes under ASan+UBSan and TSan.
 - `./gradlew ktlintFormat check` passes on macOS arm64.
-- Linux x86_64 in Colima: `scull-term` 98 and `scull-ffi` 39 tests pass.
+- Linux x86_64 in Colima: `vesper-term` 98 and `scull-ffi` 39 tests pass.

@@ -1,6 +1,6 @@
-# scull-term conformance fixtures
+# vesper-term conformance fixtures
 
-`ConformanceTest` in `scull-term` replays every case of the files listed under
+`ConformanceTest` in `vesper-term` replays every case of the files listed under
 T7.1 and T7.2 against a fresh `Terminal` and compares what the case names:
 screen text, cursor, cell styles, scrollback length and, from T7.2, reply bytes. A headless core can
 check all of these, so the subset is the part of esctest2 and vttest that
@@ -71,7 +71,7 @@ must check at least one thing.
 | `reset.txt` | RIS (screen, cursor, pen, modes, tabs, alternate screen, margins, scrollback kept); DECSTR (cursor kept, IRM, DECAWM kept, margins, DECOM, saved cursor, pen, DECLRMM) | esctest2 `ris.py`, `decstr.py`, `save_restore_cursor.py` |
 
 The reply queue cap and the no-exception property are unit tests in
-`scull-term`, not fixtures.
+`vesper-term`, not fixtures.
 
 ## Cases (T13)
 
@@ -82,7 +82,7 @@ The reply queue cap and the no-exception property are unit tests in
 `events:` and `links:` are optional blocks in the same `|…|` shape as
 `screen:`. An event line is what `pollEvent` returns, in order. A link
 line is `ROW START..END=ID` for one span on a screen row (row 1-based,
-columns 0-based and half-open). A clipboard read is denied or answered in `scull-term` OSC tests.
+columns 0-based and half-open). A clipboard read is denied or answered in `vesper-term` OSC tests.
 
 ## Cases (T13.2)
 

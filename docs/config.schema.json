@@ -8,7 +8,7 @@
       "$ref": "#/$defs/ColorsSection",
       "default": {
         "ansi": [],
-        "scheme": "scull-dark"
+        "scheme": "vesper-dark"
       }
     },
     "font": {
@@ -128,7 +128,7 @@
         "scheme": {
           "description": "The built-in scheme everything below overrides.",
           "$ref": "#/$defs/Scheme",
-          "default": "scull-dark"
+          "default": "vesper-dark"
         }
       },
       "additionalProperties": false
@@ -200,12 +200,12 @@
         {
           "description": "Light text on near-black; the xterm palette.",
           "type": "string",
-          "const": "scull-dark"
+          "const": "vesper-dark"
         },
         {
           "description": "Dark text on near-white.",
           "type": "string",
-          "const": "scull-light"
+          "const": "vesper-light"
         },
         {
           "description": "Ethan Schoonover's Solarized, dark variant.",

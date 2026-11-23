@@ -7,7 +7,7 @@ Measurements of the Metal renderer (T15) on 2026-10-08, Apple M3 Max, macOS 27.0
 
 ## Throughput
 
-The T3 input from [baseline.md](baseline.md): the same 1000000 bytes as `scull-bench` (A to Z, a line feed closing every 80 bytes), fed through the real core (`TerminalSession(cols: 80, rows: 24)`, parser, grid and frame updates) in chunks. With rendering, every chunk's frame is drawn offscreen at scale 2 (1440 x 856 pixels) and the CPU waits for the GPU each frame, which is slower than the view's three frames in flight. Atlas and shaper were warm.
+The T3 input from [baseline.md](baseline.md): the same 1000000 bytes as `vesper-bench` (A to Z, a line feed closing every 80 bytes), fed through the real core (`TerminalSession(cols: 80, rows: 24)`, parser, grid and frame updates) in chunks. With rendering, every chunk's frame is drawn offscreen at scale 2 (1440 x 856 pixels) and the CPU waits for the GPU each frame, which is slower than the view's three frames in flight. Atlas and shaper were warm.
 
 Reproduce with `just macos-bench` (Swift release build; the table lands in `target/macos-renderer-bench.md`).
 
@@ -20,7 +20,7 @@ Reproduce with `just macos-bench` (Swift release build; the table lands in `targ
 | one row changed | - | 200 | 0.097714 | - | 0.489 |
 | all rows changed | - | 200 | 0.134621 | - | 0.673 |
 
-Against T3: the baseline's `scull stub` row (670.56 MiB/s) times `scull-harness`'s stub, not the real core, so it is not comparable with these rows. The reference terminals of T3 (kitty, WezTerm, Alacritty, foot, Contour) were not installed and Warp has no headless feed, so there is no cross-terminal comparison yet.
+Against T3: the baseline's `scull stub` row (670.56 MiB/s) times `vesper-harness`'s stub, not the real core, so it is not comparable with these rows. The reference terminals of T3 (kitty, WezTerm, Alacritty, foot, Contour) were not installed and Warp has no headless feed, so there is no cross-terminal comparison yet.
 
 A frame costs about 0.5 ms when one row changed and 0.7 ms when all did, so at 60 or 120 Hz the renderer is not what limits throughput; the core's feed is.
 

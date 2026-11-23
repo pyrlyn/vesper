@@ -1,8 +1,8 @@
 ---
 title: Scull
 tagline: A terminal emulator with a Kotlin/Native core and a native interface on each platform — SwiftUI on macOS, WinUI on Windows.
-repo: https://github.com/pyrlyn/scull
-install: "git clone https://github.com/pyrlyn/scull && cd scull && mise install && ./gradlew check"
+repo: https://github.com/pyrlyn/vesper
+install: "git clone https://github.com/pyrlyn/vesper && cd vesper && mise install && ./gradlew check"
 version: "0.0.0"
 status: "Early development · no release yet"
 accent: "#7FD1E8"
@@ -36,7 +36,7 @@ link the core over a C ABI (`scull-ffi`).
 There is no release yet. Build from the repository (the Gradle wrapper lands in T2):
 
 ```bash
-git clone https://github.com/pyrlyn/scull && cd scull && mise install && ./gradlew check
+git clone https://github.com/pyrlyn/vesper && cd vesper && mise install && ./gradlew check
 ```
 
 ## Usage examples
@@ -50,7 +50,7 @@ Build the native apps (after the core library is in place):
 
 ## Links
 
-- Repository: <https://github.com/pyrlyn/scull>
-- Plan: <https://github.com/pyrlyn/scull/blob/main/PLAN.md>
-- Research: <https://github.com/pyrlyn/scull/blob/main/research.md>
-- Documentation: <https://github.com/pyrlyn/scull/tree/main/docs>
+- Repository: <https://github.com/pyrlyn/vesper>
+- Plan: <https://github.com/pyrlyn/vesper/blob/main/PLAN.md>
+- Research: <https://github.com/pyrlyn/vesper/blob/main/research.md>
+- Documentation: <https://github.com/pyrlyn/vesper/tree/main/docs>

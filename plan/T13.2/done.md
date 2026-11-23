@@ -2,8 +2,8 @@
 
 ## What was done
 
-- **`scull-grid`.** `Grid.evicted` counts every row that left the ring. Absolute line `n` is logical row `n - evicted`, so a line keeps its number while output scrolls and history is dropped.
-- **`scull-term`.**
+- **`vesper-grid`.** `Grid.evicted` counts every row that left the ring. Absolute line `n` is logical row `n - evicted`, so a line keeps its number while output scrolls and history is dropped.
+- **`vesper-term`.**
   - `Selection.kt`: cell, word, line and block selections, anchored to absolute lines.
     - The stamps of the rows a selection covers are kept. `feed` drops the selection when one of them changes or leaves the ring, or when the screen switches; a resize to another size drops it too.
     - The text joins soft-wrapped rows, ends hard lines with `\n`, reads wide characters once and blank or concealed cells as spaces, trims trailing spaces, and is cut at 16 MiB on a character boundary.
@@ -22,14 +22,14 @@
 
 ## Reused
 
-- The Rust scull selection, search, frame-mark and FFI code and tests were ported.
+- The earlier Rust core's selection, search, frame-mark and FFI code and tests were ported.
 - `checkOut`/`copyOut`, `bytesAt`, `writeStruct` and `guarded` come from `scull-ffi`.
 - No UTF-8 or case-folding helper existed elsewhere in the project or under `packages/`.
 
 ## Checked
 
 - **macOS:** `./gradlew ktlintFormat check` passes, C ABI tests under ASan and TSan included.
-- **Linux x86_64 in Colima:** scull-grid passes 91 tests, scull-term 130 and scull-ffi 44.
+- **Linux x86_64 in Colima:** vesper-grid passes 91 tests, vesper-term 130 and scull-ffi 44.
 - **New tests:**
   - `SelectionTest`, `SearchTest` and the frame-mark cases in `FrameTest`;
   - the `selection.txt` conformance cases;

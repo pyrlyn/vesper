@@ -1,0 +1,3 @@
+plugins {
+    id("vesper.library")
+}
