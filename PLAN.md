@@ -116,7 +116,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 
 ### Phase 4: C ABI
 
-- [ ] **T10.** Opaque handles, frame API, wakeup, polled events, exception poisoning, committed header and C# bindings, C tests under sanitizers.
+- [x] **T10.** Opaque handles, frame API, wakeup, polled events, exception poisoning, committed header, C tests under sanitizers (the C# bindings moved to T17).
 - [ ] **T13.3.** Events (title, directory, shell marks, clipboard, links, notifications) over the C ABI.
 
 ### Phase 5: input, selection, images, config core
@@ -139,7 +139,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 
 ### Phase 7: Windows app
 
-- [ ] **T17.** WinUI app and Direct3D renderer.
+- [ ] **T17.** WinUI app and Direct3D renderer, and the C# bindings generated from `scull.h`.
 - [ ] **T18.** TSF input method and UIA accessibility.
 
 ### Phase 8: chrome

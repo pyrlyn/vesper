@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 5
-readiness: 85%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -62,9 +62,9 @@ agent: Claude Code / claude-opus-5-5
 - Steps 1, 2 and 4 are done: 29 Kotlin/Native tests on macOS and Linux, the gate green.
 - `tests/c/two_threads.c` and `tests/c/status.c` pass under ASan+UBSan and TSan on macOS (`:scull-ffi:cTests`, part of `check`).
   - On Linux they pass without sanitizers in Colima: its amd64 emulation kills even an empty sanitized program. CI runs them natively.
-- Open: the C# bindings. Generating them needs ClangSharpPInvokeGenerator as a dotnet tool, which waits for the creator's decision.
+- The C# bindings moved to T17.1 on the creator's word: only the Windows host needs them, and it moves to this library there.
 
 ## Acceptance
 
-- [ ] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
-- [ ] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
+- [x] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
