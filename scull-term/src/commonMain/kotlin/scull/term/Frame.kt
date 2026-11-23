@@ -22,6 +22,12 @@ private const val MISSING_CLUSTER = "�"
 
 private const val WIDE_COLS = 2
 
+private const val UINT_MASK = 0xFFFF_FFFFL
+private const val BYTE_MASK = 0xFFL
+private const val STYLE_SHIFT = 32
+private const val WIDTH_SHIFT = 48
+private const val FLAGS_SHIFT = 56
+
 /** One cell as the UI paints it. */
 public data class FrameCell(
     /** The first code point of the cell's text; 0 when it shows none. */
@@ -132,6 +138,26 @@ public class Frame {
         val at = row * cols + col
         return FrameCell(codePoints[at], styleIds[at], widths[at].toInt(), cellFlags[at].toInt())
     }
+
+    /**
+     * The cell at [row], [col] packed into one Long: code point in bits 0-31, style 32-47, width
+     * 48-55, flags 56-63. Read without an object per cell; it is also the byte layout of the C ABI's
+     * `tt_cell` on a little-endian machine, so a copy out is one store per cell.
+     */
+    public fun packedCell(
+        row: Int,
+        col: Int,
+    ): Long {
+        require(row in 0 until rows && col in 0 until cols) { "cell $row,$col of a $cols by $rows frame" }
+        val at = row * cols + col
+        return (codePoints[at].toLong() and UINT_MASK) or
+            (styleIds[at].toLong() shl STYLE_SHIFT) or
+            ((widths[at].toLong() and BYTE_MASK) shl WIDTH_SHIFT) or
+            ((cellFlags[at].toLong() and BYTE_MASK) shl FLAGS_SHIFT)
+    }
+
+    /** Entries in the style table that cell and run style ids index. */
+    public val styleCount: Int get() = styles.size
 
     /** The text and runs of row [row]. */
     public fun row(row: Int): FrameRow? = lines.getOrNull(row)

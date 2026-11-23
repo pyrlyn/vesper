@@ -173,7 +173,7 @@ class TerminalTest {
         val term = Terminal(10, 5, 0)
         term.feed("$ESC]2;" + "x".repeat(MAX_EVENT_TEXT + 1) + "\u0007")
         term.feed("$ESC]2;".encodeToByteArray() + byteArrayOf(0xC3.toByte(), 0x28, 0x07))
-        term.feed("$ESC]7;file:///tmp\u0007")
+        term.feed("$ESC]1337;File=x\u0007")
         assertEquals(null, term.pollEvent())
         term.feed("$ESC]1;" + "x".repeat(MAX_EVENT_TEXT) + "$ESC\\")
         assertEquals(Event.Title(TitleTarget.Icon, "x".repeat(MAX_EVENT_TEXT)), term.pollEvent())
