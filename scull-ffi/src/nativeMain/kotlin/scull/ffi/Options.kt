@@ -86,13 +86,16 @@ internal fun bytesAt(
     return ptr.reinterpret<ByteVar>().readBytes(count)
 }
 
-/** The UTF-8 text of [str]; text that is not UTF-8 is refused. */
-internal fun tt_str.text(): String =
+/** [bytes] as text; bytes that are not UTF-8 are refused. */
+internal fun utf8(bytes: ByteArray): String =
     try {
-        bytesAt(ptr, len).decodeToString(throwOnInvalidSequence = true)
+        bytes.decodeToString(throwOnInvalidSequence = true)
     } catch (_: CharacterCodingException) {
         throw Invalid()
     }
+
+/** The UTF-8 text of [str]; text that is not UTF-8 is refused. */
+internal fun tt_str.text(): String = utf8(bytesAt(ptr, len))
 
 /** [count] strings of an array the host owns. */
 internal fun texts(

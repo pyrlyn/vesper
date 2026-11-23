@@ -216,12 +216,7 @@ private fun TermHandle.sendClipboard(
     targetBytes: ByteArray,
     data: ByteArray,
 ): UInt {
-    val targets =
-        try {
-            targetBytes.decodeToString(throwOnInvalidSequence = true)
-        } catch (_: CharacterCodingException) {
-            throw Invalid()
-        }
+    val targets = utf8(targetBytes)
     val reply =
         try {
             lock.withLock { terminal.clipboardReply(targets, data) }
