@@ -1,5 +1,9 @@
 package scull.term
 
+import scull.input.KeyModes
+import scull.input.KittyKeyboard
+import scull.input.ModifyOtherKeys
+
 // Terminal modes: the flags SM, RM, DECSET and DECRST switch, and the state DECRQM reports.
 // Setting by number lives here too, because switching some modes moves the cursor or changes
 // screens.
@@ -26,6 +30,7 @@ private const val ALT_SCREEN_SAVE_CURSOR = 1049
 private const val BRACKETED_PASTE = 2004
 private const val SYNCHRONIZED_OUTPUT = 2026
 private const val GRAPHEME_CLUSTERS = 2027
+private const val WIN32_INPUT = 9001
 
 /** DECRQM answers (`Ps` of DECRPM). */
 private const val NOT_RECOGNIZED = 0
@@ -82,6 +87,27 @@ public class Modes internal constructor() {
     public var synchronizedOutput: Boolean = false
         internal set
 
+    /** xterm's modifyOtherKeys, set by XTMODKEYS (`CSI > 4 ; level m`). */
+    public var modifyOtherKeys: ModifyOtherKeys = ModifyOtherKeys.Off
+        internal set
+
+    /** Mode `?9001`: keys go out as win32-input-mode records, which ConPTY asks for. */
+    public var win32Input: Boolean = false
+        internal set
+
+    /** The kitty keyboard flag stacks; only the program's sequences change them, so they stay internal. */
+    internal val kitty = KittyKeyboard()
+
+    /** What key encoding reads, with the kitty flags of the screen shown. */
+    internal fun keyModes(alternateScreen: Boolean): KeyModes =
+        KeyModes(
+            applicationCursor = cursorKeys,
+            applicationKeypad = keypadApp,
+            modifyOtherKeys = modifyOtherKeys,
+            kitty = kitty.stack(alternateScreen).current,
+            win32Input = win32Input,
+        )
+
     /** Back to the power-on values, for RIS. */
     internal fun reset() {
         autowrap = true
@@ -96,6 +122,9 @@ public class Modes internal constructor() {
         focusEvents = false
         bracketedPaste = false
         synchronizedOutput = false
+        modifyOtherKeys = ModifyOtherKeys.Off
+        win32Input = false
+        kitty.clear()
     }
 }
 
@@ -179,6 +208,10 @@ internal fun State.setDecMode(
         GRAPHEME_CLUSTERS -> {
             modes.graphemeClusters = on
         }
+
+        WIN32_INPUT -> {
+            modes.win32Input = on
+        }
     }
 }
 
@@ -206,5 +239,6 @@ internal fun State.decModeStatus(code: Int): Int =
         BRACKETED_PASTE -> status(modes.bracketedPaste)
         SYNCHRONIZED_OUTPUT -> status(modes.synchronizedOutput)
         GRAPHEME_CLUSTERS -> status(modes.graphemeClusters)
+        WIN32_INPUT -> status(modes.win32Input)
         else -> NOT_RECOGNIZED
     }
