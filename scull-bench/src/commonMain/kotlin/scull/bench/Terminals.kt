@@ -4,6 +4,7 @@ import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
 import okio.SYSTEM
+import scull.harness.environment
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -80,5 +81,3 @@ internal expect fun feedStdin(
     bytes: ByteArray,
     timeout: Duration,
 ): FeedOutcome
-
-internal expect fun environment(name: String): String?
