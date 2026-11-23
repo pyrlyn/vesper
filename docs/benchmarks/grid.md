@@ -12,13 +12,13 @@ Machine: Apple M3 Max, macOS 27.0.1, Kotlin/Native 2.4.21 release build. The Rus
 
 | Row at 120 columns | Scull (Kotlin/Native), measured heap | Rust `scull-grid`, computed |
 | --- | --- | --- |
-| Blank | 78 B | 56 B |
+| Blank | 75 B | 56 B |
 | Plain text (72 cells) | 675 B | 632 B |
 | SGR-heavy (120 cells) | 1062 B | 1016 B |
 
 The two columns do not count the same thing. The Rust figure is the row header plus its stored cells. The Kotlin/Native figure is heap as the collector counts it, so it also holds the allocator's header for each object, the row's slot in the ring and a share of the grid's tables.
 
-A cell is 8 bytes, so the cells of a plain row are 576 B and those of an SGR-heavy row 960 B. A row with content therefore costs about 100 B on top of its cells, and a blank row 78 B with no cell array at all.
+A cell is 8 bytes, so the cells of a plain row are 576 B and those of an SGR-heavy row 960 B. A row with content therefore costs about 100 B on top of its cells, and a blank row 75 B with no cell array at all.
 
 How it is measured:
 
@@ -26,7 +26,8 @@ How it is measured:
 - The sample is the largest ring: 131 032 history rows plus the 40 screen rows fill all 131 072 slots. The collector's figure moves in steps of 128 KiB and more, which is tens of bytes per row over 10 000 rows and under 1 B per row here.
 - The bench collects twice before each reading. After one collection the figure still counted garbage: an SGR-heavy row read 409 B.
 - The three grids stay alive until the last reading. With a grid dropped between two readings a plain row read 619 B.
-- Three runs in a row gave the same three numbers, and so did the linuxX64 build (Ubuntu 24.04, amd64 on Colima).
+- The table is the median of five passes in one process (T26). Each pass builds the three grids again after the previous pass dropped its own, and takes its own first reading, so it subtracts nothing the previous pass held.
+- The passes agree within 1 B per row: blank 75–76 B, plain 675–676 B, SGR-heavy 1061–1062 B, over three runs on macOS and two on the linuxX64 build (Ubuntu 24.04, amd64 on Colima). The first pass charged about 2 B more to the blank row, which was measured first: about 260 KB allocated once per process. The single pass of T6 recorded it as part of the row (77–78 B).
 
 A one-off probe that is not part of the bench put a `Row` object at 64 B and a `LongArray` of `n` cells at 24 + 8·`n` B (500 000 rows and 100 000 arrays of each size). With the 8 B ring slot that accounts for 72, 672 and 1056 B of the three figures.
 
@@ -58,6 +59,6 @@ What follows from it:
 ./scull-bench/build/bin/macosArm64/releaseExecutable/scull-bench.kexe grid
 ```
 
-The memory sample keeps three full rings alive, about 250 MB of heap.
+Each memory pass keeps three full rings alive, about 250 MB of heap. The whole run takes about 6 s.
 
 Rust: check out 69d9be4 (the last Rust tree), then run `cargo bench -p scull-grid --bench scrollback`.

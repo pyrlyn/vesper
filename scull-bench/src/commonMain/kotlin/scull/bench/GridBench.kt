@@ -19,8 +19,9 @@ import kotlin.time.TimeSource
 // Memory is read from the collector, which counts the heap in steps of 128 KiB and more. Over
 // 10 000 rows that is tens of bytes per row, so the memory sample is the largest ring instead.
 // Garbage between two readings skews the second one: with a grid dropped before the next was built,
-// a plain row read 619 B against 675 B in a fresh process. The three grids therefore stay alive
-// until the last figure is taken, and the memory table runs before the timings.
+// a plain row read 619 B against 675 B in a fresh process. The three grids of a pass therefore stay
+// alive until the pass's last figure is taken, and the memory table runs before the timings. The
+// next pass drops them and takes its own first reading, so it subtracts nothing they held.
 
 private const val GRID_COLS = 120
 private const val GRID_SCREEN = 40
@@ -28,6 +29,9 @@ private const val GRID_HISTORY = 10_000
 
 /** History of the memory sample: with the screen it fills the largest ring, so no slot stays spare. */
 private const val MEMORY_HISTORY = MAX_RING_ROWS - GRID_SCREEN
+
+/** Passes of the memory sample; an odd count gives the median a middle pass. */
+private const val MEMORY_PASSES = 5
 
 /** A typical log line: shorter than the window, default style. */
 private const val PLAIN_CELLS = 72
@@ -107,11 +111,11 @@ private fun heapBytes(): Long {
 }
 
 /**
- * Heap one history row costs, per fill: the growth of the live heap over building a full grid,
+ * One pass: the heap one history row costs, per fill, as the growth of the live heap over building a full grid,
  * divided by its history rows. It counts the row object, its cells and its slot in the ring, and
  * spreads the 40 screen rows and the tables over the history rows.
  */
-private fun bytesPerHistoryRow(fills: List<(Grid) -> Line>): List<Long> {
+private fun memoryPass(fills: List<(Grid) -> Line>): List<Long> {
     val kept = ArrayList<Grid>(fills.size)
     var heap = heapBytes()
     val bytes =
@@ -123,6 +127,21 @@ private fun bytesPerHistoryRow(fills: List<(Grid) -> Line>): List<Long> {
     // Read after the last measurement, so every grid is still live when the collector counts it.
     check(kept.all { it.historyLength == MEMORY_HISTORY })
     return bytes
+}
+
+/** Bytes per history row of one fill over [MEMORY_PASSES] passes. */
+private class Passes(
+    bytes: List<Long>,
+) {
+    private val sorted = bytes.sorted()
+    val median: Long get() = sorted[sorted.size / 2]
+    val range: String get() = "${sorted.first()}–${sorted.last()}"
+}
+
+/** [memoryPass] [MEMORY_PASSES] times, per fill. */
+private fun bytesPerHistoryRow(fills: List<(Grid) -> Line>): List<Passes> {
+    val passes = List(MEMORY_PASSES) { memoryPass(fills) }
+    return fills.indices.map { i -> Passes(passes.map { it[i] }) }
 }
 
 /** Median nanoseconds per scrolled line of [GRID_RUNS] batches, after a warm-up batch. */
@@ -154,11 +173,11 @@ private fun nanosPerLine(
 internal fun gridMarkdown(): String {
     val (blank, plain, sgr) = bytesPerHistoryRow(listOf({ _ -> { } }, { _ -> ::plainLine }, ::sgrLine))
     return buildString {
-        appendLine("| Scrollback row at $GRID_COLS columns, of $MEMORY_HISTORY | Bytes |")
-        appendLine("| --- | --- |")
-        appendLine("| Blank | $blank |")
-        appendLine("| Plain text ($PLAIN_CELLS cells) | $plain |")
-        appendLine("| SGR-heavy ($GRID_COLS cells, ${SGR_PALETTE * 2 + 1} styles) | $sgr |")
+        appendLine("| Scrollback row at $GRID_COLS columns, of $MEMORY_HISTORY | Median of $MEMORY_PASSES passes (B) | Range (B) |")
+        appendLine("| --- | --- | --- |")
+        appendLine("| Blank | ${blank.median} | ${blank.range} |")
+        appendLine("| Plain text ($PLAIN_CELLS cells) | ${plain.median} | ${plain.range} |")
+        appendLine("| SGR-heavy ($GRID_COLS cells, ${SGR_PALETTE * 2 + 1} styles) | ${sgr.median} | ${sgr.range} |")
         appendLine()
         appendLine("| One line into a full history of $GRID_HISTORY | Median (ns) |")
         appendLine("| --- | --- |")
