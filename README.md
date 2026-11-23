@@ -4,7 +4,7 @@ A terminal for macOS and Windows, written in Kotlin. A Kotlin/Native core parses
 
 ## Status
 
-The core is built and tested: the VT parser, Unicode tables, grid and scrollback with reflow, terminal state, input encoders, selection and search, images (kitty, iTerm2, sixel) and the PTY layer. The hosts come next; the plan is in [`PLAN.md`](PLAN.md) and the tasks in [`plan/`](plan/README.md).
+The core is built and tested: the VT parser, Unicode tables, grid and scrollback with reflow, terminal state, input encoders, selection and search, images (kitty, iTerm2, sixel) and the PTY layer. The macOS app runs the user's shell in one window, drawn with CoreText; the Metal renderer, input methods and the Windows host come next; the plan is in [`PLAN.md`](PLAN.md) and the tasks in [`plan/`](plan/README.md).
 
 ## Requirements
 
@@ -16,13 +16,21 @@ JDK 21 or newer. Gradle is provided by the wrapper. `mise install` sets up the J
 ./gradlew check
 ```
 
-Lints (ktlint) and runs the native tests of every module for the host's targets. This is the merge gate.
+Lints (ktlint) and runs the native tests of every module for the host's targets. This is the merge gate. On macOS it also renders a typed command offscreen to `vesper-macos/build/reports/first-light/first-light.png`.
+
+## Run (macOS)
+
+```bash
+./gradlew :vesper-macos:linkDebugExecutableMacosArm64 && vesper-macos/build/bin/macosArm64/debugExecutable/vesper-macos.kexe
+```
 
 ## Layout
 
 | Path | Contents |
 | --- | --- |
 | `vesper-unicode`, `vesper-parser`, `vesper-grid`, `vesper-input`, `vesper-pty`, `vesper-term` | The Kotlin/Native core, layered as `PLAN.md` section 3 describes |
+| `vesper-session` | A terminal and the child it runs, under one lock: what each window holds |
+| `vesper-macos` | The macOS app over AppKit and CoreText |
 | `vesper-png`, `vesper-image` | Allocation-capped PNG decoding and the image store with the kitty, iTerm2 and sixel decoders |
 | `vesper-harness`, `vesper-bench` | Conformance harness and benchmarks for the core |
 | `build-logic` | Gradle convention plugins and the Unicode table generator |

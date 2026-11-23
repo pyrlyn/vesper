@@ -2,7 +2,7 @@
 status: in progress
 priority: P0
 complexity: 5
-readiness: 10%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -37,5 +37,5 @@ Execution plan:
    tests in Colima; run the app, type `ls`, take a screenshot.
 
 Acceptance:
-- [ ] The work described above is implemented in Kotlin/Native.
-- [ ] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native.
+- [x] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.

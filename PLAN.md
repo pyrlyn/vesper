@@ -52,6 +52,7 @@ Not in scope until they move from [`ideas.md`](ideas.md) to [`roadmap.md`](roadm
               │                                      │
               └────────── direct Kotlin calls ───────┘
                                │
+   vesper-session  a terminal and its PTY child under one lock; wakeups, replies, resize
    vesper-term     session: screens, modes, cursor, selection, search, frame
    vesper-input    key, mouse, paste, focus encoders
    vesper-grid     cells, rows, ring, reflow, damage, links
@@ -135,7 +136,7 @@ Rules between core and host (research.md §7):
 
 ### Phase 6: macOS host
 
-- [ ] **T14.** First light: a window running the user's shell.
+- [x] **T14.** First light: a window running the user's shell.
 - [ ] **T15.** Metal renderer, CoreText atlas, measurements.
 - [ ] **T16.** Input method and accessibility.
 - [ ] **T13.4.** Selection, copy and find UI.
