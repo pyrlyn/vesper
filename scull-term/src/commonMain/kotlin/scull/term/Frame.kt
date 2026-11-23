@@ -3,6 +3,7 @@ package scull.term
 import scull.grid.Cell
 import scull.grid.CellFlags
 import scull.grid.Grid
+import scull.grid.LinkSpan
 import scull.grid.Style
 import scull.grid.StyleId
 import scull.unicode.appendCodePoint
@@ -75,6 +76,11 @@ public class FrameRow internal constructor() {
     /** The runs, left to right. */
     public val runs: List<TextRun> get() = runList
 
+    private val linkList = ArrayList<LinkSpan>()
+
+    /** The OSC 8 link spans, by column; [Terminal.linkUri] reads their URIs. */
+    public val links: List<LinkSpan> get() = linkList
+
     /** The text of [run], empty for a run of another row. */
     public fun runText(run: TextRun): String =
         if (run.textStart in 0..text.length && run.textLength in 0..text.length - run.textStart) {
@@ -86,10 +92,13 @@ public class FrameRow internal constructor() {
     internal fun set(
         text: String,
         runs: List<TextRun>,
+        links: List<LinkSpan>,
     ) {
         this.text = text
         runList.clear()
         runList.addAll(runs)
+        linkList.clear()
+        linkList.addAll(links)
     }
 }
 
@@ -252,7 +261,7 @@ public class Frame {
             }
             push(at, col, cell, grid)
         }
-        line.set(text.toString(), runs)
+        line.set(text.toString(), runs, row?.links.orEmpty())
     }
 
     private fun setCell(
