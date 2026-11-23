@@ -1,5 +1,7 @@
 # T14.1. Done
 
+PR: https://github.com/pyrlyn/vesper/pull/31 (stacked on #26).
+
 ## What changed
 
 - `scull-input`: `Key.ofCode(code)` names the key behind a `tt_key_event.key` code: kitty's
