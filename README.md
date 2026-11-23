@@ -1,4 +1,4 @@
-# Vesper
+<h1><picture><source media="(prefers-color-scheme: dark)" srcset="brand/logo-dark.svg"><img src="brand/logo.svg" width="32" height="32" alt="" align="absmiddle"></picture> Vesper</h1>
 
 A modern terminal for macOS, Windows and Linux, built with Kotlin Multiplatform and Compose Multiplatform. The design comes from the Figma file [Modern terminal](https://www.figma.com/design/tCFCAuDJvskm2XTh0cOLcX/Modern-terminal); each screen is described in [`docs/design/`](docs/design/).
 
