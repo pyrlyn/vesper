@@ -117,7 +117,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 ### Phase 4: C ABI
 
 - [x] **T10.** Opaque handles, frame API, wakeup, polled events, exception poisoning, committed header, C tests under sanitizers (the C# bindings moved to T17).
-- [ ] **T13.3.** Events (title, directory, shell marks, clipboard, links, notifications) over the C ABI.
+- [x] **T13.3.** Events (title, directory, shell marks, clipboard, links, notifications) over the C ABI.
 
 ### Phase 5: input, selection, images, config core
 
