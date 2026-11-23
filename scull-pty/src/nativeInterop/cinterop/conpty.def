@@ -79,10 +79,17 @@ static int32_t scull_conpty_spawn(
         STARTUPINFOEXW startup;
         memset(&startup, 0, sizeof(startup));
         startup.StartupInfo.cb = sizeof(startup);
+        /* Console standard handles are duplicated into the child even when
+         * bInheritHandles is FALSE, unless STARTF_USESTDHANDLES is set. The
+         * child would then write to the parent's console, and the pipe would
+         * only see ConPTY's own CSI handshake. Invalid handles force it onto
+         * the pseudo console. CREATE_NO_WINDOW is incompatible with ConPTY. */
+        startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+        startup.StartupInfo.hStdInput = INVALID_HANDLE_VALUE;
+        startup.StartupInfo.hStdOutput = INVALID_HANDLE_VALUE;
+        startup.StartupInfo.hStdError = INVALID_HANDLE_VALUE;
         startup.lpAttributeList = list;
-        /* Without CREATE_NO_WINDOW a console child can stay on the parent's
-         * console, so its output never appears on the ConPTY pipe. */
-        DWORD flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW;
+        DWORD flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT;
         if (!CreateProcessW(NULL, line, NULL, NULL, FALSE, flags, (LPVOID)environment, cwd, &startup.StartupInfo, &info)) {
             error = (int32_t)GetLastError();
         }
