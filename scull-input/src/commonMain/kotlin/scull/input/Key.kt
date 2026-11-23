@@ -256,7 +256,55 @@ public sealed interface Key {
     public data class System(
         public val key: SystemKey,
     ) : Key
+
+    public companion object {
+        /**
+         * The key behind [code]: kitty's functional key code for a named key, else the code point a
+         * main-block key types. Null for codes that name nothing, control characters among them.
+         * Hosts pass keys as these numbers, so one table serves every platform.
+         * https://sw.kovidgoyal.net/kitty/keyboard-protocol/#functional-key-definitions
+         */
+        public fun ofCode(code: Int): Key? =
+            when (code) {
+                in NAMED_FIRST until NAMED_FIRST + NAMED.size -> NAMED[code - NAMED_FIRST]
+                in SYSTEM_FIRST until SYSTEM_FIRST + SystemKey.entries.size -> System(SystemKey.entries[code - SYSTEM_FIRST])
+                in F1_CODE until F1_CODE + LAST_F_KEY -> F(code - F1_CODE + 1)
+                in KEYPAD_FIRST until KEYPAD_FIRST + KeypadKey.entries.size -> Keypad(KeypadKey.entries[code - KEYPAD_FIRST])
+                in MEDIA_FIRST until MEDIA_FIRST + MediaKey.entries.size -> Media(MediaKey.entries[code - MEDIA_FIRST])
+                in MODIFIER_FIRST until MODIFIER_FIRST + ModifierKey.entries.size -> Modifier(ModifierKey.entries[code - MODIFIER_FIRST])
+                in 0..MAX_CODE_POINT -> if (isControl(code) || code in SURROGATES) null else Character(code)
+                else -> null
+            }
+    }
 }
+
+/** kitty's code for Escape; the keys of [NAMED] follow it one code each. */
+private const val NAMED_FIRST = 57_344
+
+/** kitty's code for F1; F2 to F35 follow it. */
+private const val F1_CODE = 57_364
+
+private const val MAX_CODE_POINT = 0x10_FFFF
+private val SURROGATES = 0xD800..0xDFFF
+
+/** The keys from Escape to End in kitty's order. */
+private val NAMED: List<Key> =
+    listOf(
+        Key.Escape,
+        Key.Enter,
+        Key.Tab,
+        Key.Backspace,
+        Key.Insert,
+        Key.Delete,
+        Key.Left,
+        Key.Right,
+        Key.Up,
+        Key.Down,
+        Key.PageUp,
+        Key.PageDown,
+        Key.Home,
+        Key.End,
+    )
 
 /**
  * One key event from the platform.
