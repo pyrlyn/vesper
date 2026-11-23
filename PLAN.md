@@ -106,7 +106,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 - [x] **T22.** No-op link clears are generation-neutral.
 - [x] **T23.** Interner marks/sweep contract.
 - [x] **T24.** Harness wrap vs xterm deferred DECAWM.
-- [ ] **T26.** Grid-layer test gaps.
+- [x] **T26.** Grid-layer test gaps.
 
 ### Phase 3: I/O and frames
 

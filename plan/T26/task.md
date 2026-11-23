@@ -2,7 +2,7 @@
 status: in progress
 priority: P2
 complexity: 2
-readiness: 10%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -25,6 +25,6 @@ Cover the end-of-row wide-wrap path for a leading spacer cell, and average more 
 
 ## Acceptance
 
-- [ ] The wide-wrap spacer path has a failing-then-passing test in `scull-grid`.
-- [ ] The scrollback-memory benchmark reports a stable average, not a single pass.
-- [ ] `./gradlew check` passes.
+- [x] The wide-wrap spacer path has a failing-then-passing test in `scull-grid`.
+- [x] The scrollback-memory benchmark reports a stable average, not a single pass.
+- [x] `./gradlew check` passes.
