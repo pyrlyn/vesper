@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 4
-readiness: 10%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -28,7 +28,7 @@ One-pass reflow with tracking points for cursor, saved cursor, viewport and sele
 
 ## Acceptance
 
-- [ ] `Grid.resize` rewraps the primary screen and history in one pass and truncates the alt screen.
-- [ ] Every tracking point follows its cell or is reported clamped; the golden and property tests hold.
-- [ ] `Terminal.resize` tracks the cursor and saved cursors and rebuilds margins and tab stops.
-- [ ] `./gradlew check` passes.
+- [x] `Grid.resize` rewraps the primary screen and history in one pass and truncates the alt screen.
+- [x] Every tracking point follows its cell or is reported clamped; the golden and property tests hold.
+- [x] `Terminal.resize` tracks the cursor and saved cursors and rebuilds margins and tab stops.
+- [x] `./gradlew check` passes.
