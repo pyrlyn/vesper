@@ -123,7 +123,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 
 - [ ] **T12.** Input encoding (legacy, kitty keyboard, win32-input-mode, mouse, paste, focus).
 - [x] **T13.** OSC 8/52/7/133 and notifications in the core (selection and search are T13.2).
-- [ ] **T13.2.** Selection and scrollback search, with frame marks.
+- [x] **T13.2.** Selection and scrollback search, with frame marks.
 - [ ] **T19.** Images (kitty, iTerm2, sixel) with quotas.
 - [ ] **T34.** Allocation-capped shared PNG decoder.
 - [ ] **T30.** Config watcher never misses a reload under load.
