@@ -3,7 +3,6 @@ pluginManagement {
     repositories {
         gradlePluginPortal()
         mavenCentral()
-        google()
     }
 }
 
@@ -11,16 +10,12 @@ dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
         mavenCentral()
-        google()
     }
 }
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 rootProject.name = "vesper"
-
-// The Compose desktop app.
-include(":composeApp")
 
 // The Kotlin/Native core, layered as PLAN.md section 3 says.
 include(
