@@ -10,15 +10,24 @@ private const val DEFAULT_TAB_WIDTH = 8
 internal class TabStops(
     cols: Int,
 ) {
-    private val stops = BooleanArray(cols)
+    private var stops = BooleanArray(cols)
 
     init {
         reset()
     }
 
     /** The power-on stops: every eight columns, the first at column 8. */
-    fun reset() {
-        for (c in stops.indices) stops[c] = c > 0 && c % DEFAULT_TAB_WIDTH == 0
+    fun reset() = powerOn(0)
+
+    /** A screen [cols] wide: the stops set so far are kept and new columns get the power-on stops. */
+    fun resize(cols: Int) {
+        val old = stops.size
+        stops = stops.copyOf(cols)
+        powerOn(old)
+    }
+
+    private fun powerOn(from: Int) {
+        for (c in from until stops.size) stops[c] = c > 0 && c % DEFAULT_TAB_WIDTH == 0
     }
 
     /** HTS: a stop at [col]. */
