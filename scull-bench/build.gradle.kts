@@ -25,6 +25,7 @@ kotlin {
             implementation(projects.scullHarness)
             implementation(projects.scullParser)
             implementation(projects.scullGrid)
+            implementation(projects.scullTerm)
             implementation(libs.okio)
         }
     }

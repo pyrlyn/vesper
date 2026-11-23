@@ -39,6 +39,7 @@ One line into a full history of 10 000 rows:
 | Scroll only | 27.5–27.7 ns | 25–66 ns |
 | Write a plain line and scroll | 1559–1580 ns | 513 ns |
 | Write an SGR-heavy line and scroll | 2887–2896 ns | 388 ns |
+| Write a plain line as one run and scroll (T7) | 234–271 ns | not measured |
 
 Scull times are medians of 21 batches of 20 000 lines after a warm-up batch, over three runs. Rust times are divan medians.
 
@@ -46,7 +47,7 @@ Scrolling is an offset change plus one recycled row, and costs what it cost in R
 
 What follows from it:
 
-- T7 should write a run of cells in one call, so the frame is paid per run and not per cell.
+- T7 should write a run of cells in one call, so the frame is paid per run and not per cell. T7 added `Row.putAscii` for it. The row "as one run" is that call on the plain line, from three runs in which the per-cell line took 1686–1769 ns: 6 to 7 times faster.
 - `Row.compact` no longer copies an array that already fits. It saves one allocation for every full-width line. The SGR-heavy time moved from 2919–2952 ns to 2887–2896 ns, which is within the noise.
 - Editing cell flags in place, without rebuilding the cell, was tried and dropped: 144 million `put` calls took 2.36 s with it and 2.22 s without.
 

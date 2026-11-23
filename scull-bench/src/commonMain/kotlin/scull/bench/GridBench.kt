@@ -49,6 +49,13 @@ private fun plainLine(g: Grid) {
     for (col in 0 until PLAIN_CELLS) row.put(col, Cell.char('a'.code + col % LETTERS))
 }
 
+private val plainBytes = ByteArray(PLAIN_CELLS) { ('a'.code + it % LETTERS).toByte() }
+
+/** The same line as [plainLine], written in one call: what the terminal does with a run of ASCII. */
+private fun plainRun(g: Grid) {
+    checkNotNull(g.screenRow(GRID_SCREEN - 1)).putAscii(0, plainBytes, 0, PLAIN_CELLS, StyleId.DEFAULT)
+}
+
 private fun sgrStyles(g: Grid): List<StyleId> =
     buildList {
         for (n in 0 until SGR_PALETTE) {
@@ -157,6 +164,7 @@ internal fun gridMarkdown(): String {
         appendLine("| --- | --- |")
         appendLine("| Scroll only | ${fixed(nanosPerLine({ _ -> ::plainLine }, write = false), 1)} |")
         appendLine("| Write a plain line and scroll | ${fixed(nanosPerLine({ _ -> ::plainLine }, write = true), 1)} |")
+        appendLine("| Write a plain line as one run and scroll | ${fixed(nanosPerLine({ _ -> ::plainRun }, write = true), 1)} |")
         appendLine("| Write an SGR-heavy line and scroll | ${fixed(nanosPerLine(::sgrLine, write = true), 1)} |")
     }
 }
