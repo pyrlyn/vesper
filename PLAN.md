@@ -117,7 +117,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 
 ### Phase 4: C ABI
 
-- [ ] **T10.** Opaque handles, frame API, wakeup, polled events, exception poisoning, committed header and C# bindings, C tests under sanitizers.
+- [x] **T10.** Opaque handles, frame API, wakeup, polled events, exception poisoning, committed header, C tests under sanitizers (the C# bindings moved to T17).
 - [ ] **T13.3.** Events (title, directory, shell marks, clipboard, links, notifications) over the C ABI.
 
 ### Phase 5: input, selection, images, config core
@@ -125,7 +125,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 - [ ] **T12.** Input encoding (legacy, kitty keyboard, win32-input-mode, mouse, paste, focus).
 - [x] **T12.1.** Key encoding: legacy xterm, the kitty keyboard protocol with its per-screen flag stack, win32-input-mode.
 - [ ] **T12.2.** Mouse (all tracking modes and encodings, SGR-pixel included), bracketed paste and focus reports.
-- [ ] **T13.** Selection, search, OSC 8/52/7/133 in the core.
+- [x] **T13.** OSC 8/52/7/133 and notifications in the core (selection and search are T13.2).
 - [ ] **T13.2.** Selection and scrollback search, with frame marks.
 - [ ] **T19.** Images (kitty, iTerm2, sixel) with quotas.
 - [x] **T34.** Allocation-capped shared PNG decoder.
@@ -142,7 +142,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 
 ### Phase 7: Windows app
 
-- [ ] **T17.** WinUI app and Direct3D renderer.
+- [ ] **T17.** WinUI app and Direct3D renderer, and the C# bindings generated from `scull.h`.
 - [ ] **T18.** TSF input method and UIA accessibility.
 
 ### Phase 8: chrome

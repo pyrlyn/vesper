@@ -32,24 +32,47 @@ private const val DSR_CURSOR = 6
 
 /** Reply bytes waiting for the caller. */
 internal class Replies {
-    private val bytes = ByteArray(MAX_REPLY_BYTES)
+    private var bytes = ByteArray(MAX_REPLY_BYTES)
     private var size = 0
 
     /** Queues one whole reply, or drops it if the queue is full. */
     fun push(reply: ByteArray) {
-        if (size + reply.size > MAX_REPLY_BYTES) return
-        reply.copyInto(bytes, size)
-        size += reply.size
+        add(reply, MAX_REPLY_BYTES)
     }
 
     fun push(reply: String) = push(reply.encodeToByteArray())
 
+    /**
+     * Queues an answer the host supplied (OSC 52), which may pass [MAX_REPLY_BYTES]: that cap is
+     * there for what the PTY can make the core say, and the host chose this size itself.
+     */
+    fun pushAnswer(reply: ByteArray): Boolean = add(reply, MAX_REPLY_BYTES + MAX_ANSWER_BYTES)
+
+    private fun add(
+        reply: ByteArray,
+        cap: Int,
+    ): Boolean {
+        if (size + reply.size > cap) return false
+        if (size + reply.size > bytes.size) bytes = bytes.copyOf(size + reply.size)
+        reply.copyInto(bytes, size)
+        size += reply.size
+        return true
+    }
+
     fun take(): ByteArray {
         val out = bytes.copyOf(size)
         size = 0
+        // A buffer one clipboard answer grew is not kept for the next device report.
+        if (bytes.size > MAX_REPLY_BYTES) bytes = ByteArray(MAX_REPLY_BYTES)
         return out
     }
 }
+
+/** Room for `ESC ] 52 ;`, the targets, `;` and the terminator around an OSC 52 answer. */
+private const val ANSWER_FRAMING = 32
+
+/** The longest OSC 52 answer: the base64 of the largest clipboard in its framing. */
+private val MAX_ANSWER_BYTES = base64Length(MAX_CLIPBOARD_BYTES) + ANSWER_FRAMING
 
 internal fun State.primaryAttributes() = replies.push(PRIMARY_ATTRIBUTES)
 

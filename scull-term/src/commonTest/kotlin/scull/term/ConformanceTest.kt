@@ -13,7 +13,7 @@ import kotlin.test.fail
 // screen text, cursor, styles, history, replies and events. The cases, their esctest2 and vttest
 // sources and the fixture format are described in tests/README.md.
 
-/** The files T7 answers for; `shell.txt` and `selection.txt` wait for their tasks. */
+/** The files the core answers for; `selection.txt` waits for T13.2. */
 private val FILES =
     listOf(
         "charsets",
@@ -27,6 +27,7 @@ private val FILES =
         "screens",
         "scroll",
         "sgr",
+        "shell",
         "tabs",
         "unicode",
         "wrap",
@@ -51,9 +52,12 @@ private class Case(
     var history: Int? = null
     var replies: ByteArray? = null
     var events: List<String>? = null
+    var links: List<String>? = null
 
     val checksSomething: Boolean
-        get() = cursor != null || screen != null || styles.isNotEmpty() || history != null || replies != null || events != null
+        get() =
+            cursor != null || screen != null || styles.isNotEmpty() || history != null || replies != null || events != null ||
+                links != null
 }
 
 private fun unescape(text: String): ByteArray {
@@ -191,6 +195,10 @@ private fun parse(
                 case.events = pipes()
             }
 
+            "links" -> {
+                case.links = pipes()
+            }
+
             else -> {
                 error("$file: unknown field $key")
             }
@@ -203,6 +211,12 @@ private fun showEvent(event: Event): String =
     when (event) {
         Event.Bell -> "bell"
         is Event.Title -> "title ${event.target.code} ${event.text}"
+        is Event.Directory -> "cwd ${event.uri}"
+        is Event.ShellMark -> listOfNotNull("shell", event.kind.letter, event.exitCode).joinToString(" ")
+        is Event.ClipboardWrite -> "clip write ${event.targets} ${event.data.decodeToString()}"
+        is Event.ClipboardRead -> "clip read ${event.targets}"
+        is Event.Notification -> "notify ${event.title}|${event.body}"
+        is Event.Link -> "link ${event.id.value} ${event.uri}"
     }
 
 private fun color(c: Color): String =
@@ -262,6 +276,13 @@ private fun check(case: Case): String =
         case.events?.let { want ->
             val got = generateSequence(term::pollEvent).map(::showEvent).toList()
             if (got != want) append("  events:\n    want $want\n    got  $got\n")
+        }
+        case.links?.let { want ->
+            val got =
+                (0 until term.grid.screenRows).flatMap { r ->
+                    checkNotNull(term.grid.screenRow(r)).links.map { "${r + 1} ${it.start}..${it.end}=${it.link.value}" }
+                }
+            if (got != want) append("  links:\n    want $want\n    got  $got\n")
         }
     }
 
