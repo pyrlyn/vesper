@@ -1,6 +1,12 @@
-# T12. Input encoding
+---
+status: in progress
+priority: P1
+complexity: 4
+readiness: 5%
+agent: Claude Code / claude-opus-5-5
+---
 
-Status: not started
+# T12. Input encoding
 
 `scull-input`: pure encoders for legacy keys, the kitty keyboard protocol with a flag stack per screen, win32-input-mode, all mouse modes including SGR-pixel, bracketed paste with end-marker stripping, and focus events. Done when the table-driven tests match xterm and the kitty specification.
 
@@ -13,3 +19,5 @@ Execution plan:
 Acceptance:
 - [ ] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
 - [ ] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
+
+Split at claim: [T12.1](../T12.1/task.md) keys, [T12.2](../T12.2/task.md) mouse, paste and focus. T12 closes when both have.

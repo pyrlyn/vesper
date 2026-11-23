@@ -122,6 +122,8 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 ### Phase 5: input, selection, images, config core
 
 - [ ] **T12.** Input encoding (legacy, kitty keyboard, win32-input-mode, mouse, paste, focus).
+- [ ] **T12.1.** Key encoding: legacy xterm, the kitty keyboard protocol with its per-screen flag stack, win32-input-mode.
+- [ ] **T12.2.** Mouse (all tracking modes and encodings, SGR-pixel included), bracketed paste and focus reports.
 - [ ] **T13.** Selection, search, OSC 8/52/7/133 in the core.
 - [ ] **T13.2.** Selection and scrollback search, with frame marks.
 - [ ] **T19.** Images (kitty, iTerm2, sixel) with quotas.
