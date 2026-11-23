@@ -127,6 +127,8 @@ Reuse of Rust crates (wezterm-alacritty.md §4):
 
 These tooling and crate recommendations were written for a Rust core. The Kotlin/Native rewrite keeps the same ABI shape (a committed `scull.h` and C# P/Invoke bindings) and the same PTY and parser design, implemented in Kotlin/Native with cinterop rather than those crates.
 
+The PTY (T8) is a small C shim in cinterop `.def` files, not a library: `pty4j` is JVM-only, and the one Kotlin/Native PTY library found (`kpty` 0.0.1) calls `forkpty()` from Kotlin, which runs Kotlin runtime code between fork and exec. Sources and the reasoning are in `plan/T8/task.md` (Findings).
+
 ### 6.1 Windows host: the C# interop library (T17)
 
 The all-C# host (§8, decision 2) needs Direct3D 11, DXGI and DirectWrite for the renderer, TSF for text input (T18) and UI Automation (T18). Four libraries were compared on 2026-10-08. Versions and dates come from the NuGet registration API (`https://api.nuget.org/v3/registration5-gz-semver2/<id>/index.json`, latest stable entry) and the GitHub REST API (`/repos/<owner>/<repo>`, `/releases/latest`); coverage from each repository's tree on its default branch the same day.
