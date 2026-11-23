@@ -1,0 +1,226 @@
+# Pseudo-terminal and child process on macOS and Linux. In C rather than Kotlin because the child,
+# between fork and exec, may only make async-signal-safe calls: Kotlin code there would run the
+# Kotlin runtime in a copy of a multithreaded process, whose other threads (the collector among
+# them) are gone.
+package = scull.pty.posix
+---
+/* ptsname_r and pthread_setname_np are GNU extensions in glibc. */
+#if defined(__linux__) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE
+#endif
+#include <errno.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <termios.h>
+#include <unistd.h>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#else
+extern char** environ;
+#endif
+
+/* The process environment, "KEY=value" entries ending in NULL. */
+static char** scull_pty_environ(void) {
+#ifdef __APPLE__
+    return *_NSGetEnviron();
+#else
+    return environ;
+#endif
+}
+
+/* 1 when `path` is a regular file this process may execute. */
+static int32_t scull_pty_is_executable(const char* path) {
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISREG(st.st_mode) && access(path, X_OK) == 0;
+}
+
+static int scull_pty_slave_name(int master, char* name, size_t size) {
+#ifdef __APPLE__
+    /* TIOCPTYGNAME needs 128 bytes; ptsname is not thread-safe. */
+    if (size < 128) return -1;
+    return ioctl(master, TIOCPTYGNAME, name);
+#else
+    return ptsname_r(master, name, size);
+#endif
+}
+
+static int scull_pty_cloexec(int fd) {
+    return fcntl(fd, F_SETFD, FD_CLOEXEC);
+}
+
+/* Reports errno to the parent through the error pipe and ends the child. */
+static void scull_pty_child_fail(int report) {
+    int error = errno;
+    ssize_t written;
+    do written = write(report, &error, sizeof(error)); while (written < 0 && errno == EINTR);
+    _exit(127);
+}
+
+/* The child's side of the fork: only async-signal-safe calls from here to exec. */
+static void scull_pty_child(int slave, int master, int report, const char* path, char** argv, char** envp, const char* cwd) {
+    struct sigaction dfl;
+    memset(&dfl, 0, sizeof(dfl));
+    dfl.sa_handler = SIG_DFL;
+    sigemptyset(&dfl.sa_mask);
+    /* Handlers the host installed must not run in the child; SIGKILL and SIGSTOP fail harmlessly. */
+    for (int sig = 1; sig < NSIG; sig++) sigaction(sig, &dfl, NULL);
+    sigset_t none;
+    sigemptyset(&none);
+    sigprocmask(SIG_SETMASK, &none, NULL);
+    /* A new session whose controlling terminal is the slave: job control and ^C reach the child. */
+    if (setsid() < 0) scull_pty_child_fail(report);
+    if (ioctl(slave, TIOCSCTTY, 0) < 0) scull_pty_child_fail(report);
+    if (dup2(slave, 0) < 0 || dup2(slave, 1) < 0 || dup2(slave, 2) < 0) scull_pty_child_fail(report);
+    if (slave > 2) close(slave);
+    close(master);
+    if (cwd != NULL && chdir(cwd) != 0) scull_pty_child_fail(report);
+    execve(path, argv, envp);
+    scull_pty_child_fail(report);
+}
+
+/*
+ * Opens a pseudo-terminal of the given size and runs `path` on it with `argv` and `envp`, in `cwd`
+ * when it is not NULL. Returns the child's pid and stores the master in `*master`. On failure
+ * returns -1, with `*stage` 1 when the terminal could not be opened and 2 when the child could not
+ * start, and the system's error code in `*error`. Nothing is left open or running then.
+ */
+static int32_t scull_pty_spawn(
+    const char* path, char** argv, char** envp, const char* cwd,
+    uint16_t rows, uint16_t cols, uint16_t xpixel, uint16_t ypixel,
+    int32_t* master, int32_t* stage, int32_t* error
+) {
+    *stage = 1;
+    int m = posix_openpt(O_RDWR | O_NOCTTY);
+    if (m < 0) { *error = errno; return -1; }
+    char name[128];
+    int s = -1;
+    struct winsize size;
+    memset(&size, 0, sizeof(size));
+    size.ws_row = rows;
+    size.ws_col = cols;
+    size.ws_xpixel = xpixel;
+    size.ws_ypixel = ypixel;
+    if (scull_pty_cloexec(m) != 0 || grantpt(m) != 0 || unlockpt(m) != 0
+        || scull_pty_slave_name(m, name, sizeof(name)) != 0
+        || (s = open(name, O_RDWR | O_NOCTTY | O_CLOEXEC)) < 0
+        || ioctl(s, TIOCSWINSZ, &size) != 0) {
+        *error = errno;
+        if (s >= 0) close(s);
+        close(m);
+        return -1;
+    }
+    *stage = 2;
+    int report[2];
+    if (pipe(report) != 0) { *error = errno; close(s); close(m); return -1; }
+    scull_pty_cloexec(report[0]);
+    scull_pty_cloexec(report[1]);
+    /* Blocked until the child has reset its handlers, so none of ours runs in it. */
+    sigset_t all, old;
+    sigfillset(&all);
+    pthread_sigmask(SIG_SETMASK, &all, &old);
+    pid_t pid = fork();
+    if (pid == 0) scull_pty_child(s, m, report[1], path, argv, envp, cwd);
+    int fork_error = errno;
+    pthread_sigmask(SIG_SETMASK, &old, NULL);
+    close(s);
+    close(report[1]);
+    if (pid < 0) { *error = fork_error; close(report[0]); close(m); return -1; }
+    /* EOF means exec succeeded and closed the pipe; an int is the child's errno. */
+    int child_error = 0;
+    ssize_t got;
+    do got = read(report[0], &child_error, sizeof(child_error)); while (got < 0 && errno == EINTR);
+    close(report[0]);
+    if (got == (ssize_t)sizeof(child_error)) {
+        while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
+        close(m);
+        *error = child_error;
+        return -1;
+    }
+    *master = m;
+    return pid;
+}
+
+/* A second descriptor of the master, closed on exec. Returns -1 with errno set on failure. */
+static int32_t scull_pty_dup(int32_t fd) {
+    return fcntl(fd, F_DUPFD_CLOEXEC, 0);
+}
+
+static void scull_pty_close(int32_t fd) {
+    close(fd);
+}
+
+/* Reads up to `size` bytes; 0 at end of file, -1 on error (a hung-up Linux PTY reports EIO). */
+static int32_t scull_pty_read(int32_t fd, void* buffer, int32_t size) {
+    ssize_t got;
+    do got = read(fd, buffer, (size_t)size); while (got < 0 && errno == EINTR);
+    return (int32_t)got;
+}
+
+/* Writes all `size` bytes. Returns 0, or the system's error code. */
+static int32_t scull_pty_write_all(int32_t fd, const void* buffer, int32_t size) {
+    const char* at = (const char*)buffer;
+    while (size > 0) {
+        ssize_t put = write(fd, at, (size_t)size);
+        if (put < 0) {
+            if (errno == EINTR) continue;
+            return errno;
+        }
+        at += put;
+        size -= (int32_t)put;
+    }
+    return 0;
+}
+
+static int32_t scull_pty_resize(int32_t fd, uint16_t rows, uint16_t cols, uint16_t xpixel, uint16_t ypixel) {
+    struct winsize size;
+    memset(&size, 0, sizeof(size));
+    size.ws_row = rows;
+    size.ws_col = cols;
+    size.ws_xpixel = xpixel;
+    size.ws_ypixel = ypixel;
+    return ioctl(fd, TIOCSWINSZ, &size) == 0 ? 0 : errno;
+}
+
+/*
+ * Blocks until the child has ended, without reaping it, so its pid cannot be reused while a
+ * hangup may still be sent to it. Returns 0, or the system's error code.
+ */
+static int32_t scull_pty_wait(int32_t pid) {
+    siginfo_t info;
+    memset(&info, 0, sizeof(info));
+    while (waitid(P_PID, (id_t)pid, &info, WEXITED | WNOWAIT) != 0) {
+        if (errno != EINTR) return errno;
+    }
+    return 0;
+}
+
+/*
+ * Reaps an ended child. Stores its exit code, or 1 and the signal that ended it. Returns 0, or the
+ * system's error code.
+ */
+static int32_t scull_pty_reap(int32_t pid, int32_t* code, int32_t* signal) {
+    int status = 0;
+    while (waitpid((pid_t)pid, &status, 0) < 0) {
+        if (errno != EINTR) return errno;
+    }
+    if (WIFSIGNALED(status)) {
+        *code = 1;
+        *signal = WTERMSIG(status);
+    } else {
+        *code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+        *signal = 0;
+    }
+    return 0;
+}
+
+static int32_t scull_pty_hangup(int32_t pid) {
+    return kill((pid_t)pid, SIGHUP) == 0 ? 0 : errno;
+}
