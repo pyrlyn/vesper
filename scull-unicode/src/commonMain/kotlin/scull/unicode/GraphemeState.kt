@@ -59,6 +59,14 @@ public class GraphemeState(
         return boundary
     }
 
+    /** Forgets the text so far, so the next code point starts a cluster. For a caller that ends clusters often and must not allocate. */
+    public fun reset() {
+        prev = NO_PREVIOUS
+        oddRegionalIndicators = false
+        afterLinker = false
+        emoji = EMOJI_NONE
+    }
+
     /** Rules GB3 to GB999, in the order UAX #29 applies them. */
     private fun breaksBetween(
         prev: Int,
