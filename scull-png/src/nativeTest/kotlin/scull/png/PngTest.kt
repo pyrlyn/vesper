@@ -107,7 +107,7 @@ private fun build(
             prev = row
         }
     }
-    return pngFile(ihdr(width, height, depth, color, interlaced), extra + listOf("IDAT" to deflate(raw.toByteArray())))
+    return pngFile(ihdr(width, height, depth, color, interlaced), extra + listOf("IDAT" to Zlib.deflate(raw.toByteArray())))
 }
 
 private fun decode(png: ByteArray) = Png.decode(png, 64 * MIB)
@@ -267,7 +267,7 @@ class PngTest {
     @Test
     fun dataPastTheImageIsNeverInflated() {
         // 64 MiB of zeros in a few KiB: one pixel's worth is read, and the decode stays inside its cap.
-        val bomb = deflate(ByteArray(64 * MIB.toInt()))
+        val bomb = Zlib.deflate(ByteArray(64 * MIB.toInt()))
         val png = pngFile(ihdr(1, 1, 8, COLOR_GREY), listOf("IDAT" to bomb))
         assertEquals(listOf(grey(0)), pixels(png))
     }
@@ -283,8 +283,8 @@ class PngTest {
         refused(good.copyOf(33)) // nothing after IHDR
         refused(pngFile(ihdr(0, 1, 8, COLOR_GREY), emptyList()))
         refused(pngFile(ihdr(1, 1, 4, COLOR_RGB), emptyList()))
-        refused(pngFile(ihdr(1, 1, 8, COLOR_GREY), listOf("IDAT" to deflate(bytes(0)))))
-        refused(pngFile(ihdr(1, 1, 8, COLOR_GREY), listOf("IDAT" to deflate(bytes(5, 0)))))
+        refused(pngFile(ihdr(1, 1, 8, COLOR_GREY), listOf("IDAT" to Zlib.deflate(bytes(0)))))
+        refused(pngFile(ihdr(1, 1, 8, COLOR_GREY), listOf("IDAT" to Zlib.deflate(bytes(5, 0)))))
         refused(pngFile(ihdr(1, 1, 8, COLOR_GREY), listOf("IDAT" to bytes(1, 2, 3, 4))))
         refused(build(1, 1, 8, COLOR_GREY, listOf(1), extra = listOf("ABCD" to ByteArray(0))))
         refused(build(1, 1, 8, COLOR_PALETTE, listOf(0)))
@@ -297,7 +297,7 @@ class PngTest {
 
     @Test
     fun ancillaryChunksAreSkippedAndImageDataMaySpanChunks() {
-        val data = deflate(bytes(0, 7, 0, 9))
+        val data = Zlib.deflate(bytes(0, 7, 0, 9))
         val split = listOf("IDAT" to data.copyOfRange(0, 3), "IDAT" to ByteArray(0), "IDAT" to data.copyOfRange(3, data.size))
         val png = pngFile(ihdr(1, 2, 8, COLOR_GREY), listOf("gAMA" to ByteArray(4), "abCD" to ByteArray(2)) + split)
         assertEquals(listOf(grey(7), grey(9)), pixels(png))

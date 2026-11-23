@@ -24,7 +24,7 @@ The PTY bindings (POSIX PTY, ConPTY) need no package: `scull-pty` declares them 
 
 | Package | Where | Source | Why here |
 | --- | --- | --- | --- |
-| `platform.zlib` | local (`scull-png`; ships with the Kotlin/Native distribution, links the system `libz` on macOS and Linux and a static copy on `mingwX64`) | https://github.com/madler/zlib | Inflate, deflate and CRC-32 for the PNG decoder and its fixture encoder |
+| `platform.zlib` | local (`scull-png`; ships with the Kotlin/Native distribution, links the system `libz` on macOS and Linux and a static copy on `mingwX64`) | https://github.com/madler/zlib | Inflate, deflate and CRC-32 for the PNG decoder and its fixture encoder; capped inflate for kitty graphics `o=z` |
 
 ## Gradle
 

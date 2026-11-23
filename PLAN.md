@@ -131,7 +131,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 - [ ] **T19.** Images (kitty, iTerm2, sixel) with quotas.
 - [x] **T19.1.** Image store with a byte quota and LRU eviction; iTerm2 inline images.
 - [x] **T19.2.** Sixel decoder.
-- [ ] **T19.3.** Kitty graphics protocol.
+- [x] **T19.3.** Kitty graphics protocol.
 - [ ] **T19.4.** Images in the terminal, the frame and the C ABI.
 - [x] **T34.** Allocation-capped shared PNG decoder.
 - [ ] **T30.** Config watcher never misses a reload under load.
