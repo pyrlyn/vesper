@@ -71,7 +71,10 @@ static int32_t scull_conpty_spawn(
         error = (int32_t)GetLastError();
         free(list);
         list = NULL;
-    } else if (!UpdateProcThreadAttribute(list, 0, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, pc, sizeof(pc), NULL, NULL)) {
+    /* lpValue is a pointer to the HPCON; passing `pc` would copy from the console
+     * object itself, the child would not attach, and its output would go to the
+     * parent's console instead of the pipe. */
+    } else if (!UpdateProcThreadAttribute(list, 0, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, &pc, sizeof(pc), NULL, NULL)) {
         error = (int32_t)GetLastError();
     } else {
         memcpy(line, command_line, line_length * sizeof(wchar_t));
