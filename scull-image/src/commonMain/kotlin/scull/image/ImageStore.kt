@@ -130,6 +130,20 @@ public class ImageStore(
         return true
     }
 
+    /**
+     * Moves placement [id]'s top-left cell to [column] of absolute [line], keeping its id and its
+     * place in the drawing order, which a reflow must not change. False when there was none.
+     */
+    public fun move(
+        id: Long,
+        column: Int,
+        line: Long,
+    ): Boolean {
+        val p = placed[id] ?: return false
+        placed[id] = Placement(p.imageId, column, line, p.columns, p.rows, p.crop, p.z, p.offsetX, p.offsetY)
+        return true
+    }
+
     /** Removes every placement [predicate] matches and returns how many. */
     public fun removePlacements(predicate: (Placement) -> Boolean): Int {
         val gone = placed.filterValues(predicate).toList()

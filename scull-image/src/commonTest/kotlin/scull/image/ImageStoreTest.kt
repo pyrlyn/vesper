@@ -72,6 +72,26 @@ class ImageStoreTest {
     }
 
     @Test
+    fun aMovedPlacementKeepsItsIdItsOrderAndTheRest() {
+        val store = ImageStore(quotaBytes = 1L shl 20)
+        val a = store.add(pixels()).id
+        val first = assertNotNull(store.place(Placement(a, 1, 2, 3, 4, Crop(1, 1, 2, 2), z = -1, offsetX = 5, offsetY = 6)))
+        val second = assertNotNull(store.place(Placement(a, 0, 0, 1, 1)))
+        assertTrue(store.move(first, 7, 40))
+        assertEquals(listOf(first, second), store.placements.keys.toList())
+        val p = store.placements.getValue(first)
+        assertEquals(
+            listOf(7L, 40L, 3L, 4L, -1L, 5L, 6L),
+            listOf(p.column, p.line, p.columns, p.rows, p.z, p.offsetX, p.offsetY).map {
+                it.toLong()
+            },
+        )
+        assertEquals(2, p.crop?.width)
+        assertFalse(store.move(99, 0, 0))
+        store.checkInvariants()
+    }
+
+    @Test
     fun theImageCountIsCappedToo() {
         val store = ImageStore(quotaBytes = 1L shl 20, maxImages = 2)
         repeat(5) { store.add(pixels(1, 1)) }
