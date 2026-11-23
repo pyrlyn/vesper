@@ -67,6 +67,15 @@ public class Grid(
     public var historyLength: Int = 0
         private set
 
+    /**
+     * Rows that ever left the top of the ring: pushed out of a full history (or out of a screen that
+     * keeps none), dropped by [clearHistory] or by a resize. Logical row `i` is absolute line
+     * `evicted + i`, a number that stays with its text while output scrolls, so a selection or a match
+     * can be anchored to it.
+     */
+    public var evicted: Long = 0
+        private set
+
     /** How many rows the viewport is scrolled back into history. */
     public var displayOffset: Int = 0
         private set
@@ -149,6 +158,7 @@ public class Grid(
     public fun clearHistory() {
         for (i in 0 until historyLength) rows[phys(i)].release()
         releasedSinceSweep += historyLength
+        evicted += historyLength
         zero = phys(historyLength)
         historyLength = 0
         displayOffset = 0
@@ -236,6 +246,7 @@ public class Grid(
         val evicted = (laid.size - screen - limit).coerceAtLeast(0)
         laid.subList(0, evicted).clear()
         releasedSinceSweep += evicted
+        this.evicted += evicted
         for (s in spots) {
             if (s.row < evicted) {
                 s.row = 0
@@ -295,6 +306,7 @@ public class Grid(
             val oldest = zero
             zero = (zero + 1) and mask
             releasedSinceSweep++
+            evicted++
             // With a ring larger than screen plus history, the oldest slot is not the one reused below.
             if (phys(historyLength + screenRows - 1) != oldest && oldest < rows.size) rows[oldest].release()
         }
