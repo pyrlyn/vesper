@@ -1,6 +1,7 @@
 package scull.term
 
 import scull.grid.Grid
+import scull.grid.LinkId
 import scull.grid.Style
 import scull.parser.Parser
 import scull.unicode.WidthOptions
@@ -123,4 +124,24 @@ public class Terminal(
 
     /** The bytes to write back to the program (device reports), emptying the queue. */
     public fun takeReplies(): ByteArray = state.replies.take()
+
+    /**
+     * Answers an [Event.ClipboardRead] with [data] for [targets], queued with the replies.
+     * Returns false when the replies not yet taken leave no room for it; take them and answer again.
+     *
+     * @throws IllegalArgumentException when [targets] names no OSC 52 selection or [data] passes [MAX_CLIPBOARD_BYTES].
+     */
+    public fun answerClipboard(
+        targets: String,
+        data: ByteArray,
+    ): Boolean = state.answerClipboard(targets, data)
+
+    /**
+     * Refuses an [Event.ClipboardRead]: the program gets an empty selection, as xterm answers when
+     * reads are disallowed, so it does not wait for an answer that never comes.
+     */
+    public fun denyClipboard(targets: String): Boolean = state.answerClipboard(targets, ByteArray(0))
+
+    /** The URI of the link [id] cells carry, or null once a sweep freed it because no cell held it. */
+    public fun linkUri(id: LinkId): String? = state.links.uri(id.value)
 }

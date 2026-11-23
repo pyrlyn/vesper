@@ -60,6 +60,10 @@ internal class State(
     val charsets = Charsets()
     val replies = Replies()
     val events = EventQueue()
+    val links = Links()
+
+    // Whether the last OSC 52 read ended in BEL: the answer, which comes later from the host, ends the same way.
+    var clipboardReadBell = false
 
     // The cursor and the margins are plain fields, not the public data classes: printing moves the
     // cursor once per run, and a copy per move would be garbage on the hot path.

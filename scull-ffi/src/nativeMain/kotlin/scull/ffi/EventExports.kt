@@ -33,10 +33,14 @@ private class Taken(
 )
 
 private fun TermHandle.take(): Taken? {
-    when (val event = terminal.pollEvent()) {
-        Event.Bell -> return Taken(TT_EVENT_BELL.toUInt())
-        is Event.Title -> return Taken(TT_EVENT_TITLE.toUInt(), event.target.code.toUInt(), event.text.encodeToByteArray())
-        null -> Unit
+    // T13.3 gives the shell-integration events their kinds; until then a C host is not shown them.
+    while (true) {
+        when (val event = terminal.pollEvent()) {
+            Event.Bell -> return Taken(TT_EVENT_BELL.toUInt())
+            is Event.Title -> return Taken(TT_EVENT_TITLE.toUInt(), event.target.code.toUInt(), event.text.encodeToByteArray())
+            null -> break
+            else -> continue
+        }
     }
     // The exit comes last, after every event the child's output raised.
     val status = exit ?: return null
