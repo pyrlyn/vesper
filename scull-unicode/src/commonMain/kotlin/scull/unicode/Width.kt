@@ -142,3 +142,13 @@ internal inline fun String.forEachCodePoint(action: (Int) -> Unit) {
         }
     }
 }
+
+private const val SURROGATE_MASK = 0x3FF
+
+/** Appends the scalar value [cp] as one or two UTF-16 units. */
+public fun StringBuilder.appendCodePoint(cp: Int): StringBuilder {
+    if (cp < SUPPLEMENTARY_FIRST) return append(cp.toChar())
+    val offset = cp - SUPPLEMENTARY_FIRST
+    append(Char.MIN_HIGH_SURROGATE + (offset ushr SURROGATE_BITS))
+    return append(Char.MIN_LOW_SURROGATE + (offset and SURROGATE_MASK))
+}

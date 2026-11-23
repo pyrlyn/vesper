@@ -19,16 +19,6 @@ internal fun clusters(text: String): List<String> {
     return out.map(StringBuilder::toString)
 }
 
-internal fun StringBuilder.appendCodePoint(cp: Int) {
-    if (cp < 0x10000) {
-        append(cp.toChar())
-    } else {
-        val v = cp - 0x10000
-        append((0xD800 + (v shr 10)).toChar())
-        append((0xDC00 + (v and 0x3FF)).toChar())
-    }
-}
-
 class GraphemeBreakTest {
     /** Runs every line of the Unicode conformance file, which the generator copies into GRAPHEME_BREAK_CASES. */
     @Test
@@ -61,6 +51,36 @@ class GraphemeBreakTest {
     fun devanagariConjunctJoinsThroughVirama() {
         // KA VIRAMA SSA: GB9c keeps the conjunct in one cluster.
         assertEquals(1, clusters("क्ष").size)
+    }
+
+    @Test
+    fun resetStartsANewClusterWhateverCameBefore() {
+        val state = GraphemeState()
+        val acute = 0x301
+        state.next('e'.code)
+        assertTrue(!state.next(acute), "a mark joins the letter before it")
+        state.reset()
+        assertTrue(state.next(acute), "after a reset there is nothing to join")
+        // An odd regional indicator and an emoji before a ZWJ are forgotten too.
+        val regional = 0x1F1FA
+        state.next(regional)
+        state.reset()
+        state.next(regional)
+        assertTrue(!state.next(regional), "the pair counts from the reset")
+    }
+
+    @Test
+    fun appendCodePointWritesSurrogatePairsPastTheBmp() {
+        val text =
+            StringBuilder()
+                .appendCodePoint('a'.code)
+                .appendCodePoint(0x4E2D)
+                .appendCodePoint(0x1F468)
+                .toString()
+        assertEquals("a中👨", text)
+        val seen = mutableListOf<Int>()
+        text.forEachCodePoint { seen += it }
+        assertEquals(listOf('a'.code, 0x4E2D, 0x1F468), seen)
     }
 
     @Test
