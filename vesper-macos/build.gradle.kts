@@ -15,6 +15,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.vesperInput)
             implementation(projects.vesperGrid)
+            implementation(projects.vesperTerm)
         }
         macosMain.dependencies {
             implementation(projects.vesperSession)
