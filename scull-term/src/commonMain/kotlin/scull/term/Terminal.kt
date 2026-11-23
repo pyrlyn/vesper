@@ -3,6 +3,7 @@ package scull.term
 import scull.grid.Grid
 import scull.grid.LinkId
 import scull.grid.Style
+import scull.image.ImageStore
 import scull.input.ByteSink
 import scull.input.Key
 import scull.input.KeyEvent
@@ -57,6 +58,7 @@ public class Terminal(
     ) {
         parser.feed(bytes, from, to, state)
         if (sync.fed(state.modes.synchronizedOutput, to - from)) endSync()
+        state.images.prune(state.grid.firstLine)
         selected?.let { if (!state.grid.holds(it, state.altActive)) selected = null }
     }
 
@@ -104,6 +106,22 @@ public class Terminal(
         selected = null
         search?.current = null
     }
+
+    /**
+     * Sets the size of a cell in pixels, which images are measured with: sixel and iTerm2 sizes turn into cells
+     * with it, and kitty is told it. Until it is called a cell counts as 8 x 16. False, and nothing changes, when
+     * a side is outside 1..[scull.image.MAX_CELL_PIXELS].
+     */
+    public fun setCellSize(
+        width: Int,
+        height: Int,
+    ): Boolean = state.setCellSize(width, height)
+
+    /** The shown screen's images and their placements, anchored to absolute lines. Valid until the next [feed]. */
+    public val images: ImageStore get() = state.images.store
+
+    /** The shown screen's placements in the viewport into [out], lowest z first. */
+    internal fun placements(out: MutableList<FramePlacement>): Unit = state.visiblePlacements(out)
 
     /** Moves the viewport [delta] rows back into history (negative: towards the screen), clamped to what history holds. */
     public fun scrollDisplay(delta: Int): Unit = state.grid.scrollDisplay(delta)

@@ -163,7 +163,11 @@ public fun ttTermResize(
             val c = cols.toInt()
             val r = rows.toInt()
             if (c !in 1..MAX_COLS || r !in 1..MAX_ROWS) return@guarded TT_INVALID
-            handle.lock.withLock { handle.terminal.resize(c, r) }
+            handle.lock.withLock {
+                handle.terminal.resize(c, r)
+                // An unknown pixel size divides to 0, which leaves the cell size images use as it was.
+                handle.terminal.setCellSize(widthPx.toInt() / c, heightPx.toInt() / r)
+            }
             val pty = handle.pty ?: return@guarded OK
             try {
                 pty.resize(PtySize(rows = r.coerceAtMost(MAX_U16), cols = c, pixelWidth = widthPx.toInt(), pixelHeight = heightPx.toInt()))

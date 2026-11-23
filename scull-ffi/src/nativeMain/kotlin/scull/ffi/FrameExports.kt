@@ -6,6 +6,8 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.LongVar
 import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.UByteVar
+import kotlinx.cinterop.UIntVar
+import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.UShortVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
@@ -14,22 +16,29 @@ import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.nativeHeap
+import kotlinx.cinterop.pin
+import kotlinx.cinterop.pointed
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.toCPointer
+import kotlinx.cinterop.toLong
 import kotlinx.cinterop.usePinned
+import kotlinx.cinterop.value
 import platform.posix.memcpy
 import scull.ffi.c.TT_COLOR_INDEXED
 import scull.ffi.c.TT_COLOR_RGB
 import scull.ffi.c.TT_INVALID
 import scull.ffi.c.tt_frame_view
 import scull.ffi.c.tt_link_span
+import scull.ffi.c.tt_placement
 import scull.ffi.c.tt_row
 import scull.ffi.c.tt_run
 import scull.ffi.c.tt_scroll
 import scull.ffi.c.tt_style
 import scull.grid.Color
 import scull.grid.Style
+import scull.image.Image
 import scull.pty.withLock
 import scull.term.Frame
 import scull.term.FrameRow
@@ -37,6 +46,13 @@ import kotlin.native.CName
 
 private const val RED_SHIFT = 16
 private const val GREEN_SHIFT = 8
+
+private const val IMAGE_ADDRESS = 0
+private const val IMAGE_WIDTH = 1
+private const val IMAGE_HEIGHT = 2
+private const val IMAGE_STRIDE = 3
+private const val IMAGE_WORDS = 4
+private const val RGBA_BYTES = 4
 
 /** A native array that only grows, reused across updates so a steady frame allocates nothing. */
 private class Grow<T : CPointed>(
@@ -64,6 +80,29 @@ private class Grow<T : CPointed>(
 }
 
 /**
+ * What a `tt_image*` points to: the address, width, height and stride of [image]'s pixels, which
+ * stay pinned so the host reads them in place rather than from a copy per update.
+ */
+private class NativeImage(
+    image: Image,
+    val generation: ULong,
+) {
+    private val pinned = image.pixels.rgba.pin()
+    val ptr: CPointer<LongVar> =
+        nativeHeap.allocArray<LongVar>(IMAGE_WORDS).also {
+            it[IMAGE_ADDRESS] = pinned.addressOf(0).toLong()
+            it[IMAGE_WIDTH] = image.pixels.width.toLong()
+            it[IMAGE_HEIGHT] = image.pixels.height.toLong()
+            it[IMAGE_STRIDE] = image.pixels.width.toLong() * RGBA_BYTES
+        }
+
+    fun free() {
+        nativeHeap.free(ptr.rawValue)
+        pinned.unpin()
+    }
+}
+
+/**
  * What a `tt_frame*` points to: the Kotlin frame and the C views of it. A view's pointers are
  * these buffers, valid until the next update; rows the damage leaves alone keep theirs untouched.
  */
@@ -77,6 +116,10 @@ internal class FrameHandle {
     private val runs = ArrayList<Grow<tt_run>>()
     private val texts = ArrayList<Grow<UByteVar>>()
     private val links = ArrayList<Grow<tt_link_span>>()
+    private val placements = Grow<tt_placement> { nativeHeap.allocArray(it) }
+    private val images = HashMap<Image, NativeImage>()
+    private val shown = HashSet<Image>()
+    private var nextGeneration = 1uL
 
     /** Copies the rows [frame]'s last update changed into the C buffers and describes them in [view]. */
     fun fill(
@@ -111,6 +154,7 @@ internal class FrameHandle {
         val dirtyList = damage.dirty
         val dirtyOut = dirty.ensure(dirtyList.size)
         dirtyList.forEachIndexed { i, r -> dirtyOut!![i] = r.toUShort() }
+        val placementCount = copyPlacements()
 
         view.cols = cols.toUShort()
         view.rows = rows.toUShort()
@@ -130,6 +174,43 @@ internal class FrameHandle {
         view.scrolls_len = scrollList.size.toULong()
         view.dirty = dirty.ptr
         view.dirty_len = dirtyList.size.toULong()
+        view.placements = placements.ptr
+        view.placements_len = placementCount.toULong()
+    }
+
+    /** Writes the frame's placements, keeping each shown image's native copy, and so its generation, across updates. */
+    private fun copyPlacements(): Int {
+        val list = frame.placements
+        // The previous view, the only one that could still point at an image no longer shown, ends with this update.
+        shown.clear()
+        list.mapTo(shown) { it.image }
+        val gone = images.entries.iterator()
+        while (gone.hasNext()) {
+            val (image, native) = gone.next()
+            if (image !in shown) {
+                native.free()
+                gone.remove()
+            }
+        }
+        val out = placements.ensure(list.size)
+        list.forEachIndexed { i, p ->
+            val native = images.getOrPut(p.image) { NativeImage(p.image, nextGeneration++) }
+            val o = out!![i]
+            o.image = native.ptr.reinterpret()
+            o.generation = native.generation
+            o.row = p.row
+            o.col = p.col.toUInt()
+            o.cols = p.cols.toUInt()
+            o.rows = p.rows.toUInt()
+            o.offset_x = p.offsetX.toUInt()
+            o.offset_y = p.offsetY.toUInt()
+            o.src_x = p.sourceX.toUInt()
+            o.src_y = p.sourceY.toUInt()
+            o.src_w = p.sourceWidth.toUInt()
+            o.src_h = p.sourceHeight.toUInt()
+            o.z = p.z
+        }
+        return list.size
     }
 
     private fun copyRow(
@@ -208,7 +289,9 @@ internal class FrameHandle {
     }
 
     fun free() {
-        listOf(cells, lines, styles, scrolls, dirty).forEach { it.free() }
+        listOf(cells, lines, styles, scrolls, dirty, placements).forEach { it.free() }
+        images.values.forEach { it.free() }
+        images.clear()
         runs.forEach { it.free() }
         texts.forEach { it.free() }
         links.forEach { it.free() }
@@ -286,6 +369,21 @@ public fun ttFrameUpdate(
         }
         OK
     }
+}
+
+@CName("tt_image_pixels")
+public fun ttImagePixels(
+    image: COpaquePointer?,
+    width: CPointer<UIntVar>?,
+    height: CPointer<UIntVar>?,
+    stride: CPointer<ULongVar>?,
+): CPointer<UByteVar>? {
+    // Reads only the descriptor NativeImage wrote, so it cannot throw across the boundary.
+    val words = image?.reinterpret<LongVar>()
+    width?.pointed?.value = words?.get(IMAGE_WIDTH)?.toUInt() ?: 0u
+    height?.pointed?.value = words?.get(IMAGE_HEIGHT)?.toUInt() ?: 0u
+    stride?.pointed?.value = words?.get(IMAGE_STRIDE)?.toULong() ?: 0uL
+    return words?.get(IMAGE_ADDRESS)?.toCPointer()
 }
 
 @CName("tt_frame_free")

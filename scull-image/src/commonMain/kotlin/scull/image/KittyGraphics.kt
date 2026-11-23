@@ -676,5 +676,5 @@ private const val PRUNE_SLACK = 64
 /** Cells a placement may span each way, far more than any screen has. */
 private const val MAX_CELLS = 1L shl 16
 
-/** Cell pixels the context may give, so cell arithmetic on 32-bit image sides stays in a Long. */
-private const val MAX_CELL_PIXELS = 1 shl 12
+/** Cell pixels a [KittyContext] may give, so cell arithmetic on 32-bit image sides stays in a Long. */
+public const val MAX_CELL_PIXELS: Int = 1 shl 12

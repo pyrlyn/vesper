@@ -30,8 +30,24 @@ internal fun State.resize(
     // history instead of cutting rows off below.
     val mainCursor = if (altActive) saved[MAIN_SLOT]?.cursor ?: Cursor(row = main.screenRows - 1) else shown
     val altCursor = if (altActive) shown else saved[ALT_SLOT]?.cursor ?: Cursor()
-    val (mainAt, mainSaved) = main.resizeScreen(cols, rows, Reflow.REWRAP, mainCursor, saved[MAIN_SLOT])
-    val (altAt, altSaved) = other.resizeScreen(cols, rows, Reflow.TRUNCATE, altCursor, saved[ALT_SLOT])
+    val (mainAt, mainSaved) =
+        main.resizeScreen(
+            cols,
+            rows,
+            Reflow.REWRAP,
+            mainCursor,
+            saved[MAIN_SLOT],
+            if (altActive) hiddenImages else images,
+        )
+    val (altAt, altSaved) =
+        other.resizeScreen(
+            cols,
+            rows,
+            Reflow.TRUNCATE,
+            altCursor,
+            saved[ALT_SLOT],
+            if (altActive) images else hiddenImages,
+        )
     saved[MAIN_SLOT] = mainSaved
     saved[ALT_SLOT] = altSaved
     val at = if (altActive) altAt else mainAt
@@ -50,17 +66,25 @@ internal fun State.resize(
 
 private val SavedCursor.cursor: Cursor get() = Cursor(row, col, pendingWrap)
 
-/** Resizes this screen and moves [cursor] and [saved] (screen positions) with their cells, then clamps both onto the screen. */
+/**
+ * Resizes this screen and moves [cursor] and [saved] (screen positions) with their cells, then clamps both onto the
+ * screen. [images]' placements move with their top-left cells; one whose cell is lost goes.
+ */
 private fun Grid.resizeScreen(
     cols: Int,
     rows: Int,
     reflow: Reflow,
     cursor: Cursor,
     saved: SavedCursor?,
+    images: ScreenImages,
 ): Pair<Cursor, SavedCursor?> {
     val base = historyLength
-    val points = listOfNotNull(saved?.let { TrackPoint(base + it.row, it.col) })
+    val anchors = images.anchors(this)
+    val points = listOfNotNull(saved?.let { TrackPoint(base + it.row, it.col) }) + anchors.points
     val tracked = resize(cols, rows, reflow, TrackPoint(base + cursor.row, cursor.col), points)
+    val savedPoints = if (saved == null) 0 else 1
+    images.reanchor(this, anchors, tracked.points.subList(savedPoints, tracked.points.size))
+    images.prune(firstLine)
     val top = historyLength
     val onScreen = { p: TrackPoint -> (p.row - top).coerceIn(0, rows - 1) to p.col.coerceAtMost(cols - 1) }
     val (r, c) = onScreen(tracked.cursor)

@@ -6,6 +6,7 @@ import scull.grid.Grid
 import scull.grid.LinkSpan
 import scull.grid.Style
 import scull.grid.StyleId
+import scull.image.Image
 import scull.unicode.appendCodePoint
 import scull.unicode.firstCodePoint
 
@@ -125,6 +126,27 @@ public data class FrameCursor(
     val col: Int,
 )
 
+/**
+ * One image in the viewport: [sourceWidth] by [sourceHeight] pixels of [image] from ([sourceX], [sourceY]),
+ * scaled to [cols] by [rows] cells from viewport [row] (negative above the viewport) and [col], moved right
+ * and down by [offsetX] and [offsetY] pixels. A negative [z] draws below the text. [image] keeps its pixels
+ * however long the UI holds it, and its id names them for good, so it keys a texture cache.
+ */
+public data class FramePlacement(
+    val image: Image,
+    val row: Int,
+    val col: Int,
+    val cols: Int,
+    val rows: Int,
+    val sourceX: Int,
+    val sourceY: Int,
+    val sourceWidth: Int,
+    val sourceHeight: Int,
+    val z: Int,
+    val offsetX: Int,
+    val offsetY: Int,
+)
+
 /** The UI's copy of the viewport. Create one per view and keep it: every update reuses its buffers and copies only what changed. */
 public class Frame {
     public var cols: Int = 0
@@ -149,6 +171,13 @@ public class Frame {
     private var oldMarks: List<List<Mark>> = emptyList()
     private val collected = ArrayList<Mark>()
     private val styles = ArrayList<Style>()
+
+    // The images in the viewport, and those of the last update: a change repaints the rows under both.
+    private var placementList = ArrayList<FramePlacement>()
+    private var oldPlacements = ArrayList<FramePlacement>()
+
+    /** The images in the viewport, lowest z first; the rows under any that changed are in the damage's dirty rows. */
+    public val placements: List<FramePlacement> get() = placementList
 
     /** The cursor; null when hidden or outside the viewport. */
     public var cursor: FrameCursor? = null
@@ -224,12 +253,28 @@ public class Frame {
         oldMarks = marks
         marks = collectMarks(term)
         damage.compute(oldStamps, stamps, full) { from, to -> sameSpans(oldMarks[from], marks[to]) }
+        collectPlacements(term, full)
         applyScrolls()
         for (r in damage.dirty) {
             paint(grid, r)
             applyMarks(r)
         }
         cursor = cursorIn(term)
+    }
+
+    private fun collectPlacements(
+        term: Terminal,
+        full: Boolean,
+    ) {
+        oldPlacements = placementList.also { placementList = oldPlacements }
+        placementList.clear()
+        term.placements(placementList)
+        if (full || placementList == oldPlacements) return
+        val under = BooleanArray(rows)
+        for (p in oldPlacements + placementList) {
+            for (r in p.row.coerceAtLeast(0) until (p.row.toLong() + p.rows).coerceAtMost(rows.toLong()).toInt()) under[r] = true
+        }
+        damage.addDirty(under)
     }
 
     private fun collectMarks(term: Terminal): List<List<Mark>> {

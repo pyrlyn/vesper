@@ -6,6 +6,7 @@ import kotlinx.cinterop.COpaquePointerVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.LongVar
 import kotlinx.cinterop.MemScope
+import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
@@ -17,6 +18,7 @@ import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.toLong
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import scull.ffi.c.TT_EMPTY
@@ -24,6 +26,7 @@ import scull.ffi.c.TT_EVENT_TEXT_BODY
 import scull.ffi.c.TT_OK
 import scull.ffi.c.tt_event
 import scull.ffi.c.tt_frame_view
+import scull.ffi.c.tt_placement
 import scull.ffi.c.tt_str
 import scull.ffi.c.tt_term_options
 import scull.ffi.c.tt_wakeup_fn
@@ -115,6 +118,48 @@ internal data class StyleView(
     val underline: Int,
 )
 
+/** What `tt_image_pixels` answered: `width, height, stride` and the bytes. */
+internal data class PixelsView(
+    val size: Triple<Int, Int, Int>,
+    val bytes: List<Byte>,
+) {
+    companion object {
+        fun of(image: COpaquePointer?): PixelsView? =
+            memScoped {
+                val w = alloc<UIntVar>()
+                val h = alloc<UIntVar>()
+                val stride = alloc<ULongVar>()
+                val pixels = ttImagePixels(image, w.ptr, h.ptr, stride.ptr)
+                val size = Triple(w.value.toInt(), h.value.toInt(), stride.value.toInt())
+                pixels?.let { PixelsView(size, it.reinterpret<ByteVar>().readBytes(size.second * size.third).toList()) }
+            }
+    }
+}
+
+/** A placement with the address of its image and the pixels read through it. */
+internal data class PlacementView(
+    val image: Long,
+    val generation: ULong,
+    /** `row, col, cols, rows`. */
+    val cells: List<Int>,
+    /** `offset_x, offset_y, src_x, src_y, src_w, src_h`. */
+    val pixelRect: List<Int>,
+    val z: Int,
+    val pixels: PixelsView?,
+) {
+    companion object {
+        fun of(p: tt_placement): PlacementView =
+            PlacementView(
+                p.image.toLong(),
+                p.generation,
+                listOf(p.row, p.col.toInt(), p.cols.toInt(), p.rows.toInt()),
+                listOf(p.offset_x, p.offset_y, p.src_x, p.src_y, p.src_w, p.src_h).map { it.toInt() },
+                p.z,
+                PixelsView.of(p.image),
+            )
+    }
+}
+
 /** Everything a view pointed at, copied out before the next update invalidates it. */
 internal class FrameSnapshot(
     view: tt_frame_view,
@@ -191,6 +236,7 @@ internal class FrameSnapshot(
             Triple(s.start.toInt(), s.end.toInt(), s.from.toInt())
         }
     val dirty: List<Int> = List(view.dirty_len.toInt()) { view.dirty!![it].toInt() }
+    val placements: List<PlacementView> = List(view.placements_len.toInt()) { PlacementView.of(view.placements!![it]) }
 
     fun cell(
         row: Int,

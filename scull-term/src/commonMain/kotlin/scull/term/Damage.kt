@@ -96,6 +96,13 @@ public class Damage {
         }
     }
 
+    /** Adds the rows set in [rows] (one flag per row, which this overwrites) to the dirty ones, keeping them in order. */
+    internal fun addDirty(rows: BooleanArray) {
+        for (r in dirtyList) rows[r] = true
+        dirtyList.clear()
+        rows.forEachIndexed { r, dirty -> if (dirty) dirtyList += r }
+    }
+
     /** Extends the last scroll when [row] continues it with the same offset. */
     private fun pushScroll(
         row: Int,
