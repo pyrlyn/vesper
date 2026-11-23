@@ -20,6 +20,8 @@ kotlin {
         macosMain.dependencies {
             implementation(projects.vesperSession)
             implementation(projects.vesperUnicode)
+            // The T3 input the renderer bench feeds.
+            implementation(projects.vesperHarness)
         }
         all { languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi") }
     }

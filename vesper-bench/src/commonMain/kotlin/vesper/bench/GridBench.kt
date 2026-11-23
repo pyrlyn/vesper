@@ -7,6 +7,7 @@ import vesper.grid.Grid
 import vesper.grid.MAX_RING_ROWS
 import vesper.grid.Style
 import vesper.grid.StyleId
+import vesper.harness.fixed
 import kotlin.native.runtime.GC
 import kotlin.native.runtime.NativeRuntimeApi
 import kotlin.time.DurationUnit

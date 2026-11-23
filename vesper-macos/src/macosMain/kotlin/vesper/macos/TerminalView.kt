@@ -70,6 +70,7 @@ internal class TerminalView(
     /** Null without a Metal device (a VM, a CI runner): the view then draws with CoreText. */
     internal val renderer = MetalRenderer.create(text, palette)
     private val sources = RowSources()
+    private var probe: ((Boolean, Double) -> Unit)? = null
 
     init {
         if (renderer != null) {
@@ -80,11 +81,47 @@ internal class TerminalView(
 
     override fun makeBackingLayer(): CALayer = renderer?.layer ?: super.makeBackingLayer()
 
+    // AppKit never asks a CAMetalLayer to display, so updateLayer does not come by itself: the view
+    // schedules its own draws, at most one per turn of the main queue. Reporting that it updates its
+    // layer still keeps AppKit from drawing CoreText into the Metal layer.
     override fun wantsUpdateLayer(): Boolean = renderer != null
 
-    override fun updateLayer() {
+    override fun updateLayer() = drawMetal()
+
+    private var drawQueued = false
+
+    private fun redraw() {
+        if (renderer == null) {
+            needsDisplay = true
+            return
+        }
+        if (drawQueued) return
+        drawQueued = true
+        dispatch_async(dispatch_get_main_queue()) {
+            drawQueued = false
+            drawMetal()
+        }
+    }
+
+    private fun drawMetal() {
         val metal = renderer ?: return
+        if (window == null) return
         bounds.useContents { metal.draw(screen, sources, size.width, size.height, window?.backingScaleFactor ?: 1.0, focused) }
+    }
+
+    override fun viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        redraw()
+    }
+
+    override fun viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        redraw()
+    }
+
+    /** Hands [handler] the marks of the first frame drawn after the next update (see [MetalRenderer.onNextFrame]). */
+    fun probeNextFrame(handler: (presented: Boolean, time: Double) -> Unit) {
+        probe = handler
     }
 
     /** Renders the current frame offscreen at [scale] and waits for it; null without Metal. */
@@ -131,7 +168,9 @@ internal class TerminalView(
         val current = session ?: return
         if (current.update(screen)) {
             sources.absorb(screen.damage, screen.rows)
-            needsDisplay = true
+            probe?.let { renderer?.onNextFrame = it }
+            probe = null
+            redraw()
         }
         while (true) {
             when (val event = current.pollEvent() ?: break) {
@@ -175,13 +214,14 @@ internal class TerminalView(
     private fun focusChanged(now: Boolean) {
         focused = now
         session?.focus(now)
-        needsDisplay = true
+        redraw()
     }
 
     // Size: the terminal follows the view, but only once a drag ends, with the child's output held
     // meanwhile, so a shell redraws once rather than for every step of the drag.
     override fun setFrameSize(newSize: CValue<CGSize>) {
         super.setFrameSize(newSize)
+        redraw()
         if (!inLiveResize) applySize()
     }
 
@@ -292,7 +332,7 @@ internal class TerminalView(
         if (!mouse(event, MouseAction.Press, button)) {
             session?.scrollDisplay(lines)
             refresh()
-            needsDisplay = true
+            redraw()
             return
         }
         repeat(abs(lines) - 1) { mouse(event, MouseAction.Press, button) }
