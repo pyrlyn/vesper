@@ -1,6 +1,12 @@
-# T900. Dependency advisory updates
+---
+status: todo
+priority: P2
+complexity: 2
+readiness: 0%
+agent:
+---
 
-Status: not started
+# T900. Dependency advisory updates
 
 The creator authorized dependency updates across the audit. Update only vulnerable dependencies and the resolver-required graph without weakening existing guards or advisory policy.
 

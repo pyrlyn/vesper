@@ -18,7 +18,7 @@ Machine: Apple M3 Max, macOS 27.0.1, Kotlin/Native 2.4.21 release build.
 
 Times are medians of 21 feeds after a warm-up feed, over three runs. The parser column is one run of the parser bench taken right after them.
 
-There is no Rust column: the Rust `vesper-term` this port replaces had no throughput bench, and it was not measured for this task.
+There is no Rust column: the Rust `term` crate this port replaces had no throughput bench, and it was not measured for this task.
 
 What the numbers say:
 

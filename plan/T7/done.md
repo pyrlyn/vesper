@@ -12,7 +12,7 @@
 
 ## Reuse
 
-Searched before writing: `vesper-parser` (the `Handler` actions and `Params`), `vesper-grid` (cells, styles, rows, scrolling, clusters), `vesper-unicode` (width, grapheme breaks) and `vesper-harness` (fixture reading) are used as they are or extended in place. No new dependency. The terminal semantics are ported from the Rust `vesper-term` at 69d9be4; there is no maintained Kotlin/Native terminal state library to take instead.
+Searched before writing: `vesper-parser` (the `Handler` actions and `Params`), `vesper-grid` (cells, styles, rows, scrolling, clusters), `vesper-unicode` (width, grapheme breaks) and `vesper-harness` (fixture reading) are used as they are or extended in place. No new dependency. The terminal semantics are ported from the Rust `term` crate at 69d9be4; there is no maintained Kotlin/Native terminal state library to take instead.
 
 ## How it was checked
 

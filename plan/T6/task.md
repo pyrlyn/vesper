@@ -12,7 +12,7 @@ agent: Claude Code / claude-fable-5-2
 
 ## Execution plan
 
-The Rust tree at 69d9be4 already solved this (its `grid` crate, after foot's and Alacritty's ring, `docs/research/`). The port keeps its layout, caps and tests. It is original scull code, so no upstream notice applies. Resize and reflow (`grid/resize.rs`, `reflow.rs`) stay for T11.
+The Rust tree at 69d9be4 already solved this (its `grid` crate, after foot's and Alacritty's ring, `docs/research/`). The port keeps its layout, caps and tests. It is original code of this project, so no upstream notice applies. Resize and reflow (`grid/resize.rs`, `reflow.rs`) stay for T11.
 
 1. **T6.1: cells, interning and rows.**
    - `Cell` is an 8-byte value class over a `Long`: code point or cluster id, style id, layout flags. A row is a `LongArray`.

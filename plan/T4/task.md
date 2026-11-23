@@ -12,7 +12,7 @@ agent: Claude Code / claude-opus-5-5
 
 ## Execution plan
 
-The state machine is our own table after Paul Williams' DEC parser, ported from the Rust `vesper-parser` removed in #62 (last at 69d9be4), which already passed its fuzz target. `vtparse` would add a C dependency and a cinterop step for less than that port gives.
+The state machine is our own table after Paul Williams' DEC parser, ported from the Rust `parser` crate removed in #62 (last at 69d9be4), which already passed its fuzz target. `vtparse` would add a C dependency and a cinterop step for less than that port gives.
 
 1. `vesper-parser/src/commonMain/kotlin/vesper/parser/`:
    - `Params.kt`: up to 32 values with saturation and a colon sub-parameter mask.

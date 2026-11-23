@@ -14,7 +14,7 @@
   - `Frame`:
     - `FrameCell.SELECTED`, `MATCH` and `CURRENT_MATCH`.
     - Damage compares each row's marks next to its stamp. A row whose highlights changed is repainted, and one that moved with its highlights still scrolls.
-- **`scull-ffi`, ABI 0.3.**
+- **`vesper-ffi`, ABI 0.3.**
   - `tt_term_select_start`, `tt_term_select_extend`, `tt_term_select_clear` and `tt_term_selection_text`.
   - `tt_term_search_set`, `tt_term_search_step` and `tt_term_search_count`.
   - `tt_match`, `TT_SELECT_*`, `TT_SEARCH_IGNORE_CASE`, the caps and the `TT_CELL_*` bits.
@@ -23,13 +23,13 @@
 ## Reused
 
 - The earlier Rust core's selection, search, frame-mark and FFI code and tests were ported.
-- `checkOut`/`copyOut`, `bytesAt`, `writeStruct` and `guarded` come from `scull-ffi`.
+- `checkOut`/`copyOut`, `bytesAt`, `writeStruct` and `guarded` come from `vesper-ffi`.
 - No UTF-8 or case-folding helper existed elsewhere in the project or under `packages/`.
 
 ## Checked
 
 - **macOS:** `./gradlew ktlintFormat check` passes, C ABI tests under ASan and TSan included.
-- **Linux x86_64 in Colima:** vesper-grid passes 91 tests, vesper-term 130 and scull-ffi 44.
+- **Linux x86_64 in Colima:** vesper-grid passes 91 tests, vesper-term 130 and vesper-ffi 44.
 - **New tests:**
   - `SelectionTest`, `SearchTest` and the frame-mark cases in `FrameTest`;
   - the `selection.txt` conformance cases;

@@ -2,7 +2,7 @@
 
 ## What was done
 
-`vesper-term` now holds the picture during synchronized output, finds the damage between two pictures and copies the viewport into a UI-owned frame, ported from the Rust `vesper-term` T9 at 69d9be4.
+`vesper-term` now holds the picture during synchronized output, finds the damage between two pictures and copies the viewport into a UI-owned frame, ported from the Rust `term` crate T9 at 69d9be4.
 
 - `Sync.kt`: `SyncGate` with Alacritty's caps, `MAX_SYNC_BYTES` (2 MiB) and `MAX_SYNC_HOLD` (150 ms). `Terminal.syncHeld(now)` and `syncDeadline` tell the I/O thread whether to wake the UI and how long it may sleep; past either cap the hold ends and DECRQM reports mode 2026 as reset. A full reset ends the hold too.
 - `Damage.kt`: `RowStamp(id, generation)`, `Scroll(start, end, from)` and `Damage.compute(old, new, full)`. A row found unchanged elsewhere joins a coalesced scroll; any other changed row is dirty. A first picture, a resize or a screen switch is full damage. `Terminal.scrollDisplay(delta)` moves the viewport, and viewport scrolls come out as scroll damage like region scrolls.

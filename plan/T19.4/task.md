@@ -24,9 +24,9 @@ Done when golden tests cover each protocol end to end and `./gradlew check` pass
 
 - The Rust core this module replaced already did this work. Its `images.rs` of its `term` crate, its tests and `frame.rs` of its `ffi` crate are in this repository's history (`git show 677ad4c^:crates/vesper-term/src/images.rs`, checked 2026-11-23). This task ports that design, not its code.
 - The hosts already read the old layout:
-  - `windows/Scull.Core/FrameView.cs` reads `tt_frame_view.placements`, `tt_placement` and `tt_image_pixels(image, &w, &h, &stride)`;
-  - `macos/Sources/ScullKit/Renderer/ImageLayer.swift` keys textures on `(image, generation)`.
-- The Kotlin header has none of it yet, and no C# binding is generated from it. `Scull.Core.csproj` still links the deleted Rust `NativeMethods.g.cs`, so wiring the C# binding generator stays with T17.
+  - `windows/Vesper.Core/FrameView.cs` reads `tt_frame_view.placements`, `tt_placement` and `tt_image_pixels(image, &w, &h, &stride)`;
+  - `macos/Sources/VesperKit/Renderer/ImageLayer.swift` keys textures on `(image, generation)`.
+- The Kotlin header has none of it yet, and no C# binding is generated from it. `Vesper.Core.csproj` still links the deleted Rust `NativeMethods.g.cs`, so wiring the C# binding generator stays with T17.
 - kitty keeps a separate image store per screen, each with a quota of 320 MB. Source: https://sw.kovidgoyal.net/kitty/graphics-protocol/, "Image persistence and storage quotas" (checked 2026-11-23).
 
 ## Decisions
@@ -70,11 +70,11 @@ Done when golden tests cover each protocol end to end and `./gradlew check` pass
    - `FramePlacement` and `Frame.placements`, the visible placements in viewport rows, lowest `z` first;
    - rows under a changed placement go into `dirty`.
 4. C ABI:
-   - `tt_placement`, `tt_image`, `tt_image_pixels` and the frame view fields in `scull.h`, ABI 0.4;
+   - `tt_placement`, `tt_image`, `tt_image_pixels` and the frame view fields in `vesper.h`, ABI 0.4;
    - `FrameExports` fills them and pins the pixels;
    - `tt_term_resize` passes the cell size.
 5. Tests:
    - `ImagesTest` in `vesper-term`: a golden run per protocol, cursor moves, scroll and eviction, ED 2 and ED 3, the alternate screen, reflow, RIS, the kitty replies and frame placements;
    - an FFI test in Kotlin;
    - no new host program: native code is written in Zig first, and the Zig host harness (T901, PR #23) is not on this branch's base yet. The existing C programs still build against the new header under both sanitizers, and the export of `tt_image_pixels` is checked with `nm`. An `images.zig` host test follows once both are in `main`.
-6. Verify: `./gradlew ktlintFormat`, then `./gradlew check` on macOS, and the vesper-term, vesper-image and scull-ffi tests on Linux in Colima.
+6. Verify: `./gradlew ktlintFormat`, then `./gradlew check` on macOS, and the vesper-term, vesper-image and vesper-ffi tests on Linux in Colima.

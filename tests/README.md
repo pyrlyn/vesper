@@ -10,7 +10,7 @@ needs no pixels, no timing and no host interaction.
 
 esctest2 (<https://github.com/ThomasDickey/esctest2>, `LICENSE` at commit
 `2798f12149a19c3295e9b4853ab2da4b2eff1b2b`, checked 2026-09-13) is GPL-2.0
-only. That is not compatible with Scull's GPL-3.0-or-later, so no esctest2
+only. That is not compatible with Vesper's GPL-3.0-or-later, so no esctest2
 code or data is copied. Each case here is our own fixture, written from the
 behaviour an esctest2 test describes, and names that test in its `source:`
 line so a reader can compare. vttest (<https://invisible-island.net/vttest/>)

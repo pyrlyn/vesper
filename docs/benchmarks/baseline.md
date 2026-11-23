@@ -6,7 +6,7 @@ Reproduce with `./gradlew :vesper-bench:runReleaseExecutableMacosArm64` (or `Lin
 
 | terminal | status | bytes | seconds | MiB/s |
 | --- | --- | --- | --- | --- |
-| scull stub | ok | 1000000 | 0.003491 | 273.19 |
+| vesper stub | ok | 1000000 | 0.003491 | 273.19 |
 | kitty | not installed | 1000000 | - | - |
 | WezTerm | not installed | 1000000 | - | - |
 | Alacritty | not installed | 1000000 | - | - |

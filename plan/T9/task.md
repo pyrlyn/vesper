@@ -12,7 +12,7 @@ Row damage and scroll damage; mode 2026 with byte and time caps; a UI-owned fram
 
 ## Findings
 
-- The design is the Rust `vesper-term` T9 at 69d9be4 (commits b8fee66, 11d3ae3, 4308c21, f539f4c: `sync.rs`, `damage.rs`, `frame.rs`), ported.
+- The design is the Rust `term` crate T9 at 69d9be4 (commits b8fee66, 11d3ae3, 4308c21, f539f4c: `sync.rs`, `damage.rs`, `frame.rs`), ported.
 - No grid change is needed: every `vesper-grid` `Row` already has a stable `RowId` and a `generation` bumped by each visible change. Two pictures' `(id, generation)` stamps give the damage: a row whose id shows up elsewhere with the same generation moved unchanged (scroll damage), any other changed row is dirty. Matching on ids makes region scrolls, full-screen scrolls and viewport scrolling one case.
 - Mode 2026 holds only the frame; the bytes reach the grid at once (foot, Contour). The caps are Alacritty's: 2 MiB and 150 ms; past either the hold ends and DECRQM reads the mode as reset. The clock is passed in, so tests are deterministic.
 - Row ids are unique per grid only, so a screen switch repaints everything.

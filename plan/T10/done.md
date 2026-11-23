@@ -4,7 +4,7 @@ The C ABI of the Kotlin/Native core, in PR https://github.com/pyrlyn/vesper/pull
 
 ## What was done
 
-- `scull-ffi/include/scull.h`, hand-written, is the source of truth.
+- `vesper-ffi/include/vesper.h`, hand-written, is the source of truth.
   - It keeps the Rust ABI's names, layouts and numbering (`tt_*`, `TT_ABI_VERSION`, now 0.1).
   - The exports compile against it through cinterop (`TT_TYPES_ONLY` hides the prototypes), so a layout that drifts fails the build.
 - Exports: `tt_abi_version`, `tt_term_new`, `tt_term_spawn`, `tt_term_feed`, `tt_term_write`, `tt_term_resize_begin`, `tt_term_resize`, `tt_term_poll_event`, `tt_term_event_text`, `tt_term_free`, `tt_frame_new`, `tt_frame_update`, `tt_frame_free`.
@@ -22,9 +22,9 @@ The C ABI of the Kotlin/Native core, in PR https://github.com/pyrlyn/vesper/pull
 
 ## How it was checked
 
-- 29 Kotlin/Native tests in `scull-ffi`: every status, poisoning, struct sizes, frame contents, events, spawn and wakeup coalescing.
+- 29 Kotlin/Native tests in `vesper-ffi`: every status, poisoning, struct sizes, frame contents, events, spawn and wakeup coalescing.
   - A mutation that drops the coalescing makes its test fail.
-- `tests/c/two_threads.c` and `tests/c/status.c` pass under ASan+UBSan and under TSan on macOS (`:scull-ffi:cTests`, part of `check`).
+- `tests/c/two_threads.c` and `tests/c/status.c` pass under ASan+UBSan and under TSan on macOS (`:vesper-ffi:cTests`, part of `check`).
 - `./gradlew ktlintFormat check` is green on macOS: 335 tests, 0 failures.
 - On Linux in Colima the Kotlin tests pass, and so do both C programs without sanitizers.
   - Colima's amd64 emulation kills even an empty sanitized program, so the Linux sanitizer run is CI's.

@@ -9,7 +9,7 @@ codeql:
 snyk:
   enabled: false
 
-# .NET (if any) is built and tested by the local ci.yml.
+# No .NET in this repository.
 dotnet:
   enabled: false
 

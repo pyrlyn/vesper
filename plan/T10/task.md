@@ -8,17 +8,17 @@ agent: Claude Code / claude-opus-5-5
 
 # T10. C ABI
 
-`scull-ffi`: opaque handles, the frame API, one wakeup callback, a polled event queue, status codes, a boundary exception handler on every export with per-terminal poisoning, an ABI version check and `struct_size` in every struct. The header and C# bindings are committed and diff-checked in CI. Done when a C test program runs create, feed, update and free under the sanitizers from two threads.
+`vesper-ffi`: opaque handles, the frame API, one wakeup callback, a polled event queue, status codes, a boundary exception handler on every export with per-terminal poisoning, an ABI version check and `struct_size` in every struct. The header and C# bindings are committed and diff-checked in CI. Done when a C test program runs create, feed, update and free under the sanitizers from two threads.
 
 ## Findings
 
 - **The hosts already speak the Rust ABI.**
-  - The names are `tt_*`, the version is `TT_ABI_VERSION`, and the C# bindings are `NativeMethods` in `Scull.Native`.
-  - See `windows/Scull.Core/Abi.cs` and `macos/Sources/CScull/module.modulemap`.
+  - The names are `tt_*`, the version is `TT_ABI_VERSION`, and the C# bindings are `NativeMethods` in `Vesper.Native`.
+  - See `windows/Vesper.Core/Abi.cs` and `macos/Sources/CVesper/module.modulemap`.
   - The Kotlin ABI keeps those names, layouts and numbering, so T14 and T17 move the hosts over by pointing them at the new header.
   - The placeholder export `vesper_abi_version` becomes `tt_abi_version`.
 - **The header is hand-written, not generated.**
-  - Kotlin/Native cannot emit C structs from Kotlin code, so the direction of the Rust build flips: `scull-ffi/include/scull.h` is the source of truth.
+  - Kotlin/Native cannot emit C structs from Kotlin code, so the direction of the Rust build flips: `vesper-ffi/include/vesper.h` is the source of truth.
   - The Kotlin exports compile against the header through cinterop, so a layout that drifts from it is a compile error, not a test failure.
   - The C# bindings are generated from the header.
 - **T10 ships the subset the core has today.**
@@ -37,7 +37,7 @@ agent: Claude Code / claude-opus-5-5
 ## Execution plan
 
 1. **Handles and frame API (T10.1).**
-   - `include/scull.h` and `nativeInterop/cinterop/scull.def`, with the prototypes hidden from cinterop.
+   - `include/vesper.h` and `nativeInterop/cinterop/vesper.def`, with the prototypes hidden from cinterop.
    - `@CName` exports with one guard that catches every `Throwable`, answers `TT_PANIC` and poisons the terminal.
    - The `struct_size` rules: read `min(size, sizeof)` of an options struct, write `min(size, sizeof)` of a view.
    - An ABI check at create.
@@ -60,7 +60,7 @@ agent: Claude Code / claude-opus-5-5
 ## Status
 
 - Steps 1, 2 and 4 are done: 29 Kotlin/Native tests on macOS and Linux, the gate green.
-- `tests/c/two_threads.c` and `tests/c/status.c` pass under ASan+UBSan and TSan on macOS (`:scull-ffi:cTests`, part of `check`).
+- `tests/c/two_threads.c` and `tests/c/status.c` pass under ASan+UBSan and TSan on macOS (`:vesper-ffi:cTests`, part of `check`).
   - On Linux they pass without sanitizers in Colima: its amd64 emulation kills even an empty sanitized program. CI runs them natively.
 - The C# bindings moved to T17.1 on the creator's word: only the Windows host needs them, and it moves to this library there.
 

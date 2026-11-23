@@ -32,7 +32,7 @@
   "additionalProperties": false,
   "$defs": {
     "Action": {
-      "description": "What a binding does. The numbers are the C ABI's `TT_ACTION_*` values and\nnever change.",
+      "description": "What a binding does. The numbers never change.",
       "oneOf": [
         {
           "description": "Removes a default binding of the same chord; never in [`crate::Settings::bindings`].",

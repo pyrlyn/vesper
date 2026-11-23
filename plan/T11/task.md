@@ -12,7 +12,7 @@ One-pass reflow with tracking points for cursor, saved cursor, viewport and sele
 
 ## Findings
 
-- The design is the Rust `vesper-grid` T11 at a409a84 (`reflow.rs`, `grid/resize.rs`, the `row.rs` helpers) and the Rust `Terminal::resize` at d9e4e9a (`vesper-term/src/resize.rs`), ported. Neither is a port of Alacritty or WezTerm code: the sorted tracking-point pass is an idea from foot (`grid_resize_and_reflow`), alt-screen truncation from kitty and WezTerm, so no third-party notices apply.
+- The design is the Rust `grid` crate T11 at a409a84 (`reflow.rs`, `grid/resize.rs`, the `row.rs` helpers) and the Rust `Terminal::resize` at d9e4e9a (`vesper-term/src/resize.rs`), ported. Neither is a port of Alacritty or WezTerm code: the sorted tracking-point pass is an idea from foot (`grid_resize_and_reflow`), alt-screen truncation from kitty and WezTerm, so no third-party notices apply.
 - Kotlin T10 lists `create/feed/resize/free` for the C ABI, so `Terminal.resize` belongs here, where the reflow lands; Rust put it in its T10.2. Image re-anchoring (Rust T19.4b) waits for images.
 - `Grid.cols`, `screenRows`, `historyLimit` and the ring mask, `Row.cols` and the terminal state's size fields are fixed today and become mutable.
 

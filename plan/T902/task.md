@@ -23,7 +23,7 @@ and `./gradlew check` passes on macOS and Linux.
 2. Delete the Swift host `macos/` and the C# host `windows/`.
 3. Delete `scull-ffi` (header, exports, C tests, sanitizer tasks) and the CI step that links it.
 4. Rename `scull-*` modules to `vesper-*`, packages `scull.*` to `vesper.*`, the build-logic plugins
-   `scull.*` to `vesper.*`, `VESPER_TESTS_DIR` to `VESPER_TESTS_DIR`, and every "Scull" in the docs.
+   `scull.*` to `vesper.*`, `SCULL_TESTS_DIR` to `VESPER_TESTS_DIR`, and every "Scull" in the docs.
    Port notes that named a file of the earlier Rust core say "the earlier Rust core" instead.
 5. Rewrite `AGENTS.md`, `PLAN.md`, `README.md`, `toolchain.md` and the active tasks for Kotlin/Native
    hosts and no C ABI; close tasks that only existed for the removed parts.

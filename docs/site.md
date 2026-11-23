@@ -1,6 +1,6 @@
 ---
-title: Scull
-tagline: A terminal emulator with a Kotlin/Native core and a native interface on each platform — SwiftUI on macOS, WinUI on Windows.
+title: Vesper
+tagline: A terminal emulator written in Kotlin, with a Kotlin/Native core and a native host on each platform.
 repo: https://github.com/pyrlyn/vesper
 install: "git clone https://github.com/pyrlyn/vesper && cd vesper && mise install && ./gradlew check"
 version: "0.0.0"
@@ -10,42 +10,33 @@ order: 11
 ---
 
 <!-- Website copy for the pyrlyn project site, copied to pyrlyn/landing as
-content/projects/scull.md; front matter follows CONTENT_CONTRACT.md in that repository.
-Sources (checked 2026-11-22): README.md, PLAN.md and research.md; no release yet, hence
+content/projects/vesper.md; front matter follows CONTENT_CONTRACT.md in that repository.
+Sources (checked 2026-11-23): README.md, PLAN.md and research.md; no release yet, hence
 status. The accent is a placeholder: the repository has no brand colour yet. -->
 
 ## Overview
 
-Scull is a terminal emulator with a Kotlin/Native core and a native interface on each
-platform. The core parses, keeps state and encodes input; the platform draws text with its
-own text stack and handles windows, input methods and accessibility.
+Vesper is a terminal emulator written in Kotlin. A Kotlin/Native core parses the terminal
+stream, keeps the screen and scrollback, and encodes input; each platform gets a Kotlin/Native
+host that draws text with the platform's own text stack and handles windows, input methods and
+accessibility.
 
-Scull is in early development with no release: it is being rebuilt in Kotlin/Native. The
-SwiftUI app in `macos/` and the WinUI app in `windows/` stay in the repository and will
-link the core over a C ABI (`scull-ffi`).
+Vesper is in early development with no release: the core is built and tested, and the macOS
+and Windows hosts are next.
 
 ## Features
 
-- **Kotlin/Native core.** Parser, grid, PTY, input, Unicode, image and config modules.
-- **Native UI per platform.** SwiftUI on macOS and WinUI on Windows, over a C ABI (`scull-ffi`).
-- **Platform text stacks.** Each platform draws text, handles input methods and accessibility itself.
-- **Config schema.** A JSON Schema for the config file is generated from the code.
+- **Kotlin/Native core.** Parser, Unicode tables, grid and scrollback with reflow, PTY, input encoders, selection and search, and images (kitty, iTerm2, sixel).
+- **Native hosts in Kotlin.** AppKit, Metal and CoreText on macOS; Win32, Direct3D 11 and DirectWrite on Windows; no C ABI in between.
+- **Platform text stacks.** Each platform shapes text and handles input methods and accessibility itself; the core alone decides cell widths.
+- **Untrusted input has limits.** Every payload, table and queue the terminal stream can grow has a hard cap and a test.
 
 ## Install
 
-There is no release yet. Build from the repository (the Gradle wrapper lands in T2):
+There is no release yet. Build and test from the repository:
 
 ```bash
 git clone https://github.com/pyrlyn/vesper && cd vesper && mise install && ./gradlew check
-```
-
-## Usage examples
-
-Build the native apps (after the core library is in place):
-
-```bash
-# macOS: swift build in macos/, then assemble Scull.app
-# Windows: dotnet build windows/Scull.App/Scull.App.csproj
 ```
 
 ## Links

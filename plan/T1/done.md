@@ -14,7 +14,7 @@ Decisions. The two files agree:
 `research.md`'s opening line also names the Kotlin/Native core.
 
 One sentence was stale. `AGENTS.md` said T17 would pick the C# interop library, but §8 and §6.1
-record the choice of Microsoft.Windows.CsWin32. `windows/Scull.App` and `windows/Scull.Render`
+record the choice of Microsoft.Windows.CsWin32. `windows/Vesper.App` and `windows/Vesper.Render`
 pin it at 0.3.358, and `toolchain.md` lists it. `AGENTS.md` now names it.
 
 How it was checked: the two decision lists were compared line by line, and `git grep` found

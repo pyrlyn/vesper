@@ -19,7 +19,7 @@
     - A pending wrap survives only a change of height.
     - The margins reset, and `TabStops.resize` keeps the stops already set and gives new columns the power-on ones.
   - The KDoc states the contract for the C ABI (T10): during an interactive resize, pause PTY reads with `Pty.pauseOutput`, keep drawing the last frame, then resize once with the final size.
-- Ported from the Rust design (scull a409a84, d9e4e9a). Reused: `Random.stream()` and the screen helpers in the `vesper-term` test support, and the grid's existing link spans, `breakWideEdges` and `compact`.
+- Ported from the Rust design (the Rust core at a409a84, d9e4e9a). Reused: `Random.stream()` and the screen helpers in the `vesper-term` test support, and the grid's existing link spans, `breakWideEdges` and `compact`.
 
 ## Commits
 
