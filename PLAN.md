@@ -102,7 +102,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 - [x] **T4.** Parser: bulk scanner in front of a table state machine, hard caps, fuzz target.
 - [x] **T5.** Unicode tables: generated width and grapheme-break tables, mode 2027.
 - [x] **T6.** Grid and scrollback: fixed cells, interning, power-of-two ring.
-- [ ] **T7.** Terminal state: modes, cursor, SGR, alt screen, device reports.
+- [x] **T7.** Terminal state: modes, cursor, SGR, alt screen, device reports.
 - [ ] **T22.** No-op link clears are generation-neutral.
 - [ ] **T23.** Interner marks/sweep contract.
 - [ ] **T24.** Harness wrap vs xterm deferred DECAWM.
