@@ -3,9 +3,17 @@ package scull.term
 import scull.grid.Grid
 import scull.grid.Style
 import scull.input.ByteSink
+import scull.input.Key
 import scull.input.KeyEvent
 import scull.input.KeyModes
+import scull.input.MouseAction
+import scull.input.MouseButton
+import scull.input.MouseEvent
+import scull.input.MouseModes
+import scull.input.MouseTracking
 import scull.input.encodeKey
+import scull.input.encodeMouse
+import scull.input.encodePaste
 import scull.parser.Parser
 import scull.unicode.WidthOptions
 import kotlin.time.TimeSource
@@ -145,4 +153,47 @@ public class Terminal(
         text: String,
         out: ByteSink,
     ): Unit = scull.input.encodeText(text, out)
+
+    /** The mouse tracking and encoding the program asked for. */
+    public fun mouseModes(): MouseModes = state.modes.mouse
+
+    /** Appends pasted text, bracketed while the program asked for it (`?2004`). */
+    public fun encodePaste(
+        text: String,
+        out: ByteSink,
+    ): Unit = encodePaste(text, state.modes.bracketedPaste, out)
+
+    /** Appends a focus report while the program asked for them (`?1004`). */
+    public fun encodeFocus(
+        focused: Boolean,
+        out: ByteSink,
+    ) {
+        if (state.modes.focusEvents) scull.input.encodeFocus(focused, out)
+    }
+
+    /**
+     * Appends what the program gets for a mouse event and says whether the program took it: always
+     * while it tracks the mouse, and for a wheel step that alternate scroll (`?1007`) turns into a
+     * cursor key on the alternate screen. False leaves the event to the UI, which selects or
+     * scrolls the history.
+     */
+    public fun encodeMouse(
+        event: MouseEvent,
+        out: ByteSink,
+    ): Boolean {
+        val modes = state.modes
+        if (modes.mouse.tracking != MouseTracking.Off) {
+            encodeMouse(event, modes.mouse, out)
+            return true
+        }
+        if (!(state.altActive && modes.alternateScroll) || event.action != MouseAction.Press) return false
+        val key =
+            when (event.button) {
+                MouseButton.WheelUp -> Key.Up
+                MouseButton.WheelDown -> Key.Down
+                else -> return false
+            }
+        encodeKey(KeyEvent(key), out)
+        return true
+    }
 }

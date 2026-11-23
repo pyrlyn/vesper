@@ -180,9 +180,9 @@ class TerminalTest {
     }
 
     @Test
-    fun mouseAndKeyboardModesAreNotRecognisedYet() {
+    fun mouseModesAreRecognised() {
         val term = Terminal(10, 5, 0)
         term.feed("$CSI?1000h$CSI?1000\$p$CSI?1006\$p$CSI?2027\$p")
-        assertEquals("$CSI?1000;0\$y$CSI?1006;0\$y$CSI?2027;2\$y", term.takeReplies().decodeToString())
+        assertEquals("$CSI?1000;1\$y$CSI?1006;2\$y$CSI?2027;2\$y", term.takeReplies().decodeToString())
     }
 }
