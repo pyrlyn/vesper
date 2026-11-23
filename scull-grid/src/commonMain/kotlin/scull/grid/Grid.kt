@@ -27,6 +27,9 @@ public const val MAX_RING_ROWS: Int = 1 shl 17
 private const val SWEEP_DIVISOR = 8
 private const val NO_CLUSTER = -1
 
+/** Index of the cursor among a resize's spots. */
+private const val CURSOR = 0
+
 /** The screen and its scrollback in one ring: [cols] by [screenRows], keeping up to [historyLimit] history rows. */
 public class Grid(
     cols: Int,
@@ -42,13 +45,20 @@ public class Grid(
         require(scrollback >= 0) { "scrollback $scrollback" }
     }
 
-    public val cols: Int = cols
-    public val screenRows: Int = screenRows
+    public var cols: Int = cols
+        private set
+    public var screenRows: Int = screenRows
+        private set
+
+    /** The scrollback asked for, so a resize can clamp the history limit again. */
+    private val scrollback = scrollback
 
     /** History rows kept at most: the scrollback asked for, clamped so screen plus history fit [MAX_RING_ROWS]. */
-    public val historyLimit: Int = scrollback.coerceAtMost(MAX_RING_ROWS - screenRows)
+    public var historyLimit: Int = scrollback.coerceAtMost(MAX_RING_ROWS - screenRows)
+        private set
 
-    internal val mask: Int = ceilPowerOfTwo(screenRows + historyLimit) - 1
+    internal var mask: Int = ceilPowerOfTwo(screenRows + historyLimit) - 1
+        private set
     internal val rows = ArrayList<Row>(screenRows)
     internal var zero = 0
         private set
@@ -145,6 +155,107 @@ public class Grid(
     }
 
     /**
+     * Resizes to [cols] by [screenRows] and moves [cursor] and every point in [points] with its cell.
+     *
+     * With [Reflow.REWRAP] and a new width, history and screen are rewrapped together in one pass:
+     * soft-wrapped rows (see [Row.wrapped], set by whoever wraps) are joined into lines and cut again,
+     * wide characters move whole to the next row behind a [CellFlags.LEADING_SPACER], and styles,
+     * clusters and links travel with their cells. A row that starts where an old row started keeps
+     * that row's id, and its generation when its content is unchanged; every other row gets a fresh
+     * id. A frame repaints everything after a resize anyway.
+     *
+     * Then trailing blank rows below every point are dropped, the cursor's row is kept on the screen
+     * (rows that do not fit below it are lost), the screen is the last [screenRows] rows, and history
+     * keeps at most the configured scrollback, evicting the oldest rows. A scrolled-back viewport stays
+     * on the line at its top. The cursor ends on the screen; other points (a saved cursor among them)
+     * may end in history, and the caller clamps those that must be on the screen.
+     *
+     * The sizes come from the UI and are untrusted: a size outside 1..[MAX_COLS] by 1..[MAX_RING_ROWS]
+     * throws [IllegalArgumentException] and changes nothing, and a point outside the grid is clamped
+     * into it first and reported as clamped. The same size moves nothing.
+     */
+    public fun resize(
+        cols: Int,
+        screenRows: Int,
+        reflow: Reflow,
+        cursor: TrackPoint,
+        points: List<TrackPoint> = emptyList(),
+    ): Tracked {
+        require(cols in 1..MAX_COLS && screenRows in 1..MAX_RING_ROWS) { "a grid of $cols x $screenRows" }
+        val total = historyLength + this.screenRows
+        val viewport = displayOffset > 0
+        val spots = ArrayList<Spot>(points.size + 2)
+        spots += cursor.clampIn(total, this.cols)
+        // The viewport follows the line at its top, right after the cursor.
+        if (viewport) spots += TrackPoint((historyLength - displayOffset).coerceAtLeast(0), 0).clampIn(total, this.cols)
+        points.mapTo(spots) { it.clampIn(total, this.cols) }
+        if (cols != this.cols || screenRows != this.screenRows) {
+            val old = takeRows(total)
+            val laid = if (reflow == Reflow.REWRAP && cols != this.cols) rewrap(old, cols, spots, ::freshId) else truncate(old, cols, spots)
+            layOut(laid, cols, screenRows, spots)
+            if (viewport) displayOffset = (historyLength - spots[1].row).coerceAtLeast(0)
+        }
+        val done = spots.map { TrackPoint(it.row, it.col, it.lost) }
+        return Tracked(done[0], done.subList(if (viewport) 2 else 1, done.size))
+    }
+
+    /** Every live row, oldest first, out of the ring. */
+    private fun takeRows(total: Int): Array<Row?> {
+        val old = Array<Row?>(total) { rows[phys(it)] }
+        rows.clear()
+        return old
+    }
+
+    /** Splits [laid] into history and screen and installs them as the ring. */
+    private fun layOut(
+        laid: ArrayList<Row>,
+        cols: Int,
+        screen: Int,
+        spots: List<Spot>,
+    ) {
+        val lowestPoint = spots.maxOf { it.row }
+        var blankTail = 0
+        while (laid.size - 1 - blankTail > lowestPoint && laid[laid.size - 1 - blankTail].isBlank) blankTail++
+        // Blank rows go only where they would push content into history.
+        val keep = maxOf(laid.size - blankTail, minOf(laid.size, screen))
+        laid.subList(keep, laid.size).clear()
+        val fits = spots[CURSOR].row + screen
+        if (laid.size > fits) {
+            laid.subList(fits, laid.size).clear()
+            releasedSinceSweep += keep - fits
+            for (s in spots) {
+                if (s.row >= fits) {
+                    s.row = fits - 1
+                    s.col = cols - 1
+                    s.lost = true
+                }
+            }
+        }
+        while (laid.size < screen) laid += Row(freshId(), cols)
+        val limit = scrollback.coerceAtMost(MAX_RING_ROWS - screen)
+        val evicted = (laid.size - screen - limit).coerceAtLeast(0)
+        laid.subList(0, evicted).clear()
+        releasedSinceSweep += evicted
+        for (s in spots) {
+            if (s.row < evicted) {
+                s.row = 0
+                s.col = 0
+                s.lost = true
+            } else {
+                s.row -= evicted
+            }
+        }
+        historyLength = laid.size - screen
+        historyLimit = limit
+        mask = ceilPowerOfTwo(screen + limit) - 1
+        zero = 0
+        rows.addAll(laid)
+        this.cols = cols
+        screenRows = screen
+        displayOffset = 0
+    }
+
+    /**
      * The id of [style]. When the table is full, unused styles are swept first if that pays off:
      * after an eighth of the cap in inserts, or an eighth of the ring in recycled rows, since the
      * last sweep.
@@ -174,7 +285,7 @@ public class Grid(
 
     internal fun phys(logical: Int): Int = (zero + logical) and mask
 
-    private fun freshId(): RowId = RowId(++nextId)
+    internal fun freshId(): RowId = RowId(++nextId)
 
     private fun advance(fill: Cell) {
         if (historyLimit > 0) rows[phys(historyLength)].compact()

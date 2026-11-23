@@ -24,8 +24,8 @@ internal class SavedCursor(
     val charsets: Charsets,
 )
 
-private const val MAIN_SLOT = 0
-private const val ALT_SLOT = 1
+internal const val MAIN_SLOT = 0
+internal const val ALT_SLOT = 1
 
 private fun clearScreen(grid: Grid) {
     for (r in 0 until grid.screenRows) grid.screenRow(r)?.clear(Cell.EMPTY)

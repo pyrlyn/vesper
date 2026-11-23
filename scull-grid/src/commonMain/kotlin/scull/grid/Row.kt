@@ -58,7 +58,8 @@ public class Row(
     public var generation: Int = 0
         private set
 
-    public val cols: Int = cols
+    public var cols: Int = cols
+        private set
 
     /** Whether the line continues in the next row (soft wrap), for reflow and copy. */
     public var wrapped: Boolean = false
@@ -292,6 +293,48 @@ public class Row(
         spans?.trimToSize()
     }
 
+    /** The cell standing for every column past the stored prefix. */
+    internal val fillCell: Cell get() = fill
+
+    /**
+     * Whether the fill is erased space rather than text. Only then may the columns it stands for be
+     * dropped and padded again at another width; a row compacted into a uniform run of `z` keeps its `z`s.
+     */
+    internal val fillIsBlank: Boolean get() = fill.isEmpty && fill.flags == 0
+
+    /** Columns a reflow must carry: up to the last cell that differs from a blank fill, or the whole row when the fill shows text. */
+    internal val contentLength: Int get() = if (fillIsBlank) storedLength() else cols
+
+    /** Never written since it was blanked: reflow may drop it from the bottom of the screen without losing anything a frame shows. */
+    internal val isBlank: Boolean get() = storedLength() == 0 && fill == Cell.EMPTY && !wrapped && spans == null
+
+    /** Whether [other] shows the same cells, links and wrap, whatever the widths: a reflowed row that passes keeps its generation. */
+    internal fun sameContent(other: Row): Boolean {
+        val length = storedLength()
+        if (wrapped != other.wrapped || fill != other.fill || links != other.links || length != other.storedLength()) return false
+        return (0 until length).all { cells[it] == other.cells[it] }
+    }
+
+    /** Bumps the generation for a change made outside the cell setters. */
+    internal fun markChanged() = touch()
+
+    /** Changes the width without rewrapping (the alt screen): a narrower row loses its tail and a wide character cut in half, a wider one pads. */
+    internal fun setCols(newCols: Int) {
+        require(newCols in 0..MAX_COLS) { "a row of $newCols columns" }
+        if (newCols > cols && !fillIsBlank) {
+            // The fill shows text only up to the old edge; the new columns are blank.
+            materialize(cols)
+            fill = Cell.EMPTY
+        } else if (newCols < cols) {
+            val lost = storedLength() > newCols || !fillIsBlank
+            breakWideEdges(newCols, newCols)
+            len = len.coerceAtMost(newCols)
+            dropLinks(newCols, cols)
+            if (lost) touch()
+        }
+        cols = newCols
+    }
+
     /** Marks every style and cluster this row refers to, for a sweep. */
     public fun mark(
         styles: Marks,
@@ -308,6 +351,28 @@ public class Row(
     ) {
         styles.mark(cell.style.value)
         if (cell.isCluster) clusters.mark(cell.clusterId.value)
+    }
+
+    internal companion object {
+        /** A row reflow assembled from the first [length] of [cells] and [links] it already laid out. */
+        fun rebuilt(
+            id: RowId,
+            generation: Int,
+            cols: Int,
+            wrapped: Boolean,
+            fill: Cell,
+            cells: LongArray,
+            length: Int,
+            links: List<LinkSpan>,
+        ): Row =
+            Row(id, cols, fill).apply {
+                this.wrapped = wrapped
+                this.generation = generation
+                this.cells = cells
+                len = length
+                if (links.isNotEmpty()) spans = ArrayList(links)
+                compact()
+            }
     }
 
     private fun shift(

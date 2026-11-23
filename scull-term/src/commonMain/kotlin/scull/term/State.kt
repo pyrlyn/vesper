@@ -47,10 +47,11 @@ internal class State(
     var alt: Grid,
     val width: WidthOptions,
 ) : Handler {
-    val cols: Int = grid.cols
-    val rows: Int = grid.screenRows
-    val lastCol: Int = cols - 1
-    val lastRow: Int = rows - 1
+    // Fields, not getters on the grid: the print path reads them per character. Only resize sets them.
+    var cols: Int = grid.cols
+    var rows: Int = grid.screenRows
+    var lastCol: Int = cols - 1
+    var lastRow: Int = rows - 1
 
     var altActive = false
 

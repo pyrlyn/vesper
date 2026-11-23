@@ -63,6 +63,24 @@ public class Terminal(
         sync.reset()
     }
 
+    /**
+     * Resizes both screens to [cols] by [rows]. The primary screen and its scrollback are rewrapped in
+     * one pass and the alternate screen is cut or padded; the cursor and both saved cursors follow
+     * their cells. The margins reset, the tab stops set so far are kept and new columns get the
+     * power-on ones, and a pending wrap survives only a change of height. The same size is a no-op.
+     *
+     * Contract for the C ABI (T10): during an interactive resize the host pauses PTY reads
+     * (Pty.pauseOutput) and keeps drawing the last frame, then calls this once with the final size,
+     * resizes the PTY and resumes reads. A rewrap per drag step would cost a pass over all history each
+     * step and, at a narrow intermediate width, could push lines past the history cap for good.
+     *
+     * @throws IllegalArgumentException when a size is zero or past what a sequence can address; nothing changes then.
+     */
+    public fun resize(
+        cols: Int,
+        rows: Int,
+    ): Unit = state.resize(cols, rows)
+
     /** Moves the viewport [delta] rows back into history (negative: towards the screen), clamped to what history holds. */
     public fun scrollDisplay(delta: Int): Unit = state.grid.scrollDisplay(delta)
 
