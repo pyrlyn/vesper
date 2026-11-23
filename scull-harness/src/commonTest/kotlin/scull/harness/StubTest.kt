@@ -2,6 +2,7 @@ package scull.harness
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class StubTest {
     @Test
@@ -35,6 +36,23 @@ class StubTest {
     @Test
     fun newlineCarriageReturnAndIgnoredControlsMatchTheirGoldenSnapshot() {
         assertGolden(byteArrayOf(*"ab\ncd\rX".encodeToByteArray(), 0x00, 0x1B, 'Y'.code.toByte()), "controls.txt")
+    }
+
+    @Test
+    fun aGoldenFrameOfTheWrongShapeIsRefused() {
+        assertEquals(listOf("ab", "  "), parseGolden("ok", "2 2\nab\n  \n").lines)
+        assertEquals(listOf("ab"), parseGolden("crlf", "2 1\r\nab\r\n").lines)
+        val malformed =
+            listOf(
+                "2\nab\n",
+                "0 1\n\n",
+                "x 1\nab\n",
+                "2 2\nab\n",
+                "2 1\nab",
+                "2 1\nab\ncd\n",
+                "3 1\nab\n",
+            )
+        for (text in malformed) assertFailsWith<IllegalArgumentException>(text) { parseGolden("bad", text) }
     }
 
     @Test
