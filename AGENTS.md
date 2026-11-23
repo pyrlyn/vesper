@@ -27,7 +27,7 @@ If an `AGENTS.md` or `CLAUDE.md` exists higher in the tree, follow it too; on co
 Settled by the creator; reasons are in `research.md` §8.
 
 - The structural reference named "Wrapp" in the brief is Warp.
-- **Windows host:** C# only (WinUI 3), shell and surface alike. No C++/WinRT component. Direct3D, DirectWrite, TSF and UIA are reached from C# through an interop library that T17 picks.
+- **Windows host:** C# only (WinUI 3), shell and surface alike. No C++/WinRT component. Direct3D, DirectWrite, TSF and UIA are reached from C# through Microsoft.Windows.CsWin32, the library T17 picked (`research.md` §6.1).
 - **VT core:** our own Kotlin/Native state and grid. libghostty-vt is not embedded.
 - **PTY:** inside the core, through Kotlin/Native cinterop (POSIX PTY on Unix, ConPTY on Windows).
 - **Minimum macOS:** 26. No fallbacks for older systems.

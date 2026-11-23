@@ -92,7 +92,7 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 
 ### Phase 0: decisions and skeleton
 
-- [ ] **T1.** Reaffirm `research.md` §8; record that the VT core is Kotlin/Native.
+- [x] **T1.** Reaffirm `research.md` §8; record that the VT core is Kotlin/Native.
 - [x] **T2.** Gradle KMP workspace, seven modules, pinned JDK 21, ktlint, `./gradlew check`, CI skeleton.
 
 ### Phase 1: harness
