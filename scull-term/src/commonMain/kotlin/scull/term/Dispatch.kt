@@ -38,9 +38,11 @@ private const val DA_REQUEST = 0
 
 private const val PRIVATE_DEC = '?'.code
 private const val PRIVATE_SECONDARY = '>'.code
+private const val PRIVATE_LESS = '<'.code
+private const val PRIVATE_EQUALS = '='.code
 
 /** The flat index of parameter [index], sub-parameters skipped, or -1. */
-private fun paramAt(
+internal fun paramAt(
     params: Params,
     index: Int,
 ): Int {
@@ -177,7 +179,9 @@ internal fun State.dispatchCsi(csi: Csi) {
             when (csi.private) {
                 0 -> csiAnsi(csi)
                 PRIVATE_DEC -> csiDec(csi)
-                PRIVATE_SECONDARY -> if (final == 'c' && arg(p, 0, DA_REQUEST) == DA_REQUEST) secondaryAttributes()
+                PRIVATE_SECONDARY -> csiSecondary(csi)
+                PRIVATE_LESS -> if (final == 'u') kittyPop(p)
+                PRIVATE_EQUALS -> if (final == 'u') kittySet(p)
             }
         }
 
@@ -336,6 +340,17 @@ private fun State.csiAnsi(csi: Csi) {
     }
 }
 
+/** Control sequences with the `>` marker and no intermediate. */
+private fun State.csiSecondary(csi: Csi) {
+    val p = csi.params
+    when (csi.finalByte.toChar()) {
+        'c' -> if (arg(p, 0, DA_REQUEST) == DA_REQUEST) secondaryAttributes()
+        'm' -> setKeyModifierOptions(p)
+        'n' -> disableKeyModifierOptions(p)
+        'u' -> kittyPush(p)
+    }
+}
+
 /** Control sequences with the `?` marker and no intermediate. */
 private fun State.csiDec(csi: Csi) {
     val p = csi.params
@@ -355,6 +370,10 @@ private fun State.csiDec(csi: Csi) {
 
         'n' -> {
             deviceStatus(arg(p, 0, 0), private = true)
+        }
+
+        'u' -> {
+            kittyQuery()
         }
     }
 }
