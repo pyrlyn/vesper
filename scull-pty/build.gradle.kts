@@ -26,3 +26,14 @@ kotlin {
         all { languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi") }
     }
 }
+
+tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
+    testLogging {
+        events("failed", "standard_out", "standard_error")
+        showStandardStreams = true
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+}
