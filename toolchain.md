@@ -20,6 +20,12 @@
 
 The PTY bindings (POSIX PTY, ConPTY) need no package: `scull-pty` declares them in its own cinterop `.def` files, compiled by the clang that ships with Kotlin/Native (`plan/T8/task.md` says why). A fuzz/property-test runner is chosen and recorded here in T25.
 
+## Kotlin/Native platform libraries
+
+| Package | Where | Source | Why here |
+| --- | --- | --- | --- |
+| `platform.zlib` | local (`scull-png`; ships with the Kotlin/Native distribution, links the system `libz` on macOS and Linux and a static copy on `mingwX64`) | https://github.com/madler/zlib | Inflate, deflate and CRC-32 for the PNG decoder and its fixture encoder |
+
 ## Gradle
 
 | Package | Where | Source | Why here |
