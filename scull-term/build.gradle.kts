@@ -8,6 +8,11 @@ kotlin {
             api(projects.scullParser)
             api(projects.scullGrid)
             api(projects.scullInput)
+            api(projects.scullUnicode)
+        }
+        commonTest.dependencies {
+            // Reads the conformance cases in tests/fixtures.
+            implementation(projects.scullHarness)
         }
     }
 }

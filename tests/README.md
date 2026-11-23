@@ -1,8 +1,8 @@
 # scull-term conformance fixtures
 
-The harness (T3) replays every case in `tests/fixtures/*.txt` against a fresh
-`Terminal` and compares what the case names: screen text, cursor, cell
-styles, scrollback length and, from T7.2, reply bytes. A headless core can
+`ConformanceTest` in `scull-term` replays every case of the files listed under
+T7.1 and T7.2 against a fresh `Terminal` and compares what the case names:
+screen text, cursor, cell styles, scrollback length and, from T7.2, reply bytes. A headless core can
 check all of these, so the subset is the part of esctest2 and vttest that
 needs no pixels, no timing and no host interaction.
 
@@ -80,7 +80,7 @@ The reply queue cap and the no-exception property are unit tests in
 | `shell.txt` | OSC 0/1/2 titles, coalesced BEL, OSC 7, OSC 133, OSC 52 read and write, OSC 8 per-row spans | xterm ctlseqs; OSC 8 hyperlink spec; iTerm2 escape codes; VS Code shell integration |
 
 `events:` and `links:` are optional blocks in the same `|…|` shape as
-`screen:`. An event line is what `poll_event` returns, in order. A link
+`screen:`. An event line is what `pollEvent` returns, in order. A link
 line is `ROW START..END=ID` for one span on a screen row (row 1-based,
 columns 0-based and half-open). A clipboard read is denied or answered in `scull-term` OSC tests.
 
