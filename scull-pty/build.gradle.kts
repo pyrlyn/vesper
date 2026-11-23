@@ -29,8 +29,7 @@ kotlin {
 
 tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
     testLogging {
-        events("failed", "standard_out", "standard_error")
-        showStandardStreams = true
+        events("failed", "standard_error")
         showExceptions = true
         showCauses = true
         showStackTraces = true
