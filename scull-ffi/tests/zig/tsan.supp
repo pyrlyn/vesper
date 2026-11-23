@@ -1,4 +1,4 @@
-# ThreadSanitizer suppressions for the C tests.
+# ThreadSanitizer suppressions for the host tests.
 #
 # The Kotlin/Native runtime is not built with TSan, so the collector's sweep (on the "Main GC
 # thread") clearing freed blocks under its own lock looks like a race with the later allocation

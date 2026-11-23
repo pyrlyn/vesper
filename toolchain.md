@@ -8,11 +8,12 @@
 | Gradle | the wrapper (`./gradlew`, 9.9.2 with a pinned SHA-256 in `gradle/wrapper/gradle-wrapper.properties`) | Builds the Kotlin/Native core; `./gradlew check` (ktlint and the native tests) is the merge gate | https://github.com/gradle/gradle |
 | Kotlin/Native | the Kotlin Gradle plugin (`gradle/libs.versions.toml`); Gradle downloads the compiler into `~/.konan` | Compiles the core for `macosArm64`, `linuxX64` and `mingwX64`; a macOS host cross-links all three, tests run only on the host's own target | https://github.com/JetBrains/kotlin |
 | ktlint | the ktlint Gradle plugin runs the version pinned in `gradle/libs.versions.toml` | Formatting and lint of every Kotlin source and build script, part of `check` | https://github.com/pinterest/ktlint |
-| mise | brew, then `mise install` | Pins the JDK and lint tools for local work and CI | https://github.com/jdx/mise |
+| mise | brew, then `mise install` | Pins the JDK, Zig and lint tools for local work and CI | https://github.com/jdx/mise |
 | jactionlint | mise (`mise.toml` pins `github:jdx/jactionlint` 2.0.2) | Lint the workflows (the `jactionlint` CI job, the pre-push hook and `mise x -- jactionlint`) | https://github.com/jdx/jactionlint |
 | hk | mise (`mise.toml` pins 2.5.0) | Runs jactionlint as a pre-push hook (`hk.pkl`) | https://github.com/jdx/hk |
 | shellcheck | mise (`mise.toml` pins 0.11.0; CI uses the runner image's copy) | Checks `run:` scripts inside jactionlint | https://github.com/koalaman/shellcheck |
-| clang | system (Xcode Command Line Tools; the `clang` package on Linux, preinstalled on the CI image) | Builds `scull-ffi/tests/c` against the shared library and runs it under ASan+UBSan and TSan (`:scull-ffi:cTests`, part of `check` on macOS and Linux) | https://github.com/llvm/llvm-project |
+| Zig | mise (`mise.toml` pins 0.17.1) | Translates `scull.h` and builds the host programs in `scull-ffi/tests/zig` against the shared library, under TSan and as objects for the ASan link (`:scull-ffi:hostTests`, part of `check` on macOS and Linux) | https://github.com/ziglang/zig |
+| clang | system (Xcode Command Line Tools; the `clang` package on Linux, preinstalled on the CI image) | Links the Zig host programs with the ASan runtime, which Zig does not provide (`:scull-ffi:hostTests`) | https://github.com/llvm/llvm-project |
 | Xcode (Swift 6.4, SwiftPM, AppKit/SwiftUI SDK) | Mac App Store or developer.apple.com (27.0) | Build and test the macOS app in `macos/` (arm64 only) | https://developer.apple.com/xcode/ |
 | codesign | system (Xcode) | Ad-hoc signs `Scull.app` so it launches locally | https://developer.apple.com/documentation/security/code-signing-services |
 | .NET SDK (`dotnet`, C# compiler, MSBuild) | https://dot.net (pinned to 10.0.401 in `windows/global.json`; CI: `actions/setup-dotnet`) | Build and test the C# projects in `windows/` | https://github.com/dotnet/sdk |

@@ -1,8 +1,9 @@
 # Tool pins for mise users (https://mise.jdx.dev/). The Kotlin/Native toolchain itself comes from
 # the Gradle wrapper and the Kotlin Gradle plugin (see PLAN.md, phase 0); mise only provides the
-# JDK that runs Gradle and the repository lint tools.
+# JDK that runs Gradle, Zig for the C ABI host tests and the repository lint tools.
 [tools]
 java = "temurin-21" # runs Gradle and the Kotlin/Native compiler
+zig = "0.17.1" # builds scull-ffi/tests/zig, part of `check` on macOS and Linux
 # Workflow lint (hk.pkl); CI lints through the jactionlint job in ci.yml.
 "github:jdx/jactionlint" = "2.0.2" # the pre-push hook and local `mise x -- jactionlint`
 hk = "2.5.0" # runs jactionlint as a pre-push hook (hk.pkl); `mise x -- hk install --mise`

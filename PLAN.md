@@ -167,8 +167,8 @@ Each phase lists the existing `plan/T*` tasks. Every checkbox starts unchecked.
 - **Core:** Kotlin/Native tests per module, golden fixtures in the harness, property tests
   (dirty-row repaint equals a full repaint; no tracking point lost on reflow; encoders do not
   throw).
-- **C ABI:** a C program drives create/feed/update/free from two threads under ASan, UBSan and
-  TSan on Unix.
+- **C ABI:** Zig host programs drive create/feed/update/free from two threads through the
+  header's prototypes under ASan and TSan on Unix.
 - **Unicode:** `GraphemeBreakTest.txt` in full; a freshness check against pinned data files.
 - **Fuzz:** short, bounded smoke of parser and image targets in CI (T25).
 - **Platform:** `swift test` in `macos/`; `dotnet test windows/Scull.slnx` and a WinUI build on
