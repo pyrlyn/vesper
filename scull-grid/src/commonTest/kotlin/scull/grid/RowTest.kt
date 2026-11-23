@@ -102,6 +102,39 @@ class RowTest {
     }
 
     @Test
+    fun putAsciiWritesARunLikeOnePutPerByte() {
+        val bytes = "xhello!".encodeToByteArray()
+        val run = row()
+        run.put(2, ch('W'), wide = true)
+        run.put(7, ch('V'), wide = true)
+        val g0 = run.generation
+        run.putAscii(3, bytes, 1, 5, RED)
+        assertNotEquals(g0, run.generation)
+        val single = row()
+        single.put(2, ch('W'), wide = true)
+        single.put(7, ch('V'), wide = true)
+        for (i in 0 until 5) single.put(3 + i, Cell.char(bytes[1 + i].toInt(), RED))
+        assertEquals("...hello..", text(run), "both cut wide characters lost their other half")
+        for (col in 0 until COLS) assertEquals(single.cell(col), run.cell(col), "column $col")
+        assertEquals(RED, run.cell(5).style)
+    }
+
+    @Test
+    fun putAsciiRefusesARunPastTheRowOrTheBytes() {
+        val r = row()
+        val bytes = "abc".encodeToByteArray()
+        assertFailsWith<IndexOutOfBoundsException> { r.putAscii(COLS - 2, bytes, 0, 3, StyleId.DEFAULT) }
+        assertFailsWith<IndexOutOfBoundsException> { r.putAscii(0, bytes, 1, 3, StyleId.DEFAULT) }
+        assertFailsWith<IndexOutOfBoundsException> { r.putAscii(COLS, bytes, 0, 1, StyleId.DEFAULT) }
+        val g0 = r.generation
+        r.putAscii(0, bytes, 0, 0, StyleId.DEFAULT)
+        assertEquals(g0, r.generation, "an empty run is not a change")
+        // A byte outside ASCII keeps only its low seven bits: the style and flags stay intact.
+        r.putAscii(0, byteArrayOf(0xE1.toByte()), 0, 1, RED)
+        assertEquals(Cell.char('a'.code, RED), r.cell(0))
+    }
+
+    @Test
     fun overwritingHalfAWideCharBlanksTheOtherHalf() {
         val r = row()
         r.put(2, ch('W'), wide = true)
