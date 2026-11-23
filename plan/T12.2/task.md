@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 3
-readiness: 10%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -48,5 +48,5 @@ Done when the table-driven tests match xterm's ctlseqs, `./gradlew check` passes
 
 ## Acceptance
 
-- [ ] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
-- [ ] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
+- [x] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
