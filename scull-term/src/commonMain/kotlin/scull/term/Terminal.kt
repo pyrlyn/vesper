@@ -4,6 +4,7 @@ import scull.grid.Grid
 import scull.grid.Style
 import scull.parser.Parser
 import scull.unicode.WidthOptions
+import kotlin.time.TimeSource
 
 /** The most rows a screen has: the largest row a control sequence can address. */
 public const val MAX_ROWS: Int = 0xFFFF
@@ -26,6 +27,7 @@ public class Terminal(
 ) {
     private val parser = Parser()
     private val state: State
+    private val sync = SyncGate()
 
     init {
         require(rows in 1..MAX_ROWS) { "rows $rows not in 1..$MAX_ROWS" }
@@ -37,7 +39,29 @@ public class Terminal(
         bytes: ByteArray,
         from: Int = 0,
         to: Int = bytes.size,
-    ): Unit = parser.feed(bytes, from, to, state)
+    ) {
+        parser.feed(bytes, from, to, state)
+        if (sync.fed(state.modes.synchronizedOutput, to - from)) endSync()
+    }
+
+    /**
+     * Whether synchronized output (mode 2026) holds the picture at [now]. The hold ends, and the mode
+     * reads as reset, once it has lasted [MAX_SYNC_HOLD] from the first call that saw it or spanned
+     * [MAX_SYNC_BYTES] fed bytes. Call it after every [feed] and wake the UI only when it is false.
+     */
+    public fun syncHeld(now: TimeSource.Monotonic.ValueTimeMark): Boolean {
+        if (sync.holds(state.modes.synchronizedOutput, now)) return true
+        endSync()
+        return false
+    }
+
+    /** When a hold that [syncHeld] has seen ends by itself: how long the I/O thread may sleep while the picture is held. */
+    public val syncDeadline: TimeSource.Monotonic.ValueTimeMark? get() = sync.deadline
+
+    private fun endSync() {
+        state.modes.synchronizedOutput = false
+        sync.reset()
+    }
 
     /** The screen shown: the alternate one while [isAltScreen]. Valid until the next [feed]. */
     public val grid: Grid get() = state.grid
