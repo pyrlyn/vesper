@@ -29,6 +29,7 @@ private const val OSC_NOTIFY = 9
 private const val OSC_CLIPBOARD = 52
 private const val OSC_SHELL = 133
 private const val OSC_RXVT = 777
+private const val OSC_ITERM = 1337
 
 /** The selections OSC 52 may name: clipboard, primary, secondary, select, cut buffers 0 to 7. */
 private const val CLIPBOARD_TARGETS = "cpqs01234567"
@@ -59,6 +60,7 @@ internal fun State.dispatchOsc(osc: Osc) {
         OSC_CLIPBOARD -> clipboard(payload, osc.bellTerminated)
         OSC_SHELL -> shellMark(payload)
         OSC_RXVT -> rxvt(payload)
+        OSC_ITERM -> inlineImage(osc)
     }
 }
 

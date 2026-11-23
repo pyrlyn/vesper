@@ -3,7 +3,10 @@ package scull.term
 import scull.grid.Cell
 import scull.grid.Grid
 import scull.grid.Row
+import scull.image.ITerm2Images
+import scull.image.SixelDecoder
 import scull.parser.Csi
+import scull.parser.End
 import scull.parser.Esc
 import scull.parser.Handler
 import scull.parser.Osc
@@ -85,6 +88,21 @@ internal class State(
     /** The last character printed, for REP, or [NO_CHAR]. */
     var lastChar = NO_CHAR
 
+    /** The shown screen's images, and the hidden one's; they swap with [grid] and [alt]. */
+    var images = ScreenImages()
+    var hiddenImages = ScreenImages()
+
+    /** What images are measured with until the host reports its cell. */
+    var cellWidth = DEFAULT_CELL_WIDTH
+    var cellHeight = DEFAULT_CELL_HEIGHT
+
+    /** One per terminal: it holds a multipart transfer between OSCs. */
+    val iterm = ITerm2Images(MAX_IMAGE_FILE_BYTES, MAX_IMAGE_PIXEL_BYTES)
+
+    /** The sixel image a DCS `q` is drawing, or null. */
+    var sixel: SixelDecoder? = null
+    val apc = ApcBuffer()
+
     /** The cursor's row for writing. The cursor never leaves the screen, so the row exists. */
     fun cursorRow(): Row = checkNotNull(grid.screenRow(row)) { "cursor row $row of $rows" }
 
@@ -129,4 +147,29 @@ internal class State(
     override fun csiDispatch(csi: Csi) = dispatchCsi(csi)
 
     override fun oscDispatch(osc: Osc) = dispatchOsc(osc)
+
+    override fun dcsHook(header: Csi) = sixelStart(header)
+
+    override fun dcsPut(
+        bytes: ByteArray,
+        start: Int,
+        end: Int,
+    ) {
+        sixel?.put(bytes, start, end)
+    }
+
+    override fun dcsUnhook(end: End) = sixelEnd(end)
+
+    override fun apcStart() {
+        endCluster()
+        apc.clear()
+    }
+
+    override fun apcPut(
+        bytes: ByteArray,
+        start: Int,
+        end: Int,
+    ) = apc.append(bytes, start, end)
+
+    override fun apcEnd(end: End) = kittyEnd(end)
 }

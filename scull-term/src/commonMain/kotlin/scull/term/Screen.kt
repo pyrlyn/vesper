@@ -56,11 +56,14 @@ internal fun State.restoreCursor() {
     charsets.assign(from.charsets)
 }
 
-/** Swaps the shown and the hidden grid. Style ids belong to one grid, so the pen must intern again on the other. */
+/** Swaps the shown and the hidden grid with their images. Style ids belong to one grid, so the pen must intern again on the other. */
 private fun State.swapScreens() {
     val shown = grid
     grid = alt
     alt = shown
+    val shownImages = images
+    images = hiddenImages
+    hiddenImages = shownImages
     altActive = !altActive
     pen.forget()
 }
@@ -68,13 +71,17 @@ private fun State.swapScreens() {
 /** Enters the alternate screen; [clear] blanks it first (`?1049`). */
 internal fun State.enterAltScreen(clear: Boolean) {
     if (!altActive) swapScreens()
-    if (clear) clearScreen(grid)
+    if (clear) {
+        clearScreen(grid)
+        images = ScreenImages()
+    }
 }
 
-/** Leaves the alternate screen; [clear] blanks it on the way (`?1047`). */
+/** Leaves the alternate screen; [clear] blanks it on the way (`?1047`). Its images go either way, as in foot. */
 internal fun State.leaveAltScreen(clear: Boolean) {
     if (!altActive) return
     if (clear) clearScreen(grid)
+    images = ScreenImages()
     swapScreens()
 }
 
@@ -82,6 +89,8 @@ internal fun State.leaveAltScreen(clear: Boolean) {
 internal fun State.fullReset() {
     leaveAltScreen(clear = true)
     clearScreen(grid)
+    images = ScreenImages()
+    sixel = null
     goto(0, 0)
     pen.set(Style.DEFAULT)
     modes.reset()

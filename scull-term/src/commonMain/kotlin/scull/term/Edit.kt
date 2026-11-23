@@ -49,10 +49,12 @@ internal fun State.eraseDisplay(which: Int) {
         ERASE_ALL -> {
             pendingWrap = false
             clearRows(0, rows)
+            eraseScreenImages()
         }
 
         ERASE_SCROLLBACK -> {
             grid.clearHistory()
+            images.prune(grid.firstLine)
         }
     }
 }
