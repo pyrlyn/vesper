@@ -25,7 +25,6 @@ include(
     ":scull-input",
     ":scull-pty",
     ":scull-term",
-    ":scull-ffi",
     // PNG decode with a caller-set allocation cap, for the image protocols (T19).
     ":scull-png",
     // Images and their placements under a byte quota, and the protocol decoders (T19).

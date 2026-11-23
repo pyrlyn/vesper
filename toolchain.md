@@ -12,7 +12,6 @@
 | jactionlint | mise (`mise.toml` pins `github:jdx/jactionlint` 2.0.2) | Lint the workflows (the `jactionlint` CI job, the pre-push hook and `mise x -- jactionlint`) | https://github.com/jdx/jactionlint |
 | hk | mise (`mise.toml` pins 2.5.0) | Runs jactionlint as a pre-push hook (`hk.pkl`) | https://github.com/jdx/hk |
 | shellcheck | mise (`mise.toml` pins 0.11.0; CI uses the runner image's copy) | Checks `run:` scripts inside jactionlint | https://github.com/koalaman/shellcheck |
-| clang | system (Xcode Command Line Tools; the `clang` package on Linux, preinstalled on the CI image) | Builds `scull-ffi/tests/c` against the shared library and runs it under ASan+UBSan and TSan (`:scull-ffi:cTests`, part of `check` on macOS and Linux) | https://github.com/llvm/llvm-project |
 
 The PTY bindings (POSIX PTY, ConPTY) need no package: `scull-pty` declares them in its own cinterop `.def` files, compiled by the clang that ships with Kotlin/Native (`plan/T8/task.md` says why). A fuzz/property-test runner is chosen and recorded here in T25.
 

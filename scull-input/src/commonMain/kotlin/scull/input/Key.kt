@@ -1,8 +1,8 @@
 package scull.input
 
 // The platform-neutral key event every key encoder reads, and the tables that name keys on the
-// wire. Separate from the encoders so the C ABI can mirror one plain struct and no UI-toolkit key
-// type reaches the core. The fields follow Ghostty's embedding API: the platform reports what was
+// wire. Separate from the encoders so no UI-toolkit key type reaches the
+// core. The fields follow Ghostty's embedding API: the platform reports what was
 // pressed and what text it produced; the core decides the bytes.
 //
 // Ported from the creator's Rust scull (`crates/scull-input/src/key.rs`).

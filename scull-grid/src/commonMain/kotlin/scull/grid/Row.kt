@@ -12,7 +12,7 @@ package scull.grid
 // visible change. A frame that cached (id, generation) per row repaints exactly the rows whose pair
 // differs, and reads a scroll as known ids at new positions.
 
-/** Columns a row may have: link spans and the C ABI count them in 16 bits. */
+/** Columns a row may have: link spans count them in 16 bits. */
 public const val MAX_COLS: Int = 0xFFFF
 
 private val NO_CELLS = LongArray(0)

@@ -87,7 +87,7 @@ public class Terminal(
      * their cells. The margins reset, the tab stops set so far are kept and new columns get the
      * power-on ones, and a pending wrap survives only a change of height. The same size is a no-op.
      *
-     * Contract for the C ABI (T10): during an interactive resize the host pauses PTY reads
+     * Contract for the host: during an interactive resize the host pauses PTY reads
      * (Pty.pauseOutput) and keeps drawing the last frame, then calls this once with the final size,
      * resizes the PTY and resumes reads. A rewrap per drag step would cost a pass over all history each
      * step and, at a narrow intermediate width, could push lines past the history cap for good.
