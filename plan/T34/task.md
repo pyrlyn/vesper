@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 3
-readiness: 10%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -11,9 +11,9 @@ agent: Claude Code / claude-opus-5-5
 PNG decode for iTerm2 images and kitty `f=100` goes through one shared decoder: read the header first, compute the RGBA length from the size before allocating a pixel buffer, then decode with a hard allocation cap. Errors map to `ImageError.Decode`. Test fixtures can encode through the same helper; grey and palette PNGs stay covered.
 
 Acceptance:
-- [ ] Header-first, size-capped PNG decode lives in a shared module used by `scull-image`.
-- [ ] Tests cover cap failures, grey and palette fixtures, and sRGB output.
-- [ ] `./gradlew check` passes.
+- [x] Header-first, size-capped PNG decode lives in a shared module used by `scull-image` (`scull-png`; `scull-image` is created by T19 and depends on it).
+- [x] Tests cover cap failures, grey and palette fixtures, and sRGB output.
+- [x] `./gradlew check` passes.
 
 ## Findings
 
