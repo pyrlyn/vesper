@@ -80,6 +80,35 @@ class ImageStoreTest {
     }
 
     @Test
+    fun theOldestPlacementGoesWhenTheCapIsHit() {
+        val store = ImageStore(quotaBytes = 1L shl 20, maxPlacements = 2)
+        val a = store.add(pixels()).id
+        val p1 = assertNotNull(store.place(Placement(a, 0, 0, 1, 1)))
+        val p2 = assertNotNull(store.place(Placement(a, 1, 0, 1, 1)))
+        val p3 = assertNotNull(store.place(Placement(a, 2, 0, 1, 1)))
+        assertEquals(listOf(p2, p3), store.placements.keys.toList())
+        assertFalse(store.unplace(p1), "the oldest placement is already gone")
+        assertEquals(2, store.placementsOf(a))
+        assertTrue(store.hasImage(a), "the image stays after a placement is evicted")
+        assertFailsWith<IllegalArgumentException> { ImageStore(quotaBytes = 64, maxPlacements = 0) }
+        store.checkInvariants()
+    }
+
+    @Test
+    fun aPlacementEvictionCanLeaveItsImageUnshown() {
+        val store = ImageStore(quotaBytes = 2 * 64, maxPlacements = 1)
+        val (a, b) = List(2) { store.add(pixels()).id }
+        assertNotNull(store.place(Placement(a, 0, 0, 1, 1)))
+        assertNotNull(store.place(Placement(b, 0, 1, 1, 1)))
+        assertEquals(listOf(b), store.placements.values.map { it.imageId })
+        assertEquals(0, store.placementsOf(a), "a is still held, just unshown")
+        store.add(pixels())
+        assertEquals(-1, store.placementsOf(a), "the unshown image was evicted first")
+        assertEquals(1, store.placementsOf(b))
+        store.checkInvariants()
+    }
+
+    @Test
     fun placementsComeAndGoWithoutTheirImage() {
         val store = ImageStore(quotaBytes = 1L shl 20)
         val a = store.add(pixels(10, 6)).id

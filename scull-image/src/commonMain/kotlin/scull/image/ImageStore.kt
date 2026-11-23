@@ -3,6 +3,9 @@ package scull.image
 /** Most images a store keeps by default, whatever their size, so tiny images cannot pile up. */
 public const val DEFAULT_MAX_IMAGES: Int = 4096
 
+/** Most placements a store keeps by default, so a stream cannot grow them without bound. */
+public const val DEFAULT_MAX_PLACEMENTS: Int = 4096
+
 /**
  * Pixels the store holds under [id]. Ids are never reused, so an id names one immutable buffer
  * and a texture cached by id never goes stale.
@@ -46,16 +49,21 @@ public class Placement(
 }
 
 /**
- * Images and their placements under a byte quota on the pixels. When a new image does not fit,
- * the least recently used images go first, those no placement shows before those it does; an
- * evicted image takes its placements with it, so a full scrollback never blocks new images.
+ * Images and their placements under a byte quota on the pixels and a cap on how many
+ * placements are kept. When a new image does not fit, the least recently used images go first,
+ * those no placement shows before those it does; an evicted image takes its placements with it,
+ * so a full scrollback never blocks new images. When a new placement does not fit the cap, the
+ * oldest placements go first, and their images stay until evicted or deleted.
  */
 public class ImageStore(
     public val quotaBytes: Long,
     public val maxImages: Int = DEFAULT_MAX_IMAGES,
+    public val maxPlacements: Int = DEFAULT_MAX_PLACEMENTS,
 ) {
     init {
-        require(quotaBytes > 0 && maxImages > 0) { "quota $quotaBytes bytes, $maxImages images" }
+        require(quotaBytes > 0 && maxImages > 0 && maxPlacements > 0) {
+            "quota $quotaBytes bytes, $maxImages images, $maxPlacements placements"
+        }
     }
 
     private val images = HashMap<Long, Image>()
@@ -105,7 +113,8 @@ public class ImageStore(
 
     /**
      * Shows [placement] and returns its id; null when its image is gone or its crop falls
-     * outside the image.
+     * outside the image. When the store already holds [maxPlacements], the oldest placements
+     * are evicted first so the new one always fits.
      */
     public fun place(placement: Placement): Long? {
         val image = get(placement.imageId) ?: return null
@@ -113,6 +122,7 @@ public class ImageStore(
         if (crop != null && (crop.x.toLong() + crop.width > image.pixels.width || crop.y.toLong() + crop.height > image.pixels.height)) {
             return null
         }
+        while (placed.size >= maxPlacements) evictOldestPlacement()
         val id = nextPlacement++
         placed[id] = placement
         uses[placement.imageId] = (uses[placement.imageId] ?: 0) + 1
@@ -149,10 +159,15 @@ public class ImageStore(
         delete(victim.id)
     }
 
+    private fun evictOldestPlacement() {
+        // Only reached with a placement held: place adds one and maxPlacements is at least one.
+        unplace(placed.keys.first())
+    }
+
     /** Checks the bookkeeping against a recount; for the fuzz entry and tests. */
     internal fun checkInvariants() {
         check(usedBytes == images.values.sumOf { it.pixels.bytes }) { "used bytes drifted" }
-        check(usedBytes <= quotaBytes && images.size <= maxImages) { "over the quota" }
+        check(usedBytes <= quotaBytes && images.size <= maxImages && placed.size <= maxPlacements) { "over the quota" }
         check(placed.values.all { it.imageId in images }) { "a placement outlived its image" }
         check(uses == placed.values.groupingBy { it.imageId }.eachCount()) { "use counts drifted" }
     }
