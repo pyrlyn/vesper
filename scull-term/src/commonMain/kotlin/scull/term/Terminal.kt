@@ -138,13 +138,25 @@ public class Terminal(
     public fun answerClipboard(
         targets: String,
         data: ByteArray,
-    ): Boolean = state.answerClipboard(targets, data)
+    ): Boolean = state.replies.pushAnswer(clipboardReply(targets, data))
 
     /**
      * Refuses an [Event.ClipboardRead]: the program gets an empty selection, as xterm answers when
      * reads are disallowed, so it does not wait for an answer that never comes.
      */
-    public fun denyClipboard(targets: String): Boolean = state.answerClipboard(targets, ByteArray(0))
+    public fun denyClipboard(targets: String): Boolean = answerClipboard(targets, ByteArray(0))
+
+    /**
+     * The bytes that answer an [Event.ClipboardRead] with [data] for [targets], for a host that
+     * writes them to the child itself: queued replies leave only when the child writes again, and a
+     * program waiting for this answer writes nothing. Empty [data] is a denial.
+     *
+     * @throws IllegalArgumentException as [answerClipboard] does.
+     */
+    public fun clipboardReply(
+        targets: String,
+        data: ByteArray,
+    ): ByteArray = state.clipboardReply(targets, data)
 
     /** The URI of the link [id] cells carry, or null once a sweep freed it because no cell held it. */
     public fun linkUri(id: LinkId): String? = state.links.uri(id.value)

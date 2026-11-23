@@ -40,10 +40,11 @@ internal class TermHandle(
     var exit: ExitStatus? = null
     var exitReported = false
 
-    /** The serial of the last polled event and its text; under [lock]. */
+    /** The serial of the last polled event and its two texts; under [lock]. */
     var serial = 0uL
     var heldSerial = 0uL
     var heldText: ByteArray? = null
+    var heldTitle: ByteArray? = null
 
     val isPoisoned: Boolean get() = poisoned.load() != 0
 

@@ -44,7 +44,7 @@ if (cHost != null) {
     val libDir = layout.buildDirectory.dir("bin/$cHost/debugShared")
     val cTests = tasks.register("cTests") { group = "verification" }
     val sanitizers = mapOf("Asan" to "address,undefined", "Tsan" to "thread")
-    for (program in listOf("status", "two_threads")) {
+    for (program in listOf("status", "two_threads", "events")) {
         for ((suffix, sanitize) in sanitizers) {
             val name = program.split('_').joinToString("") { it.replaceFirstChar(Char::uppercase) } + suffix
             val exe = layout.buildDirectory.file("ctest/$program-${suffix.lowercase()}")

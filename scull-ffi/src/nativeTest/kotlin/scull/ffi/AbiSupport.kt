@@ -20,6 +20,7 @@ import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import scull.ffi.c.TT_EMPTY
+import scull.ffi.c.TT_EVENT_TEXT_BODY
 import scull.ffi.c.TT_OK
 import scull.ffi.c.tt_event
 import scull.ffi.c.tt_frame_view
@@ -139,11 +140,15 @@ internal class FrameSnapshot(
     val ids: List<Long>
     val generations: List<Int>
 
+    /** Each row's link spans as `id, col, cols`. */
+    val links: List<List<Triple<Int, Int, Int>>>
+
     init {
         val texts = mutableListOf<String>()
         val allRuns = mutableListOf<List<RunView>>()
         val rowIds = mutableListOf<Long>()
         val gens = mutableListOf<Int>()
+        val spans = mutableListOf<List<Triple<Int, Int, Int>>>()
         for (r in 0 until view.lines_len.toInt()) {
             val line = view.lines!![r]
             val bytes = if (line.text_len == 0uL) ByteArray(0) else line.text!!.reinterpret<ByteVar>().readBytes(line.text_len.toInt())
@@ -162,11 +167,17 @@ internal class FrameSnapshot(
                 }
             rowIds += line.id.toLong()
             gens += line.generation.toInt()
+            spans +=
+                List(line.links_len.toInt()) {
+                    val link = line.links!![it]
+                    Triple(link.id.toInt(), link.col.toInt(), link.cols.toInt())
+                }
         }
         text = texts
         runs = allRuns
         ids = rowIds
         generations = gens
+        links = spans
     }
 
     val styles: List<StyleView> =
@@ -205,6 +216,8 @@ internal data class EventView(
     val textLen: Int,
     val exitCode: UInt,
     val signaled: Boolean,
+    val id: ULong,
+    val titleLen: Int,
 )
 
 /** The next event, or null on `TT_EMPTY`. */
@@ -221,6 +234,8 @@ internal fun poll(term: COpaquePointer): EventView? =
                     event.text_len.toInt(),
                     event.exit_code,
                     event.signaled.toInt() == 1,
+                    event.id,
+                    event.title_len.toInt(),
                 )
             }
 
@@ -239,11 +254,12 @@ internal fun eventText(
     term: COpaquePointer,
     serial: ULong,
     cap: Int = 256,
+    part: UInt = TT_EVENT_TEXT_BODY.toUInt(),
 ): Triple<UInt, Int, String> =
     memScoped {
         val buf = allocArray<ByteVar>(cap.coerceAtLeast(1))
         val len = alloc<ULongVar>()
-        val status = ttTermEventText(term, serial, 0u, if (cap == 0) null else buf, cap.toULong(), len.ptr)
+        val status = ttTermEventText(term, serial, part, if (cap == 0) null else buf, cap.toULong(), len.ptr)
         val n = len.value.toInt()
         Triple(status, n, if (status == TT_OK) buf.readBytes(n).decodeToString() else "")
     }
