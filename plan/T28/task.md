@@ -2,7 +2,7 @@
 status: in progress
 priority: P3
 complexity: 2
-readiness: 75%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -13,8 +13,8 @@ The Powerline separators of shell prompts come from the bundled symbols font (T2
 Check: sprite tests that every code point in the range has a sprite and its edges reach the cell edges.
 
 Acceptance:
-- [ ] The work described above is implemented in Kotlin/Native.
-- [ ] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native.
+- [x] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
 
 ## Execution plan
 
