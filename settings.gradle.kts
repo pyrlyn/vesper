@@ -33,6 +33,8 @@ include(
     ":vesper-session",
     // The macOS app: Kotlin/Native over AppKit and CoreText (T14).
     ":vesper-macos",
+    // The Windows app: Kotlin/Native over Win32, Direct3D 11 and DirectWrite (T17).
+    ":vesper-windows",
     // Test and measurement tools; nothing in the shipped library depends on them.
     ":vesper-harness",
     ":vesper-bench",
