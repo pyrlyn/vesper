@@ -2,7 +2,7 @@
 status: in progress
 priority: P2
 complexity: 2
-readiness: 70%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -13,8 +13,8 @@ Prompts such as oh-my-posh and powerlevel10k print Powerline separators and Nerd
 Check: a snapshot of a Powerline prompt with no Nerd Font installed.
 
 Acceptance:
-- [ ] The work described above is implemented in Kotlin/Native.
-- [ ] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native.
+- [x] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
 
 ## Execution plan
 

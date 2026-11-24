@@ -140,7 +140,7 @@ Rules between core and host (research.md §7):
 - [x] **T15.** Metal renderer, CoreText atlas, measurements.
 - [ ] **T16.** Input method and accessibility.
 - [ ] **T13.4.** Selection, copy and find UI.
-- [ ] **T27.** Powerline and Nerd Font symbols.
+- [x] **T27.** Powerline and Nerd Font symbols.
 - [ ] **T28.** Powerline separators from cell geometry.
 
 ### Phase 7: Windows host
