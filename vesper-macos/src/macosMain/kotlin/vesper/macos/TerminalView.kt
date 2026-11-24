@@ -7,8 +7,14 @@ import kotlinx.cinterop.ObjCAction
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.useContents
+import platform.AppKit.NSAccessibilityPostNotification
+import platform.AppKit.NSAccessibilitySelectedTextChangedNotification
+import platform.AppKit.NSAccessibilityTextAreaRole
+import platform.AppKit.NSAccessibilityValueChangedNotification
 import platform.AppKit.NSBeep
 import platform.AppKit.NSEvent
+import platform.AppKit.NSFont
+import platform.AppKit.NSFontAttributeName
 import platform.AppKit.NSGraphicsContext
 import platform.AppKit.NSMarkedClauseSegmentAttributeName
 import platform.AppKit.NSPasteboard
@@ -21,6 +27,8 @@ import platform.AppKit.NSTrackingMouseMoved
 import platform.AppKit.NSUnderlineStyleAttributeName
 import platform.AppKit.NSView
 import platform.AppKit.NSViewLayerContentsRedrawOnSetNeedsDisplay
+import platform.AppKit.NSWorkspace
+import platform.AppKit.voiceOverEnabled
 import platform.CoreGraphics.CGAffineTransformMakeScale
 import platform.CoreGraphics.CGContextFillRect
 import platform.CoreGraphics.CGContextRef
@@ -38,7 +46,9 @@ import platform.Foundation.NSNotFound
 import platform.Foundation.NSRange
 import platform.Foundation.NSRangePointer
 import platform.Foundation.NSURL
+import platform.Foundation.NSValue
 import platform.Foundation.create
+import platform.Foundation.valueWithRange
 import platform.QuartzCore.CALayer
 import platform.darwin.NSObject
 import platform.darwin.dispatch_async
@@ -56,7 +66,10 @@ import vesper.pty.SpawnOptions
 import vesper.session.Session
 import vesper.term.Event
 import vesper.term.Frame
+import vesper.term.SelectionKind
+import vesper.term.TextRange
 import vesper.term.TitleTarget
+import vesper.term.ViewportText
 import kotlin.math.abs
 
 private const val CHANNEL_MAX = 255.0
@@ -145,7 +158,7 @@ internal class TerminalView(
     var onDirectory: (NSURL) -> Unit = {}
     var onExit: () -> Unit = {}
 
-    /** The screen's text, row by row; what the accessibility tree will read (T16) and the tests check. */
+    /** The frame's text, row by row, as drawn (a preedit included); what the tests check. */
     val screenText: String get() =
         (0 until screen.rows).joinToString("\n") {
             screen
@@ -183,6 +196,7 @@ internal class TerminalView(
             probe?.let { renderer?.onNextFrame = it }
             probe = null
             redraw()
+            screenChanged()
         }
         while (true) {
             when (val event = current.pollEvent() ?: break) {
@@ -379,6 +393,96 @@ internal class TerminalView(
         val rect = CGRectMake(PADDING + col * cell.width, PADDING + row * cell.height, cols * cell.width, rows * cell.height)
         val window = window ?: return CGRectMake(0.0, 0.0, 0.0, 0.0)
         return window.convertRectToScreen(convertRect(rect, toView = null))
+    }
+
+    // Accessibility: the view is a text area over the viewport's text (see ScreenReading), so
+    // VoiceOver reads the screen by character, word and line and selects through the core.
+
+    private val viewportText get() = session?.viewportText() ?: ViewportText.EMPTY
+    private var postedSelection: List<TextRange> = emptyList()
+
+    /** Tells VoiceOver the screen changed. Skipped without it: a reader re-reads the whole text on each one. */
+    private fun screenChanged() {
+        if (!NSWorkspace.sharedWorkspace.voiceOverEnabled) return
+        NSAccessibilityPostNotification(this, NSAccessibilityValueChangedNotification)
+        // Output that rewrites the selected rows drops the selection.
+        postSelectionChange()
+    }
+
+    /** Tells VoiceOver the selection changed, when it differs from the one last posted. */
+    private fun postSelectionChange() {
+        if (!NSWorkspace.sharedWorkspace.voiceOverEnabled) return
+        val now = viewportText.selected
+        if (now == postedSelection) return
+        postedSelection = now
+        NSAccessibilityPostNotification(this, NSAccessibilitySelectedTextChangedNotification)
+    }
+
+    override fun isAccessibilityElement(): Boolean = true
+
+    override fun accessibilityRole(): String? = NSAccessibilityTextAreaRole
+
+    override fun accessibilityLabel(): String? = "Terminal"
+
+    override fun accessibilityValue(): Any? = viewportText.text
+
+    override fun accessibilityNumberOfCharacters(): Long = viewportText.length.toLong()
+
+    override fun accessibilityVisibleCharacterRange(): CValue<NSRange> = TextRange(0, viewportText.length).toNSRange()
+
+    override fun accessibilitySelectedText(): String? = viewportText.selectedString
+
+    override fun accessibilitySelectedTextRange(): CValue<NSRange> = viewportText.selectedSpan(screen.cursor).toNSRange()
+
+    override fun accessibilitySelectedTextRanges(): List<*>? =
+        viewportText.selectedRanges(screen.cursor).map {
+            NSValue.valueWithRange(it.toNSRange())
+        }
+
+    /** VoiceOver selecting text: the cells of the range's characters. An empty range only moves the insertion point, so it clears the selection. */
+    override fun setAccessibilitySelectedTextRange(accessibilitySelectedTextRange: CValue<NSRange>) {
+        val current = session ?: return
+        val cells = accessibilitySelectedTextRange.toTextRange()?.let(viewportText::cellsFor)
+        if (cells == null) {
+            current.selectClear()
+        } else {
+            val (first, last) = cells
+            current.select(SelectionKind.Cell, first.row, first.col)
+            current.selectExtend(last.row, last.col + last.cols - 1)
+        }
+        refresh()
+        postSelectionChange()
+    }
+
+    override fun accessibilityInsertionPointLineNumber(): Long = (screen.cursor?.row ?: 0).coerceIn(0, viewportText.lineCount - 1).toLong()
+
+    override fun accessibilityLineForIndex(index: Long): Long =
+        viewportText.lineOf(index.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()).toLong()
+
+    override fun accessibilityRangeForLine(line: Long): CValue<NSRange> =
+        line.takeIf { it in 0..Int.MAX_VALUE }?.let { viewportText.lineRange(it.toInt()) }?.toNSRange() ?: NO_RANGE
+
+    override fun accessibilityStringForRange(range: CValue<NSRange>): String? = range.toTextRange()?.let(viewportText::substring)
+
+    @OptIn(BetaInteropApi::class)
+    override fun accessibilityAttributedStringForRange(range: CValue<NSRange>): NSAttributedString? {
+        val part = range.toTextRange()?.let(viewportText::substring) ?: return null
+        val font = NSFont.userFixedPitchFontOfSize(0.0) ?: return NSAttributedString.create(string = part)
+        return NSAttributedString.create(string = part, attributes = mapOf<Any?, Any?>(NSFontAttributeName to font))
+    }
+
+    override fun accessibilityFrameForRange(range: CValue<NSRange>): CValue<CGRect> {
+        val box = range.toTextRange()?.let { viewportText.boxOf(it, screen.cols) } ?: return CGRectMake(0.0, 0.0, 0.0, 0.0)
+        return screenRect(box.row, box.col, box.cols, box.rows)
+    }
+
+    /** The character under a point on the screen. */
+    override fun accessibilityRangeForPosition(point: CValue<CGPoint>): CValue<NSRange> {
+        val window = window ?: return NO_RANGE
+        if (grid.cols <= 0 || grid.rows <= 0) return NO_RANGE
+        val local = convertPoint(window.convertPointFromScreen(point), fromView = null)
+        val at = local.useContents { cellAt(x, y, text.cell, grid) }
+        return viewportText.rangeAt(at.rows, at.cols).toNSRange()
     }
 
     private fun key(

@@ -54,6 +54,9 @@ class ViewportTextTest {
         assertEquals(TextCell(0, 2, 1), t.cellAt(4))
         assertEquals(TextCell(0, 3, 1), t.cellAt(6))
         assertEquals(listOf(0, 0, 4, 6, 7), (0..4).map { t.indexAt(0, it) })
+        assertEquals(TextRange(0, 4), t.characterAt(2), "the character under an offset is its whole cluster")
+        assertEquals(TextRange(4, 6), t.characterAt(4))
+        assertNull(t.characterAt(7), "a line's end")
     }
 
     @Test

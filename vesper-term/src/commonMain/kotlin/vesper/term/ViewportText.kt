@@ -76,6 +76,15 @@ public class ViewportText internal constructor(
         return TextCell(line, columns[line][k], columns[line][k + 1] - columns[line][k])
     }
 
+    /** The whole character (a cluster, as the terminal drew it) holding [index]; null on a line's end or outside the text. */
+    public fun characterAt(index: Int): TextRange? {
+        if (index !in 0 until text.length) return null
+        val line = lineOf(index)
+        val k = lastAtOrBefore(indices[line], index)
+        if (k < 0 || k + 1 >= indices[line].size) return null
+        return TextRange(indices[line][k], indices[line][k + 1])
+    }
+
     /** The columns of [line] that the characters in [range] cover, from the first touched to the last; at least one column. */
     public fun cellsOf(
         line: Int,
