@@ -137,7 +137,7 @@ Rules between core and host (research.md §7):
 ### Phase 6: macOS host
 
 - [x] **T14.** First light: a window running the user's shell.
-- [ ] **T15.** Metal renderer, CoreText atlas, measurements.
+- [x] **T15.** Metal renderer, CoreText atlas, measurements.
 - [ ] **T16.** Input method and accessibility.
 - [ ] **T13.4.** Selection, copy and find UI.
 - [ ] **T27.** Powerline and Nerd Font symbols.
@@ -207,8 +207,9 @@ serve as reference designs for the Kotlin/Native hosts. Kept: `research.md` and
 ## 8. Risks and open questions
 
 - DirectWrite has no C interface, so the Windows host needs a shim for it (T17's first step).
-- Kotlin/Native over AppKit and Metal: frame-time cost of Kotlin objects on the render path is
-  not measured yet; T15 measures it against the T3 baseline.
+- Kotlin/Native over AppKit and Metal: T15 measured the render path (about 0.3 ms per frame on an
+  M3 Max, most of it the GPU round trip; `docs/benchmarks/macos-renderer.md`). Key-to-screen
+  latency still needs a run with the screen unlocked.
 - Kotlin Gradle plugin 2.4 uses a plain enum as a Gradle attribute, a deprecation that
   Gradle 10 turns into an error; KGP 2.5 fixes it. Move to Kotlin 2.5 before Gradle 10.
 - CodeQL has no Kotlin/Native extractor; scans stay on Actions.

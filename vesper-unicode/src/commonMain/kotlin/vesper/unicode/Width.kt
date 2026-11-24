@@ -126,6 +126,7 @@ public fun clusterWidth(
 
 @PublishedApi
 internal const val SURROGATE_BITS: Int = 10
+
 @PublishedApi
 internal const val SUPPLEMENTARY_FIRST: Int = 0x10000
 

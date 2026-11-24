@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 5
-readiness: 0%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -34,5 +34,5 @@ Execution plan:
    latency from a probe in the release app; results in `docs/benchmarks/macos-renderer.md`.
 
 Acceptance:
-- [ ] The work described above is implemented in Kotlin/Native.
-- [ ] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native.
+- [x] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
