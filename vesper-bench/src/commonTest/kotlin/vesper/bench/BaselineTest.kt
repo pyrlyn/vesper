@@ -1,5 +1,7 @@
 package vesper.bench
 
+import vesper.harness.baselineInput
+import vesper.harness.fixed
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -10,7 +12,7 @@ class BaselineTest {
     // FNV-1a over the payload, so a change to the generator changes every recorded baseline.
     @Test
     fun fixedInputHashIsPinned() {
-        val input = fixedInput()
+        val input = baselineInput()
         assertEquals(INPUT_BYTES, input.size)
         var hash = 0xCBF29CE484222325uL
         for (byte in input) {
@@ -21,7 +23,7 @@ class BaselineTest {
 
     @Test
     fun tableEmitsAMissingTerminalAndATimedStub() {
-        val input = fixedInput()
+        val input = baselineInput()
         val rows =
             listOf(
                 Row.measured("vesper stub", input.size, timeStub(input)),

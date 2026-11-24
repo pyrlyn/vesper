@@ -1,5 +1,6 @@
 package vesper.bench
 
+import vesper.harness.fixed
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource

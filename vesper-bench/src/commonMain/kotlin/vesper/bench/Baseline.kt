@@ -1,36 +1,28 @@
 package vesper.bench
 
+import vesper.harness.BASELINE_BYTES
+import vesper.harness.BASELINE_COLUMNS
 import vesper.harness.Stub
+import vesper.harness.baselineInput
+import vesper.harness.fixed
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 
 /** Columns of the stub, and the period of the line feed in the fixed input. */
-internal const val COLUMNS = 80
+internal const val COLUMNS = BASELINE_COLUMNS
 
 /** Rows of the stub. Bytes past the last row are dropped by the harness. */
 internal const val ROWS = 24
 
 /** Length of the payload every terminal receives. */
-internal const val INPUT_BYTES = 1_000_000
+internal const val INPUT_BYTES = BASELINE_BYTES
 
 /** Timed feeds of the stub; an odd count gives the median a middle run. */
 internal const val STUB_RUNS = 9
 
-private const val ALPHABET = 26
 private const val BYTES_PER_MIB = 1024.0 * 1024.0
-
-/**
- * The fixed payload: [INPUT_BYTES] of a repeating `A`..`Z` pattern with a line feed closing every
- * [COLUMNS] bytes. Built here so the repository does not store it; the test pins its FNV-1a hash.
- */
-internal fun fixedInput(): ByteArray {
-    var letter = 0
-    return ByteArray(INPUT_BYTES) { i ->
-        if ((i + 1) % COLUMNS == 0) '\n'.code.toByte() else ('A'.code + letter++ % ALPHABET).toByte()
-    }
-}
 
 /** `Stub(80, 24).feed`. The count is data-dependent so the optimiser cannot drop the writes. */
 internal fun feedStub(input: ByteArray): Int {
@@ -83,7 +75,7 @@ internal class Row(
 
 /** Markdown for `docs/benchmarks/baseline.md`. */
 internal fun baselineMarkdown(): String {
-    val input = fixedInput()
+    val input = baselineInput()
     val rows = listOf(Row.measured("vesper stub", input.size, timeStub(input))) + referenceRows(input)
     return render(rows, utcDate(), machine())
 }
@@ -115,19 +107,6 @@ private fun mibPerSecond(row: Row): String {
     val secs = row.elapsed?.toDouble(DurationUnit.SECONDS) ?: return "-"
     if (secs == 0.0) return "-"
     return fixed(row.bytes / secs / BYTES_PER_MIB, 2)
-}
-
-/** [value] with exactly [digits] decimals; Kotlin/Native has no `String.format`. */
-internal fun fixed(
-    value: Double,
-    digits: Int,
-): String {
-    var scale = 1L
-    repeat(digits) { scale *= 10 }
-    val scaled = kotlin.math.round(value * scale).toLong()
-    val whole = scaled / scale
-    val fraction = (scaled % scale).toString().padStart(digits, '0')
-    return if (digits == 0) "$whole" else "$whole.$fraction"
 }
 
 /** The UTC calendar date of the run. */
