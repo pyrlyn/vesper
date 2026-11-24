@@ -49,3 +49,9 @@ internal fun dragScroll(
         y >= height -> -1
         else -> 0
     }
+
+/** A left-button gesture the view took for selection: the cell it last reached. */
+internal data class SelectionDrag(
+    val cell: Cells,
+    val clearsOnRelease: Boolean,
+)
