@@ -598,14 +598,22 @@ internal class TerminalView(
             val row = screen.row(r) ?: continue
             val top = PADDING + r * cell.height
             for (run in row.runs) {
+                val bg = palette.colors(screen.style(run.style) ?: Style.DEFAULT).bg
+                if (bg == palette.background) continue
+                fill(context, bg)
+                CGContextFillRect(context, CGRectMake(PADDING + run.col * cell.width, top, run.cols * cell.width, cell.height))
+            }
+            // Highlights go over the run backgrounds and cover blank cells too, which belong to no run.
+            for (c in 0 until screen.cols) {
+                val highlight = palette.highlight(screen.cell(r, c).flags) ?: continue
+                fill(context, highlight)
+                CGContextFillRect(context, CGRectMake(PADDING + c * cell.width, top, cell.width, cell.height))
+            }
+            for (run in row.runs) {
                 val style = screen.style(run.style) ?: Style.DEFAULT
                 val colors = palette.colors(style)
                 val left = PADDING + run.col * cell.width
                 val width = run.cols * cell.width
-                if (colors.bg != palette.background) {
-                    fill(context, colors.bg)
-                    CGContextFillRect(context, CGRectMake(left, top, width, cell.height))
-                }
                 if (style.attrs and Attrs.HIDDEN != 0) continue
                 fill(context, colors.fg)
                 val runText = row.runText(run)
