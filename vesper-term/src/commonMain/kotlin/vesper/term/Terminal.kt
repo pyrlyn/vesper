@@ -17,6 +17,7 @@ import vesper.input.encodeKey
 import vesper.input.encodeMouse
 import vesper.input.encodePaste
 import vesper.parser.Parser
+import vesper.unicode.ClusterPolicy
 import vesper.unicode.WidthOptions
 import kotlin.time.TimeSource
 
@@ -142,6 +143,11 @@ public class Terminal(
         frame.copyFrom(this)
         return true
     }
+
+    /** How printed text is measured, so the frame lays a preedit out as the child's text would be. */
+    internal val widthOptions: WidthOptions get() = state.width
+
+    internal val clusterPolicy: ClusterPolicy get() = state.policy
 
     /** The screen shown: the alternate one while [isAltScreen]. Valid until the next [feed]. */
     public val grid: Grid get() = state.grid
