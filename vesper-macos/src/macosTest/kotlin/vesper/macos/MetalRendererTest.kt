@@ -138,6 +138,19 @@ class MetalRendererTest {
         assertEquals(palette.background, scrolled.cell(0, 0))
     }
 
+    @Test
+    fun aPreeditIsUnderlinedAtTheBottomOfItsRow() {
+        val f = fixture(6, 2) ?: return
+        f.frame.setPreedit("ab")
+        val bitmap = f.render("")
+        // The row's last pixel row lies inside the underline and below any glyph's ink.
+        val bottom = ((PADDING + text.cell.height) * SCALE).toInt() - 1
+        val x = ((PADDING + 0.5 * text.cell.width) * SCALE).toInt()
+        assertEquals(palette.foreground, bitmap.pixel(x, bottom) and RGB)
+        assertEquals(palette.background, bitmap.cell(4, 0, dy = 0.98), "past the preedit there is no line")
+        assertEquals(palette.cursor, bitmap.cell(2, 0), "the cursor waits after the preedit")
+    }
+
     @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun anImageCoversItsCells() {

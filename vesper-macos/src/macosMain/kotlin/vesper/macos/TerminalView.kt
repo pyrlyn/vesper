@@ -1,19 +1,24 @@
 package vesper.macos
 
 import kotlinx.cinterop.BetaInteropApi
+import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ObjCAction
+import kotlinx.cinterop.pointed
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.useContents
 import platform.AppKit.NSBeep
 import platform.AppKit.NSEvent
 import platform.AppKit.NSGraphicsContext
+import platform.AppKit.NSMarkedClauseSegmentAttributeName
 import platform.AppKit.NSPasteboard
 import platform.AppKit.NSPasteboardTypeString
+import platform.AppKit.NSTextInputClientProtocol
 import platform.AppKit.NSTrackingActiveInKeyWindow
 import platform.AppKit.NSTrackingArea
 import platform.AppKit.NSTrackingInVisibleRect
 import platform.AppKit.NSTrackingMouseMoved
+import platform.AppKit.NSUnderlineStyleAttributeName
 import platform.AppKit.NSView
 import platform.AppKit.NSViewLayerContentsRedrawOnSetNeedsDisplay
 import platform.CoreGraphics.CGAffineTransformMakeScale
@@ -23,11 +28,17 @@ import platform.CoreGraphics.CGContextSetRGBFillColor
 import platform.CoreGraphics.CGContextSetRGBStrokeColor
 import platform.CoreGraphics.CGContextSetTextMatrix
 import platform.CoreGraphics.CGContextStrokeRect
+import platform.CoreGraphics.CGPoint
 import platform.CoreGraphics.CGRect
 import platform.CoreGraphics.CGRectMake
 import platform.CoreGraphics.CGSize
+import platform.Foundation.NSAttributedString
 import platform.Foundation.NSHomeDirectory
+import platform.Foundation.NSNotFound
+import platform.Foundation.NSRange
+import platform.Foundation.NSRangePointer
 import platform.Foundation.NSURL
+import platform.Foundation.create
 import platform.QuartzCore.CALayer
 import platform.darwin.NSObject
 import platform.darwin.dispatch_async
@@ -58,7 +69,8 @@ private const val CHANNEL_MAX = 255.0
 internal class TerminalView(
     private val text: TextStyle,
     frame: CValue<CGRect>,
-) : NSView(frame) {
+) : NSView(frame),
+    NSTextInputClientProtocol {
     private val palette = Palette()
     private val screen = Frame()
     private var session: Session? = null
@@ -248,10 +260,126 @@ internal class TerminalView(
         refresh()
     }
 
-    // Keys. Text input methods arrive with T16; until then a key's own characters are its text.
-    override fun keyDown(event: NSEvent) = key(event, if (event.ARepeat) KeyAction.Repeat else KeyAction.Press)
+    // Keys go through the input method first: it may compose (CJK, dead keys, the accent menu), in
+    // which case the key never reaches the core and the composed text goes to the child as text.
+    private val input = TextInput()
 
-    override fun keyUp(event: NSEvent) = key(event, KeyAction.Release)
+    // Keys the input method took; their release is not the program's either.
+    private val composedKeys = HashSet<UShort>()
+
+    override fun keyDown(event: NSEvent) {
+        input.beginKey()
+        interpretKeyEvents(listOf(event))
+        when (val outcome = input.endKey()) {
+            KeyOutcome.Key -> {
+                key(event, if (event.ARepeat) KeyAction.Repeat else KeyAction.Press)
+            }
+
+            is KeyOutcome.Text -> {
+                composedKeys += event.keyCode
+                commit(outcome.text)
+            }
+
+            KeyOutcome.Consumed -> {
+                composedKeys += event.keyCode
+            }
+        }
+    }
+
+    override fun keyUp(event: NSEvent) {
+        if (!composedKeys.remove(event.keyCode)) key(event, KeyAction.Release)
+    }
+
+    // A key the input method maps to a command (Return, arrows, Delete) is the core's to encode, not
+    // an editing command: doing nothing here keeps AppKit from beeping for want of a handler.
+    override fun doCommandBySelector(selector: COpaquePointer?) = Unit
+
+    private fun commit(text: String) {
+        session?.text(text)
+        showPreedit()
+    }
+
+    /** Hands the composition to the frame, which lays it over the cursor row, and brings the view back to the cursor. */
+    private fun showPreedit() {
+        screen.setPreedit(input.marked, input.caret, input.clauses)
+        if (input.hasMarkedText) session?.scrollDisplay(-Int.MAX_VALUE)
+        refresh()
+    }
+
+    override fun insertText(
+        string: Any,
+        replacementRange: CValue<NSRange>,
+    ) {
+        val text = input.insert(plainText(string)) ?: return showPreedit()
+        commit(text)
+    }
+
+    override fun setMarkedText(
+        string: Any,
+        selectedRange: CValue<NSRange>,
+        replacementRange: CValue<NSRange>,
+    ) {
+        val selected = selectedRange.toTextRange()
+        input.setMarked(plainText(string), selected?.start, selected?.length ?: 0, markedRuns(string))
+        showPreedit()
+    }
+
+    // AppKit asks the view to accept the marked text as typed (focus lost, a click).
+    override fun unmarkText() {
+        if (input.hasMarkedText) insertText(input.marked, NO_RANGE)
+    }
+
+    override fun selectedRange(): CValue<NSRange> = input.selectedRange.toNSRange()
+
+    override fun markedRange(): CValue<NSRange> = input.markedRange?.toNSRange() ?: NO_RANGE
+
+    override fun hasMarkedText(): Boolean = input.hasMarkedText
+
+    @OptIn(BetaInteropApi::class)
+    override fun attributedSubstringForProposedRange(
+        range: CValue<NSRange>,
+        actualRange: NSRangePointer?,
+    ): NSAttributedString? {
+        val part = range.toTextRange()?.let(input::substring) ?: return null
+        actualRange?.pointed?.apply {
+            location = part.start.toULong()
+            length = part.length.toULong()
+        }
+        return NSAttributedString.create(string = input.marked.substring(part.start, part.end))
+    }
+
+    // An input method only tags its clauses when the client says it reads the tags.
+    override fun validAttributesForMarkedText(): List<*> = listOfNotNull(NSUnderlineStyleAttributeName, NSMarkedClauseSegmentAttributeName)
+
+    /** The cursor cell, which the frame keeps at the composition's caret, on the screen: the candidate window opens beside it. */
+    override fun firstRectForCharacterRange(
+        range: CValue<NSRange>,
+        actualRange: NSRangePointer?,
+    ): CValue<CGRect> {
+        range.toTextRange()?.let { asked ->
+            actualRange?.pointed?.apply {
+                location = asked.start.toULong()
+                length = asked.length.toULong()
+            }
+        }
+        val cursor = screen.cursor ?: return CGRectMake(0.0, 0.0, 0.0, 0.0)
+        return screenRect(cursor.row, cursor.col, 1)
+    }
+
+    override fun characterIndexForPoint(point: CValue<CGPoint>): ULong = NSNotFound.toULong()
+
+    /** Cells in screen coordinates, as input methods and accessibility take them. */
+    internal fun screenRect(
+        row: Int,
+        col: Int,
+        cols: Int,
+        rows: Int = 1,
+    ): CValue<CGRect> {
+        val cell = text.cell
+        val rect = CGRectMake(PADDING + col * cell.width, PADDING + row * cell.height, cols * cell.width, rows * cell.height)
+        val window = window ?: return CGRectMake(0.0, 0.0, 0.0, 0.0)
+        return window.convertRectToScreen(convertRect(rect, toView = null))
+    }
 
     private fun key(
         event: NSEvent,
@@ -384,7 +512,19 @@ internal class TerminalView(
                 if (style.attrs and Attrs.STRIKE != 0) CGContextFillRect(context, CGRectMake(left, top + cell.height / 2, width, 1.0))
             }
         }
+        drawPreedit(context)
         drawCursor(context)
+    }
+
+    private fun drawPreedit(context: CGContextRef) {
+        val preedit = screen.preedit ?: return
+        val cell = text.cell
+        fill(context, palette.foreground)
+        for (line in preeditLines(preedit)) {
+            val thickness = if (line.thick) 2.0 else 1.0
+            val top = PADDING + (preedit.row + 1) * cell.height - thickness
+            CGContextFillRect(context, CGRectMake(PADDING + line.col * cell.width + 1, top, line.cols * cell.width - 2, thickness))
+        }
     }
 
     private fun drawCursor(context: CGContextRef) {
