@@ -254,6 +254,13 @@ public class Terminal(
      */
     public fun selectionText(): String = selected?.let(state.grid::selectedText).orEmpty()
 
+    /** The viewport's text for a screen reader, with the selection as ranges of it. */
+    public fun viewportText(): ViewportText {
+        val marks = ArrayList<Mark>()
+        selected?.let { state.grid.selectionMarks(it, marks) }
+        return state.grid.viewportText(marks)
+    }
+
     /**
      * Searches for [pattern], literally, replacing any earlier search. Returns false and clears the
      * search for an empty pattern or one longer than [MAX_SEARCH_PATTERN] UTF-8 bytes.
