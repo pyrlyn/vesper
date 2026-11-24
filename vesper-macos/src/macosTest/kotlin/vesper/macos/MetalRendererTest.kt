@@ -21,6 +21,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 private const val ESC = "\u001b"
@@ -172,5 +173,37 @@ class MetalRendererTest {
         assertEquals(true, inked, "the v left no ink")
         assertEquals(palette.cursor, bitmap.cell(2, 7))
         savePng(bitmap, "macos-renderer.png")
+    }
+
+    /** The T27 check: a Powerline prompt's icons draw from the bundled symbols, with no Nerd Font installed. */
+    @Test
+    fun powerlinePromptSnapshot() {
+        val f = fixture(40, 2) ?: return
+        val blue = "$ESC[38;2;255;255;255;48;2;40;90;160m"
+        val grey = "$ESC[38;2;255;255;255;48;2;60;60;60m"
+        val green = "$ESC[38;2;0;0;0;48;2;80;140;60m"
+        // apple, folder and branch icons between solid separators; each icon is the second cell of its segment.
+        val prompt =
+            "$blue  user $ESC[38;2;40;90;160;48;2;60;60;60m" +
+                "$grey  ~/src $ESC[38;2;60;60;60;48;2;80;140;60m" +
+                "$green  main $ESC[0;38;2;80;140;60m$ESC[0m "
+        val bitmap = f.render(prompt)
+        val icons = mapOf(1 to 0x285AA0, 10 to 0x3C3C3C, 20 to 0x508C3C)
+        for ((col, background) in icons) {
+            assertEquals(background, bitmap.cell(col, 0, dx = 0.05, dy = 0.05), "col $col")
+            val x0 = ((PADDING + col * text.cell.width) * SCALE).toInt()
+            val y0 = (PADDING * SCALE).toInt()
+            val inked =
+                (x0 until x0 + (text.cell.width * SCALE).toInt()).sumOf { x ->
+                    (y0 until y0 + (text.cell.height * SCALE).toInt()).count { y -> bitmap.pixel(x, y) and RGB != background }
+                }
+            // A missing glyph leaves the cell blank; a box of a fallback font would be inked too, so the
+            // shaping test pins the font.
+            assertTrue(inked > 20, "col $col left $inked inked pixels")
+        }
+        // The separator after "user" is a sprite: the blue reaches the cell's left edge on the grey.
+        assertEquals(0x285AA0, bitmap.cell(8, 0, dx = 0.05))
+        assertEquals(0x3C3C3C, bitmap.cell(8, 0, dx = 0.95, dy = 0.05))
+        savePng(bitmap, "macos-powerline.png")
     }
 }

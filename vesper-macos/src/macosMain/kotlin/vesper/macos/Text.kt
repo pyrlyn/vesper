@@ -54,7 +54,8 @@ private const val ITALIC = 2
 /**
  * The user's fixed-pitch font and its bold and italic faces, and one line of text drawn with
  * CoreText. Text takes its colour from the context's fill colour, so one attribute set per face
- * serves every colour. CoreText falls back to other fonts for characters this one lacks.
+ * serves every colour. CoreText falls back to other fonts for characters this one lacks, to the
+ * bundled Nerd Font symbols ([bundledSymbols]) before the system's.
  */
 internal class TextStyle {
     /** Regular, bold, italic and bold italic, indexed by [face]. */
@@ -73,7 +74,8 @@ internal class TextStyle {
         faces =
             (0..(BOLD or ITALIC)).map { traits ->
                 val mask = traitMask(traits)
-                if (traits == 0) regular else CTFontCreateCopyWithSymbolicTraits(regular, 0.0, null, mask, mask) ?: regular
+                val face = if (traits == 0) regular else CTFontCreateCopyWithSymbolicTraits(regular, 0.0, null, mask, mask) ?: regular
+                withFallback(face, bundledSymbols)
             }
         ascent = CTFontGetAscent(regular)
         val height = ceil(ascent + CTFontGetDescent(regular) + CTFontGetLeading(regular))
