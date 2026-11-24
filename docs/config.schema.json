@@ -8,7 +8,7 @@
       "$ref": "#/$defs/ColorsSection",
       "default": {
         "ansi": [],
-        "scheme": "scull-dark"
+        "scheme": "vesper-dark"
       }
     },
     "font": {
@@ -32,7 +32,7 @@
   "additionalProperties": false,
   "$defs": {
     "Action": {
-      "description": "What a binding does. The numbers are the C ABI's `TT_ACTION_*` values and\nnever change.",
+      "description": "What a binding does. The numbers never change.",
       "oneOf": [
         {
           "description": "Removes a default binding of the same chord; never in [`crate::Settings::bindings`].",
@@ -128,7 +128,7 @@
         "scheme": {
           "description": "The built-in scheme everything below overrides.",
           "$ref": "#/$defs/Scheme",
-          "default": "scull-dark"
+          "default": "vesper-dark"
         }
       },
       "additionalProperties": false
@@ -200,12 +200,12 @@
         {
           "description": "Light text on near-black; the xterm palette.",
           "type": "string",
-          "const": "scull-dark"
+          "const": "vesper-dark"
         },
         {
           "description": "Dark text on near-white.",
           "type": "string",
-          "const": "scull-light"
+          "const": "vesper-light"
         },
         {
           "description": "Ethan Schoonover's Solarized, dark variant.",

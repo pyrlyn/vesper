@@ -120,7 +120,3 @@ jobs:
       - if: env.RUN == 'true' && env.SKIP_TESTS == 'true'
         name: tests skipped (SKIP_CI_TESTS)
         run: echo "::notice title=SKIP_CI_TESTS::tests skipped by SKIP_CI_TESTS"
-
-      - if: env.RUN == 'true'
-        name: Link the scull libraries
-        run: ./gradlew :scull-ffi:linkReleaseShared${{ matrix.task }} :scull-ffi:linkReleaseStatic${{ matrix.task }} --console=plain

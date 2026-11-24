@@ -18,11 +18,11 @@ The cluster and style interner must not reclaim a live id if a caller interns be
 
 ## Execution plan
 
-1. `scull-grid/src/commonMain/kotlin/scull/grid/Interner.kt`: state the contract on `Marks` and say in the stamp comment why a length check would not do.
-2. `scull-grid/src/commonTest/kotlin/scull/grid/TablesTest.kt`: an interleaved intern between marks and sweep through `StyleTable` (appended id) and `ClusterTable` (reused id); fresh marks still sweep.
-3. Verify: the tests fail with the stamp check removed; `./gradlew check` on macOS; the linuxX64 `scull-grid` test binary in a Colima container.
+1. `vesper-grid/src/commonMain/kotlin/vesper/grid/Interner.kt`: state the contract on `Marks` and say in the stamp comment why a length check would not do.
+2. `vesper-grid/src/commonTest/kotlin/vesper/grid/TablesTest.kt`: an interleaved intern between marks and sweep through `StyleTable` (appended id) and `ClusterTable` (reused id); fresh marks still sweep.
+3. Verify: the tests fail with the stamp check removed; `./gradlew check` on macOS; the linuxX64 `vesper-grid` test binary in a Colima container.
 
 ## Acceptance
 
-- [x] The interner contract is documented and tested in `scull-grid`, including an interleaved intern between marks and sweep.
+- [x] The interner contract is documented and tested in `vesper-grid`, including an interleaved intern between marks and sweep.
 - [x] `./gradlew check` passes.

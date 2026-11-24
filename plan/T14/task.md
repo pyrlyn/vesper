@@ -1,16 +1,21 @@
+---
+status: todo
+priority: P0
+complexity: 5
+readiness: 0%
+agent:
+---
+
 # T14. macOS app: first light
 
-Status: not started
+A Kotlin/Native macOS app (`vesper-macos`, `macosArm64`) over AppKit through the Kotlin/Native platform libraries: an `NSApplication` with one window whose `NSView` draws the frame's text runs with CoreText (backgrounds, cursor, wide cells), sends key, text and mouse events to `vesper-term` through `vesper-input`, resizes the terminal and the PTY, and turns the core's wakeup into a main-queue redraw. The core is called directly: no C ABI. Done when the user's shell is usable in one window. Minimum macOS 26.
 
-A SwiftUI shell with an `NSView` surface that draws frames with CoreText, sends key and mouse events, and resizes. Done when a shell is usable in one window.
+Before the app: the terminal stores the input modes the encoders need (mouse tracking 1000/1002/1003, SGR 1006 and pixels 1016, focus 1004, bracketed paste 2004, the kitty keyboard flag stack) and gains `key`, `text`, `mouse`, `paste`, `focus` and `scrollDisplay` calls that encode with `vesper-input` against them and write to the PTY. Title, working directory and OSC 52 events reach the window and the pasteboard (`NSPasteboard.general`; reads denied until a setting allows them).
 
-Execution plan (split to fit the budget):
+The removed Swift app in `macos/` at eaeb20f is the reference for the AppKit side. The execution plan is written at claim time and split into slices of at most 500 lines.
 
-- T14.1 Input through the C ABI: store the mouse tracking modes (1000/1002/1003, 1006 SGR, 1016 pixels), focus reporting (1004), bracketed paste (2004) and the kitty keyboard flags stack (CSI > u, < u, = u, ? u) in `scull-term`, reusing `scull-input`'s types rather than copying them; export `tt_term_key`, `tt_term_text`, `tt_term_mouse`, `tt_term_paste`, `tt_term_focus` and `tt_term_scroll_display` that encode with `scull-input` against the current modes and write to the PTY; regenerate the header and C# bindings, bump the ABI minor.
-- T14.2 macOS app in `macos/`: a Swift package with the SwiftUI app and an `NSView` surface, a module map over `scull.h`, and a the macOS app build recipe that builds `scull-ffi` as a static library for `aarch64-apple-darwin` and then the app bundle. The view draws the frame's text runs with CoreText (one `CTLine` per run, backgrounds, cursor, wide cells), maps `NSEvent` keys, text input and mouse to the T14.1 exports, sends pixel sizes on resize, and turns the wakeup callback into a main-queue redraw. Minimum macOS 26.
-- Events (moved from T13.3, over its exports): `TerminalSession` keeps the title and working directory, writes OSC 52 writes to a pasteboard (`NSPasteboard.general` by default) and denies reads until a setting allows them; `TerminalView` puts the title on its window; Swift tests on a named pasteboard, `swift test` in `macos/`.
-- Verify: Kotlin/Native tests for every new export and mode; `./gradlew check` and the C ABI sanitizer test exit 0; the macOS app build builds; the app runs the user's shell in one window, and a screenshot after typing `ls` shows the output.
+Check: `./gradlew check`; the app runs the user's shell in one window, and a screenshot after typing `ls` shows the output.
 
 Acceptance:
-- [ ] The work described above is implemented in Kotlin/Native (platform UI stays Swift/C# where this task says so).
-- [ ] Tests and the `./gradlew check` gate (plus the platform tests this task names) pass.
+- [ ] The work described above is implemented in Kotlin/Native.
+- [ ] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.

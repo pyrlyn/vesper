@@ -1,6 +1,6 @@
 # Grid memory and scroll cost
 
-T6 records what one scrollback row costs in the Kotlin/Native `scull-grid`, and what one scrolled line costs. The fixture is the one of the Rust `scull-grid` bench this port replaces (`benches/scrollback.rs` at 69d9be4): 120 columns, 40 screen rows, and three kinds of line:
+T6 records what one scrollback row costs in the Kotlin/Native `vesper-grid`, and what one scrolled line costs. The fixture is the one of the Rust `grid` crate bench this port replaces (`benches/scrollback.rs` at 69d9be4): 120 columns, 40 screen rows, and three kinds of line:
 
 - **Blank:** nothing written.
 - **Plain text:** 72 cells in the default style, a typical log line.
@@ -10,7 +10,7 @@ Machine: Apple M3 Max, macOS 27.0.1, Kotlin/Native 2.4.21 release build. The Rus
 
 ## Memory per scrollback row
 
-| Row at 120 columns | Scull (Kotlin/Native), measured heap | Rust `scull-grid`, computed |
+| Row at 120 columns | Vesper (Kotlin/Native), measured heap | Rust `grid` crate, computed |
 | --- | --- | --- |
 | Blank | 75 B | 56 B |
 | Plain text (72 cells) | 675 B | 632 B |
@@ -35,14 +35,14 @@ A one-off probe that is not part of the bench put a `Row` object at 64 B and a `
 
 One line into a full history of 10 000 rows:
 
-| Operation | Scull (Kotlin/Native) | Rust `scull-grid` |
+| Operation | Vesper (Kotlin/Native) | Rust `grid` crate |
 | --- | --- | --- |
 | Scroll only | 27.5–27.7 ns | 25–66 ns |
 | Write a plain line and scroll | 1559–1580 ns | 513 ns |
 | Write an SGR-heavy line and scroll | 2887–2896 ns | 388 ns |
 | Write a plain line as one run and scroll (T7) | 234–271 ns | not measured |
 
-Scull times are medians of 21 batches of 20 000 lines after a warm-up batch, over three runs. Rust times are divan medians.
+Vesper times are medians of 21 batches of 20 000 lines after a warm-up batch, over three runs. Rust times are divan medians.
 
 Scrolling is an offset change plus one recycled row, and costs what it cost in Rust. Writing a line is 3 to 7 times slower, and the time is in `Row.put`, not in the ring: in a one-off probe 72 `put` calls with no scroll took 1140 ns, 16 ns per cell. The disassembly shows why. Kotlin/Native enters a shadow-stack frame on every call, with a thread-local lookup and a block of zeroed slots, and `put` is called once per cell.
 
@@ -55,10 +55,10 @@ What follows from it:
 ## How to reproduce
 
 ```bash
-./gradlew :scull-bench:linkReleaseExecutableMacosArm64
-./scull-bench/build/bin/macosArm64/releaseExecutable/scull-bench.kexe grid
+./gradlew :vesper-bench:linkReleaseExecutableMacosArm64
+./vesper-bench/build/bin/macosArm64/releaseExecutable/vesper-bench.kexe grid
 ```
 
 Each memory pass keeps three full rings alive, about 250 MB of heap. The whole run takes about 6 s.
 
-Rust: check out 69d9be4 (the last Rust tree), then run `cargo bench -p scull-grid --bench scrollback`.
+Rust: check out 69d9be4 (the last Rust tree), then run `cargo bench -p vesper-grid --bench scrollback`.

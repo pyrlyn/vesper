@@ -8,7 +8,7 @@ agent: Claude Code / claude-opus-5-5
 
 # T13. Links and shell integration in the core
 
-Shell integration in `scull-term`: OSC 8 links as per-row ranges, OSC 52 as an event the UI may deny or answer, OSC 7 and OSC 133, OSC 9 and OSC 777 notifications. Done when each has a golden case in `tests/fixtures/shell.txt` and an event in the queue.
+Shell integration in `vesper-term`: OSC 8 links as per-row ranges, OSC 52 as an event the UI may deny or answer, OSC 7 and OSC 133, OSC 9 and OSC 777 notifications. Done when each has a golden case in `tests/fixtures/shell.txt` and an event in the queue.
 
 Selection and search are T13.2, events over the C ABI are T13.3, and the macOS selection UI is T13.4.
 
@@ -19,7 +19,7 @@ Selection and search are T13.2, events over the C ABI are T13.3, and the macOS s
   - Reflow and resize carry the spans along.
   - `Marks(size)` exists for a terminal-side table to sweep.
 - **The events and the fixture exist.**
-  - `scull-term/Events.kt` has the capped queue, the coalesced bell and OSC 0/1/2.
+  - `vesper-term/Events.kt` has the capped queue, the coalesced bell and OSC 0/1/2.
   - `tests/fixtures/shell.txt` already holds the cases, written for the Rust core.
   - `ConformanceTest` skips the file until this task.
 - **Nothing else to reuse.**

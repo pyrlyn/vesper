@@ -3,13 +3,13 @@
 version: 1
 
 codeql:
-  languages: [actions, csharp, swift]
+  languages: [actions]
 
 # Snyk stays off (pyrlyn/ci default).
 snyk:
   enabled: false
 
-# .NET (if any) is built and tested by the local ci.yml.
+# No .NET in this repository.
 dotnet:
   enabled: false
 

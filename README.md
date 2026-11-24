@@ -1,22 +1,10 @@
 # Vesper
 
-A modern terminal for macOS, Windows and Linux, built with Kotlin Multiplatform and Compose Multiplatform. The design comes from the Figma file [Modern terminal](https://www.figma.com/design/tCFCAuDJvskm2XTh0cOLcX/Modern-terminal); each screen is described in [`docs/design/`](docs/design/).
+A terminal for macOS and Windows, written in Kotlin. A Kotlin/Native core parses the terminal stream, keeps the screen and scrollback, and encodes input; each platform gets a Kotlin/Native host over its own APIs (AppKit, Metal and CoreText on macOS; Win32, Direct3D 11 and DirectWrite on Windows) that calls the core directly. The design comes from the Figma file [Modern terminal](https://www.figma.com/design/tCFCAuDJvskm2XTh0cOLcX/Modern-terminal); each screen is described in [`docs/design/`](docs/design/).
 
-## Features
+## Status
 
-- Command blocks. Each command and its output form a card with exit status, duration, and copy, re-run, stop and delete actions. Blocks are detected through shell integration (OSC 133/7) for zsh, bash, fish and PowerShell.
-- Full-screen programs (vim, htop, less) switch to a classic grid with mouse and alt-screen support.
-- A prompt bar with context chips (directory, git branch and status, node, package manager), ghost-text suggestions and history.
-- Tabs and split panes, with zoom and draggable dividers.
-- A command palette (⌘K / Ctrl+K) covering hosts, workflows, commands, history and directories.
-- A system monitor showing CPU, memory, processes, network, listening ports and activity.
-- SSH hosts, read from `~/.ssh/config` plus your own saved hosts.
-- Workflows: named multi-step commands.
-- Settings for theme (dark/light/system), accent colour, font, cursor and shell.
-
-## Native core
-
-The repository also holds the Kotlin/Native terminal core that started as the Scull project: the VT parser, Unicode tables, grid and scrollback, with a C ABI for native front ends (SwiftUI in `macos/`, WinUI in `windows/`). It is being built task by task; the plan is in [`PLAN.md`](PLAN.md) and the task folders in [`plan/`](plan/README.md). The Compose app still runs on its own JVM parser and emulator.
+The core is built and tested: the VT parser, Unicode tables, grid and scrollback with reflow, terminal state, input encoders, selection and search, images (kitty, iTerm2, sixel) and the PTY layer. The hosts come next; the plan is in [`PLAN.md`](PLAN.md) and the tasks in [`plan/`](plan/README.md).
 
 ## Requirements
 
@@ -28,39 +16,18 @@ JDK 21 or newer. Gradle is provided by the wrapper. `mise install` sets up the J
 ./gradlew check
 ```
 
-Lints (ktlint) and tests the native core for the host's targets and runs the app's JVM tests. This is the merge gate.
-
-## Run
-
-```bash
-./gradlew :composeApp:run
-```
-
-## Package
-
-```bash
-./gradlew :composeApp:packageDistributionForCurrentOS
-```
-
-This produces a DMG on macOS, an MSI on Windows, and a DEB or RPM on Linux.
+Lints (ktlint) and runs the native tests of every module for the host's targets. This is the merge gate.
 
 ## Layout
 
 | Path | Contents |
 | --- | --- |
-| `composeApp/src/commonMain/.../terminal` | VT parser, emulator and PTY session with block tracking |
-| `composeApp/src/commonMain/.../app` | App state: tabs, panes, settings, history |
-| `composeApp/src/commonMain/.../ui` | Compose UI: blocks, grid, prompt, palette, monitor, settings, hosts |
-| `composeApp/src/jvmMain` | pty4j launcher, OSHI monitor, platform services, window chrome, `Main.kt` |
-| `scull-unicode`, `scull-parser`, `scull-grid`, `scull-input`, `scull-pty`, `scull-term`, `scull-ffi` | The Kotlin/Native core, layered as `PLAN.md` section 3 describes |
-| `scull-harness`, `scull-bench` | Conformance harness and benchmarks for the core |
+| `vesper-unicode`, `vesper-parser`, `vesper-grid`, `vesper-input`, `vesper-pty`, `vesper-term` | The Kotlin/Native core, layered as `PLAN.md` section 3 describes |
+| `vesper-png`, `vesper-image` | Allocation-capped PNG decoding and the image store with the kitty, iTerm2 and sixel decoders |
+| `vesper-harness`, `vesper-bench` | Conformance harness and benchmarks for the core |
 | `build-logic` | Gradle convention plugins and the Unicode table generator |
-| `macos/`, `windows/` | Native front ends that will link the core through the C ABI |
+| `tests/` | Golden frames, conformance fixtures and the pinned Unicode data |
 | `docs/` | Design notes per screen, benchmarks, research and the config schema |
-
-## Fonts
-
-The app bundles JetBrains Mono (© The JetBrains Mono Project Authors) and Inter (© The Inter Project Authors). Both are licensed under the SIL Open Font License 1.1: https://openfontlicense.org
 
 ## License
 

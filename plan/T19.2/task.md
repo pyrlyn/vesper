@@ -8,7 +8,7 @@ agent: Claude Code / claude-opus-5-5
 
 # T19.2. Sixel decoder
 
-Part of T19. A streaming decoder fed DCS bytes (`put`) into an RGBA buffer in `scull-image`: the palette (HLS and RGB), raster attributes, repeat, carriage return and newline, and background select. Width, height and colour caps are checked before the buffer grows. Reuse a maintained Kotlin library if one fits; otherwise write it and say why in the commit. Done when golden tests cover the protocol, the decoder has a fuzz entry run by the tests, and `./gradlew check` passes.
+Part of T19. A streaming decoder fed DCS bytes (`put`) into an RGBA buffer in `vesper-image`: the palette (HLS and RGB), raster attributes, repeat, carriage return and newline, and background select. Width, height and colour caps are checked before the buffer grows. Reuse a maintained Kotlin library if one fits; otherwise write it and say why in the commit. Done when golden tests cover the protocol, the decoder has a fuzz entry run by the tests, and `./gradlew check` passes.
 
 ## Findings
 
@@ -31,7 +31,7 @@ Part of T19. A streaming decoder fed DCS bytes (`put`) into an RGBA buffer in `s
 
 ## Execution plan
 
-1. `SixelDecoder(transparentBackground, maxWidth, maxHeight, maxPixelBytes, background)` with `put(bytes, start, end)` and `finish()` in `scull-image`.
+1. `SixelDecoder(transparentBackground, maxWidth, maxHeight, maxPixelBytes, background)` with `put(bytes, start, end)` and `finish()` in `vesper-image`.
 2. `fuzzSixel(data)`: whole and cut streams must agree, only `ImageError` escapes, the image stays within the caps.
 3. Golden tests: bit order, repeat, `$` and `-`, the VT340 map, HLS and RGB, clamping, redefinition, raster attributes and background, ignored bytes, caps, an empty image, and the fuzz over seeded corpora.
 4. `./gradlew ktlintFormat check`, then Linux in Colima.

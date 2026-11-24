@@ -37,11 +37,11 @@ The core events (notifications included) and the link-id sweep are T13; the macO
 1. **Core: `Terminal.clipboardReply(targets, data)`.**
    - It builds the answer bytes without queueing them; `answerClipboard` uses it.
    - `FrameRow.links` copies the row's link spans when the row is painted.
-2. **`scull.h`, ABI 0.2.** The new constants, all appended:
+2. **`vesper.h`, ABI 0.2.** The new constants, all appended:
    - `TT_EVENT_DIRECTORY`, `_SHELL_MARK`, `_CLIPBOARD_WRITE`, `_CLIPBOARD_READ`, `_LINK`, `_NOTIFICATION`;
    - `TT_SHELL_*`;
    - `TT_EVENT_TEXT_TITLE`, the second part (a notification's title, or the clipboard targets).
-3. **`scull.h`, fields and calls.**
+3. **`vesper.h`, fields and calls.**
    - `tt_event.id` is the link id. `exit_code` is D's exit code, or `TT_EXIT_CODE_UNKNOWN` when D carries none.
    - `tt_link_span` and `tt_row.links` / `links_len`.
    - `tt_term_clipboard_reply`, `tt_term_clipboard_deny` and `tt_term_link_uri`.

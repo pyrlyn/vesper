@@ -1,7 +1,0 @@
-# LeakSanitizer suppressions for the C tests (Linux; macOS ASan does not check leaks).
-#
-# Monitor (scull-pty) frees its native lock from a Kotlin/Native Cleaner, which runs only after the
-# garbage collector finds the monitor unreachable. A short test exits before that happens, so every
-# lock a freed terminal held (its FairLock, the PTY's and the child's monitors) is still allocated at
-# exit. Nothing else is suppressed.
-leak:scull_monitor_new

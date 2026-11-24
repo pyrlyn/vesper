@@ -1,6 +1,6 @@
 # Terminal emulator architecture — research report
 
-Research for Scull: a terminal with a Kotlin/Native core and a native UI per platform (SwiftUI on macOS, WinUI on Windows) joined by FFI. The core computes, the platform renders.
+Research for Vesper: a terminal with a Kotlin/Native core and a native UI per platform. The core computes, the platform renders. The research was written when the hosts were Swift and C# behind a C ABI; since T902 both hosts are Kotlin/Native (AppKit on macOS, Win32 on Windows) and call the core directly (§8).
 
 All sources were checked on 2026-10-02. Nothing was built or benchmarked: every performance statement below is a reading of the code, not a measurement, unless it says otherwise.
 
@@ -26,7 +26,7 @@ The brief names "Wrapp". No terminal of that name exists on GitHub; the creator 
 ## 2. Headline conclusions
 
 1. **Warp is not a model of core/UI separation.** Its terminal crate imports UI-framework types, its session model lives in the app crate, and its renderer reads the grid under the same mutex the PTY thread writes through. It has no frame snapshot and no render damage tracking (warp.md A.2, A.4). It is a reference for the PTY thread, the event vocabulary, tests and conventions, not for the boundary.
-2. **No surveyed terminal does "platform renders".** Ghostty and Windows Terminal both keep the GPU renderer and shaping inside the core; the native layer supplies a view, input, IME and chrome (ffi-native-ui.md §0, Part 1). Scull's requirement is stricter than both.
+2. **No surveyed terminal does "platform renders".** Ghostty and Windows Terminal both keep the GPU renderer and shaping inside the core; the native layer supplies a view, input, IME and chrome (ffi-native-ui.md §0, Part 1). Vesper's requirement is stricter than both.
 3. **The closest precedents for our boundary** are Contour's `RenderBuffer` (a resolved snapshot handed to a frontend that only draws) and libghostty-vt's `RenderState` (caller-owned snapshot with per-row dirty flags). Both need the same four changes: flat arrays, per-row generations, a queued event stream instead of callbacks, and platform text stacks instead of the built-in rasteriser (foot-contour.md Part 3a; ffi-native-ui.md Part 1).
 4. **No existing core library fits as a drop-in.** `alacritty_terminal` is clean and published but stores one `char` per cell, has no images and no input encoders. `wezterm-term` has every feature but is unpublished, heavy, and has no flat buffer. The recommendation is our own Kotlin/Native state and grid, not an embed of those libraries (wezterm-alacritty.md §4).
 5. **Every surveyed terminal has a weakness the others fix**, so "take only the best" is a real design, not a slogan. Section 4 lists the pick per stage.
@@ -49,7 +49,7 @@ The brief names "Wrapp". No terminal of that name exists on GitHub; the creator 
 
 Sources: the numbered sections of each detail file (kitty.md §1–§11; wezterm-alacritty.md §1–§2; foot-contour.md Parts 1–2; warp.md B.1–B.11).
 
-## 4. Best of each — what Scull takes
+## 4. Best of each — what Vesper takes
 
 | Stage | Take from | What exactly | Avoid |
 | --- | --- | --- | --- |
@@ -103,8 +103,8 @@ Licence: Warp-original core code is AGPL. Alacritty-derived files must be taken 
 
 Rendering (ffi-native-ui.md Part 2):
 
-- **macOS:** an `NSView` with a `CAMetalLayer`, a Swift Metal renderer and a CoreText glyph atlas, wrapped in `NSViewRepresentable`. Drawing rows with CoreText is a valid first milestone. Pure SwiftUI is ruled out because IME needs `NSTextInputClient` on an `NSView`; its performance at 200x60 and 120 Hz is **unverified**.
-- **Windows:** `SwapChainPanel` with D3D11 and a DirectWrite atlas, as Windows Terminal's AtlasEngine does. TSF and UIA are hand-written. XAML text is not viable for the grid. Authoring WinUI in Rust is not supported: `microsoft/windows-app-rs` is archived.
+- **macOS:** an `NSView` with a `CAMetalLayer`, a Metal renderer and a CoreText glyph atlas. Drawing rows with CoreText is a valid first milestone. IME needs `NSTextInputClient` on an `NSView`. Since T902 this is Kotlin/Native over the AppKit, Metal and CoreText platform libraries.
+- **Windows:** a swap chain with D3D11 and a DirectWrite atlas, as Windows Terminal's AtlasEngine does. TSF and UIA are hand-written. XAML text is not viable for the grid. Since T902 this is Kotlin/Native over Win32, with a plain window in place of WinUI's `SwapChainPanel`; `dwrite.h` has no C interface, so T17 picks a shim for it.
 
 FFI tooling (ffi-native-ui.md Part 3, crates.io API):
 
@@ -125,11 +125,13 @@ Reuse of Rust crates (wezterm-alacritty.md §4):
 | `alacritty_terminal` | 0.26.0 | Learn from: ring storage, damage bounds, lease read loop |
 | `wezterm-term` and friends | git only | Learn from; fallback is a pinned fork treated as owned code |
 
-These tooling and crate recommendations were written for a Rust core. The Kotlin/Native rewrite keeps the same ABI shape (a committed `scull.h` and C# P/Invoke bindings) and the same PTY and parser design, implemented in Kotlin/Native with cinterop rather than those crates.
+These tooling and crate recommendations were written for the earlier Rust core. The Kotlin/Native rewrite keeps the same PTY and parser design, implemented in Kotlin/Native with cinterop rather than those crates. With Kotlin/Native hosts (T902) there is no C ABI, so no header or bindings generator either.
 
 The PTY (T8) is a small C shim in cinterop `.def` files, not a library: `pty4j` is JVM-only, and the one Kotlin/Native PTY library found (`kpty` 0.0.1) calls `forkpty()` from Kotlin, which runs Kotlin runtime code between fork and exec. Sources and the reasoning are in `plan/T8/task.md` (Findings).
 
 ### 6.1 Windows host: the C# interop library (T17)
+
+Kept as a record: T902 replaced the C# host with a Kotlin/Native one, so this pick no longer applies.
 
 The all-C# host (§8, decision 2) needs Direct3D 11, DXGI and DirectWrite for the renderer, TSF for text input (T18) and UI Automation (T18). Four libraries were compared on 2026-10-08. Versions and dates come from the NuGet registration API (`https://api.nuget.org/v3/registration5-gz-semver2/<id>/index.json`, latest stable entry) and the GitHub REST API (`/repos/<owner>/<repo>`, `/releases/latest`); coverage from each repository's tree on its default branch the same day.
 
@@ -152,53 +154,53 @@ Sources: https://www.nuget.org/packages/Vortice.Direct3D11/3.8.3, https://github
 Two facts narrow what the library has to cover, both from the Windows App SDK reference (checked 2026-10-08):
 
 - A WinUI 3 control exposes UIA text through its XAML automation peer: `Microsoft.UI.Xaml.Automation.Provider.ITextProvider` is a WinRT interface a custom control implements for `AutomationPeer.GetPattern` with `PatternInterface.Text` (https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.automation.provider.itextprovider, Windows App SDK 1.0 to 2.0). It comes with the Windows App SDK projection, not the interop library; raw `UIAutomationCore.h` is a fallback only.
-- WinUI 3's `ISwapChainPanelNative` is declared in the Windows App SDK's `microsoft.ui.xaml.media.dxinterop.h`, not the Windows SDK (https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/win32/microsoft.ui.xaml.media.dxinterop/nn-microsoft-ui-xaml-media-dxinterop-iswapchainpanelnative). Neither win32metadata nor TerraFX carries it, so `windows/Scull.App` calls its one method, `SetSwapChain`, through the vtable (T17.3). Its IID is `63aad0b8-7c24-40ff-85a8-640d944cc325`, from `MIDL_INTERFACE` in `include/microsoft.ui.xaml.media.dxinterop.h` of the `Microsoft.WindowsAppSDK.WinUI` 2.3.9 package (https://www.nuget.org/packages/Microsoft.WindowsAppSDK.WinUI/2.3.9, which `Microsoft.WindowsAppSDK` 2.5.1 depends on; checked 2026-10-08); the system XAML interface of the same name has another IID. The panel's COM pointer comes from `WinRT.IWinRTObject.NativeObject.ThisPtr`, present in the `WinRT.Runtime.dll` of `Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57, the projection the .NET 10.0.401 SDK pairs with `net10.0-windows10.0.19041.0` (its `Microsoft.NETCoreSdk.BundledVersions.props`, checked 2026-10-08).
-- A composition swap chain takes only `DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL` and `DXGI_SCALING_STRETCH`, and software drivers such as `D3D_DRIVER_TYPE_REFERENCE` are not supported for it (https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgifactory2-createswapchainforcomposition, updated 2022-08-12, checked 2026-10-08). WARP is not named there; `windows/Scull.Render.Tests` creates one on WARP on the Windows CI runner.
+- WinUI 3's `ISwapChainPanelNative` is declared in the Windows App SDK's `microsoft.ui.xaml.media.dxinterop.h`, not the Windows SDK (https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/win32/microsoft.ui.xaml.media.dxinterop/nn-microsoft-ui-xaml-media-dxinterop-iswapchainpanelnative). Neither win32metadata nor TerraFX carries it, so the C# app called its one method, `SetSwapChain`, through the vtable (T17.3). Its IID is `63aad0b8-7c24-40ff-85a8-640d944cc325`, from `MIDL_INTERFACE` in `include/microsoft.ui.xaml.media.dxinterop.h` of the `Microsoft.WindowsAppSDK.WinUI` 2.3.9 package (https://www.nuget.org/packages/Microsoft.WindowsAppSDK.WinUI/2.3.9, which `Microsoft.WindowsAppSDK` 2.5.1 depends on; checked 2026-10-08); the system XAML interface of the same name has another IID. The panel's COM pointer comes from `WinRT.IWinRTObject.NativeObject.ThisPtr`, present in the `WinRT.Runtime.dll` of `Microsoft.Windows.SDK.NET.Ref` 10.0.19041.57, the projection the .NET 10.0.401 SDK pairs with `net10.0-windows10.0.19041.0` (its `Microsoft.NETCoreSdk.BundledVersions.props`, checked 2026-10-08).
+- A composition swap chain takes only `DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL` and `DXGI_SCALING_STRETCH`, and software drivers such as `D3D_DRIVER_TYPE_REFERENCE` are not supported for it (https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgifactory2-createswapchainforcomposition, updated 2022-08-12, checked 2026-10-08). WARP is not named there; the C# renderer tests created one on WARP on the Windows CI runner.
 
 **Pick: Microsoft.Windows.CsWin32 with `allowMarshaling: false`.** It is the only candidate that covers all five APIs, TSF and UIA included, from Microsoft's own metadata, and it is the most active (a release the day before this check). With marshalling off every COM interface is a blittable struct called through function pointers, so a frame allocates nothing in the binding, and the generated code is plain unsafe C# that AOT compiles and trimming has nothing to remove from. Being a source generator it adds no runtime assembly, only the APIs listed in `NativeMethods.txt`. TerraFX is the close second (same struct shape, `IsAotCompatible`), but has no UIA and its last release is ten months old. Vortice allocates a wrapper per COM object and leans on a prerelease runtime; Silk.NET 2.x lacks TSF and UIA and is being replaced by 3.0. The risk of CsWin32 is its 0.x version line: generated shapes may change between releases, so the version is pinned exactly and bumped deliberately.
 
 ## 7. Architecture plan
 
 ```
-        Swift (macOS)                         C# / C++ (Windows)
-  SwiftUI chrome + NSView surface       WinUI 3 chrome + SwapChainPanel
+     Kotlin/Native (macOS)                 Kotlin/Native (Windows)
+  AppKit window + NSView surface        Win32 window + DXGI swap chain
   Metal + CoreText, NSTextInputClient   D3D11 + DirectWrite, TSF, UIA
               │                                      │
-              └────────── C ABI (scull.h) ───────────┘
+              └────────── direct Kotlin calls ───────┘
                                │
-   scull-ffi      handles, frame snapshot, event queue, panic guard
-   scull-term     session: screens, modes, cursor, selection, search
-   scull-input    key, mouse, paste, focus encoders
-   scull-grid     cells, rows, ring, reflow, damage, images, links
-   scull-unicode  generated width and grapheme tables
-   scull-parser   bulk scanner + sequence machine → typed actions
-   scull-pty      PTY, reader thread, back-pressure
+   vesper-term     session: screens, modes, cursor, selection, search
+   vesper-input    key, mouse, paste, focus encoders
+   vesper-grid     cells, rows, ring, reflow, damage, images, links
+   vesper-unicode  generated width and grapheme tables
+   vesper-parser   bulk scanner + sequence machine → typed actions
+   vesper-pty      PTY, reader thread, back-pressure
 ```
 
-Rules of the boundary (ffi-native-ui.md Part 4):
+Rules of the boundary between core and host (ffi-native-ui.md Part 4, written for a C ABI; the rules still hold without one):
 
 - **Threads.** The core owns one reader thread per terminal. The UI owns the main and render threads. The core never calls into the UI except one wakeup callback, and never while holding a lock.
-- **Frames.** The UI owns a frame object. `scull_frame_update(frame, term)` copies only changed rows into flat buffers under a short lock. Buffers: fixed-size cells, a style table with resolved colours, per-row stable id and generation, text runs for shaping, selection and search highlights, preedit, image placements.
+- **Frames.** The UI owns a frame object. `Terminal.updateFrame` copies only changed rows into flat buffers under a short lock. Buffers: fixed-size cells, a style table with resolved colours, per-row stable id and generation, text runs for shaping, selection and search highlights, preedit, image placements.
 - **Shaping.** The platform shapes. The core alone decides cell widths.
 - **Events.** One coalesced wakeup, then a polled queue: title, bell, clipboard read and write (with reply or deny), URL, notification, child exit.
 - **Input.** A key struct with physical key, modifiers, consumed modifiers, text, unshifted code point and composing flag. The core encodes bytes.
-- **Safety.** Every C export catches uncaught exceptions; an uncaught exception poisons one terminal, not the app. Status codes, no unwinding across the boundary.
-- **ABI.** Version check at start-up, `struct_size` first in every struct, append-only enums. Generated header and C# bindings are committed and diff-checked in CI.
+- **Safety.** An uncaught exception in one terminal fails that terminal, not the app.
 - **Tests.** Headless: golden frames, esctest and vttest, fuzzing, and a property test that a dirty-row repaint equals a full repaint.
 
 ## 8. Decisions
 
-The creator accepted the recommendations below except 2, where the choice is all C#, and 5, where the minimum is macOS 26. The licence (6) is GPL-3.0-or-later.
+The creator accepted the recommendations below except 2, where the choice was all C# and is now Kotlin/Native, and 5, where the minimum is macOS 26. The licence (6) is GPL-3.0-or-later. Decisions 8 and 9 came with T902.
 
 | # | Decision | Recommendation |
 | --- | --- | --- |
 | 1 | "Wrapp" means Warp | Confirmed |
-| 2 | Windows host language | Recommended: C# WinUI 3 shell plus a C++/WinRT surface control (Windows Terminal's own split). **Creator chose all C#**; the interop library is Microsoft.Windows.CsWin32 (§6.1) |
+| 2 | Windows host language | Recommended: C# WinUI 3 shell plus a C++/WinRT surface control (Windows Terminal's own split). **Creator chose all C#** (interop through Microsoft.Windows.CsWin32, §6.1), then **Kotlin/Native over Win32** in T902: one language across the project |
 | 3 | VT core | Our own Kotlin/Native state and grid, not libghostty-vt (unstable API, adds a Zig toolchain) |
 | 4 | PTY | Inside the core |
 | 5 | Minimum macOS | Recommended: 14, for `CAMetalDisplayLink`. **Creator chose 26** |
 | 6 | Project licence | **Creator chose GPL-3.0-or-later**, with paid subscription services around the terminal. MIT, Apache-2.0 and GPL-3 sources may be ported; Warp's AGPL core stays study-only |
 | 7 | Split panes on Windows | One swap chain per window, panes as viewports; Microsoft advises at most four swap chains |
+| 8 | macOS host language | **Creator chose Kotlin/Native over AppKit**, Metal and CoreText through the platform libraries (T902); the Swift app was removed |
+| 9 | Core-to-host boundary | **No C ABI** (T902): the hosts are Kotlin/Native and call the core modules directly; native code a host still needs is written in Zig first, C or C++ only where Zig does not fit |
 
 ## 9. Unverified
 
@@ -206,5 +208,4 @@ The creator accepted the recommendations below except 2, where the choice is all
 - kitty's position on sixel: the word does not appear in the repository.
 - How much of esctest and vttest runs headlessly.
 - The six items listed at the end of foot-contour.md, and the "Not verified" sections of warp.md and wezterm-alacritty.md.
-- The C# interop library for the Windows host was compared on paper (§6.1); its per-frame cost on a real renderer is not measured yet (T17.4).
-- Whether `d3dcompiler_47.dll`, which `windows/Scull.Render` loads for `D3DCompile`, is guaranteed on every Windows 10 and 11 install. The API reference names the DLL (https://learn.microsoft.com/en-us/windows/win32/api/d3dcompiler/nf-d3dcompiler-d3dcompile, updated 2024-02-22) and "Where is the DirectX SDK?" calls the Windows SDK's copy a redistributable, not a system component (https://learn.microsoft.com/en-us/windows/win32/directx-sdk--august-2009-, updated 2025-03-11; both checked 2026-10-08); that a copy sits in System32 is only observed on the CI runner (T17.2).
+- Whether `d3dcompiler_47.dll`, which a Windows renderer that compiles HLSL at start-up loads for `D3DCompile`, is guaranteed on every Windows 10 and 11 install. The API reference names the DLL (https://learn.microsoft.com/en-us/windows/win32/api/d3dcompiler/nf-d3dcompiler-d3dcompile, updated 2024-02-22) and "Where is the DirectX SDK?" calls the Windows SDK's copy a redistributable, not a system component (https://learn.microsoft.com/en-us/windows/win32/directx-sdk--august-2009-, updated 2025-03-11; both checked 2026-10-08); that a copy sits in System32 was only observed on the CI runner by the removed C# renderer.

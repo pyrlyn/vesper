@@ -9,5 +9,5 @@
 ## How it was checked
 
 - With the stamp check removed from `Interner.sweep`, the two new tests and `InternerTest.internsBetweenMarksAndSweepSurvive` fail ("marks taken before an intern free nothing"); the source was restored afterwards.
-- `./gradlew check` on macOS arm64: ktlint and all tests pass (`scull-grid` 60 tests).
-- linuxX64: the `scull-grid` test binary passes in an Ubuntu 24.04 container (amd64 on Colima); mingwX64 compiles.
+- `./gradlew check` on macOS arm64: ktlint and all tests pass (`vesper-grid` 60 tests).
+- linuxX64: the `vesper-grid` test binary passes in an Ubuntu 24.04 container (amd64 on Colima); mingwX64 compiles.

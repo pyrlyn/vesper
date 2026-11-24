@@ -4,27 +4,11 @@ kotlin = "2.4.21"
 ktlint-gradle = "14.2.0"
 ktlint = "1.8.0"
 okio = "3.18.2"
-compose-multiplatform = "1.12.2"
-coroutines = "1.11.0"
-serialization = "1.12.0"
-pty4j = "0.14.0"
-oshi = "6.12.0"
-anthropic = "3.3.0"
 
 [libraries]
 # build-logic puts these Gradle plugins on the classpath of every module, so modules apply them
 # by id without a version.
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
-kotlin-compose-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
-kotlin-serialization-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
-compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "compose-multiplatform" }
 ktlint-gradle-plugin = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint-gradle" }
 
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
-kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
-kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
-pty4j = { module = "org.jetbrains.pty4j:pty4j", version.ref = "pty4j" }
-oshi-core = { module = "com.github.oshi:oshi-core", version.ref = "oshi" }
-anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic" }
-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

@@ -1,6 +1,6 @@
 # T13. Done
 
-Links and shell integration in the core (`scull-term`), stacked on T10.
+Links and shell integration in the core (`vesper-term`), stacked on T10.
 
 ## What was done
 
@@ -22,7 +22,7 @@ Links and shell integration in the core (`scull-term`), stacked on T10.
   - 4096 bytes for URIs;
   - 1 MiB of clipboard data;
   - a 2 MiB byte budget on the event queue, on top of the 32-event cap.
-- `scull-ffi` skips the new events until T13.3 gives them ABI kinds. T13.3 now also covers the link spans in the frame.
+- `vesper-ffi` skips the new events until T13.3 gives them ABI kinds. T13.3 now also covers the link spans in the frame.
 - Reused: the grid's link spans and `Marks`, and `kotlin.io.encoding.Base64`. No other OSC handler existed under apps, packages or tools.
 
 ## How it was checked
@@ -35,4 +35,4 @@ Links and shell integration in the core (`scull-term`), stacked on T10.
   - links across scroll, erase, overwrite and RIS;
   - the sweep past 1024 ids, and a table full of live ids.
 - `./gradlew ktlintFormat check` is green on macOS: 384 tests, 0 failures, and the C sanitizer runs pass.
-- On Linux in Colima, `scull-term` (98 tests) and `scull-ffi` (29 tests) pass.
+- On Linux in Colima, `vesper-term` (98 tests) and `vesper-ffi` (29 tests) pass.

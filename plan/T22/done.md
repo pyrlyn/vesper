@@ -13,5 +13,5 @@ The other half of the Rust fix bumps the generation when narrowing a row drops o
 ## How it was checked
 
 - The test fails against two broken versions of `clearLinks`: one that always bumps ("nothing was linked") and one that bumps whenever the row holds any link ("ranges that touch the link without overlapping it hold none of it"). The source was restored after each run.
-- `./gradlew check` on macOS arm64: ktlint and all tests pass (`scull-grid` 58 tests).
-- linuxX64: the `scull-grid` test binary passes in an Ubuntu 24.04 container (amd64 on Colima); mingwX64 compiles.
+- `./gradlew check` on macOS arm64: ktlint and all tests pass (`vesper-grid` 58 tests).
+- linuxX64: the `vesper-grid` test binary passes in an Ubuntu 24.04 container (amd64 on Colima); mingwX64 compiles.

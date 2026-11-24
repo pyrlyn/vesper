@@ -8,11 +8,11 @@ agent: Claude Code / claude-opus-5-5
 
 # T19.3. Kitty graphics protocol
 
-Part of T19, a pure decoder over the `scull-image` store. It covers:
+Part of T19, a pure decoder over the `vesper-image` store. It covers:
 
 - APC `G` key parsing;
 - chunked transmission (`m=1`);
-- formats 24, 32 and 100 (PNG through `scull-png`);
+- formats 24, 32 and 100 (PNG through `vesper-png`);
 - zlib (`o=z`) through `platform.zlib` with a cap;
 - the transmit, put and delete actions;
 - client image ids and numbers;
@@ -65,13 +65,13 @@ documentation of kitty 0.51.1):
 
 ## Execution plan
 
-1. `scull-png`: a public `Zlib` object, `deflate` (the encoder's, moved) and a capped `inflate`
+1. `vesper-png`: a public `Zlib` object, `deflate` (the encoder's, moved) and a capped `inflate`
    for `o=z`, with `ZlibException`.
-2. `scull-image`: the base64 part buffer shared by the iTerm2 and kitty decoders; `Placement`
+2. `vesper-image`: the base64 part buffer shared by the iTerm2 and kitty decoders; `Placement`
    gains the `X,Y` cell offsets.
-3. `scull-image`: `KittyGraphics` (keys, chunks, formats, actions, ids, replies) and
+3. `vesper-image`: `KittyGraphics` (keys, chunks, formats, actions, ids, replies) and
    `fuzzKitty`.
 4. Tests: golden replies per action and error, chunking, quiet levels, ids and numbers, each
-   delete kind, a seeded mutated corpus through `fuzzKitty`; zlib tests in `scull-png`.
-5. Verify: `./gradlew ktlintFormat check` on macOS; the `scull-png` and `scull-image` linuxX64
+   delete kind, a seeded mutated corpus through `fuzzKitty`; zlib tests in `vesper-png`.
+5. Verify: `./gradlew ktlintFormat check` on macOS; the `vesper-png` and `vesper-image` linuxX64
    test binaries in Colima.

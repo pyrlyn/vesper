@@ -4,7 +4,7 @@ The T13 events, clipboard answers and link ids over the C ABI, stacked on T13.
 
 ## What was done
 
-- `scull.h` is ABI 0.2. Everything new is appended, so a 0.1 host still links and runs.
+- `vesper.h` is ABI 0.2. Everything new is appended, so a 0.1 host still links and runs.
   - Event kinds `TT_EVENT_DIRECTORY`, `_SHELL_MARK`, `_CLIPBOARD_WRITE`, `_CLIPBOARD_READ`, `_LINK`, `_NOTIFICATION`.
   - `TT_SHELL_*` in `tt_event.detail`. `exit_code` is D's exit code, or `TT_EXIT_CODE_UNKNOWN` when D has none.
   - `tt_event.id` is the link id. `TT_EVENT_TEXT_TITLE` is the second text: a notification's title, or the clipboard targets.
@@ -33,4 +33,4 @@ The T13 events, clipboard answers and link ids over the C ABI, stacked on T13.
   - A spawned `/bin/sh` that reads its answer without writing first receives both the answer and the denial.
 - `tests/c/events.c` does the same through the header's prototypes under ASan+UBSan and TSan.
 - `./gradlew ktlintFormat check` passes on macOS arm64.
-- Linux x86_64 in Colima: `scull-term` 98 and `scull-ffi` 39 tests pass.
+- Linux x86_64 in Colima: `vesper-term` 98 and `vesper-ffi` 39 tests pass.
