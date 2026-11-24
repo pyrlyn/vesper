@@ -2,7 +2,7 @@
 status: in progress
 priority: P1
 complexity: 4
-readiness: 90%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -15,8 +15,8 @@ The removed Swift code in `macos/` at eaeb20f (`TextInput`, `ScreenText`, `Termi
 Check: `./gradlew check` with tests for the text and range mapping (ASCII, CJK wide cells, emoji, wrapped rows, trailing blanks); a real input method and VoiceOver speech need a human.
 
 Acceptance:
-- [ ] The work described above is implemented in Kotlin/Native.
-- [ ] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native.
+- [x] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
 
 ## Execution plan
 
