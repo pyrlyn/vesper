@@ -36,6 +36,7 @@ import platform.posix.getenv
 import vesper.grid.Attrs
 import vesper.grid.Style
 import vesper.grid.Underline
+import vesper.host.Bitmap
 import vesper.input.KeyAction
 import vesper.input.MouseAction
 import vesper.input.MouseButton

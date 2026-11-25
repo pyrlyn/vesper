@@ -13,6 +13,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.vesperHost)
             implementation(projects.vesperInput)
             implementation(projects.vesperGrid)
             implementation(projects.vesperTerm)

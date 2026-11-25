@@ -14,6 +14,7 @@ import platform.CoreGraphics.kCGBitmapByteOrder32Little
 import platform.CoreGraphics.kCGColorSpaceSRGB
 import platform.Foundation.writeToFile
 import platform.posix.getenv
+import vesper.host.Bitmap
 import vesper.term.Frame
 import vesper.term.Terminal
 import kotlin.io.encoding.Base64

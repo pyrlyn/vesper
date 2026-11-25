@@ -2,6 +2,11 @@ package vesper.macos
 
 import platform.Metal.MTLCreateSystemDefaultDevice
 import vesper.grid.Underline
+import vesper.host.Bitmap
+import vesper.host.isSpriteKey
+import vesper.host.keyFont
+import vesper.host.keyGlyph
+import vesper.host.keySprite
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

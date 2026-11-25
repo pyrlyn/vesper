@@ -10,6 +10,10 @@ import platform.Metal.MTLStorageModeShared
 import platform.Metal.MTLTextureDescriptor
 import platform.Metal.MTLTextureProtocol
 import platform.Metal.MTLTextureUsageShaderRead
+import vesper.host.AtlasEntry
+import vesper.host.AtlasTexture
+import vesper.host.Bitmap
+import vesper.host.GlyphCache
 
 /** A [width] by [height] region of a texture from ([x], [y]). */
 internal fun region(
@@ -44,56 +48,60 @@ internal fun MTLDeviceProtocol.sharedTexture(
     return newTextureWithDescriptor(descriptor)
 }
 
-/** The glyphs and sprites in one texture, laid out by [AtlasLayout]. */
+/** The glyphs and sprites in one Metal texture, cached by [GlyphCache]. */
 internal class GlyphAtlas private constructor(
-    private val device: MTLDeviceProtocol,
-    private val layout: AtlasLayout,
-    texture: MTLTextureProtocol,
+    private val store: Store,
+    private val cache: GlyphCache,
 ) {
-    var texture: MTLTextureProtocol = texture
-        private set
+    private class Store(
+        val device: MTLDeviceProtocol,
+    ) : AtlasTexture {
+        var texture: MTLTextureProtocol? = null
 
-    /** See [AtlasLayout.generation]: entries handed out under an older one are gone. */
-    val generation: Int get() = layout.generation
+        override fun resize(size: Int): Boolean {
+            texture = device.sharedTexture(size, size) ?: return false
+            return true
+        }
+
+        override fun upload(
+            entry: AtlasEntry,
+            bitmap: Bitmap,
+        ) {
+            bitmap.pixels.usePinned { pinned ->
+                texture!!.replaceRegion(
+                    region(entry.x, entry.y, bitmap.width, bitmap.height),
+                    0u,
+                    pinned.addressOf(0),
+                    (bitmap.width * 4).toULong(),
+                )
+            }
+        }
+    }
+
+    val texture: MTLTextureProtocol get() = store.texture!!
+
+    /** See [GlyphCache.generation]: entries handed out under an older one are gone. */
+    val generation: Int get() = cache.generation
 
     /** The entry for [key], rasterised by [make] the first time; null when it fits nowhere. */
     fun entry(
         key: Long,
         frame: Long,
         make: () -> Bitmap?,
-    ): AtlasEntry? {
-        layout.get(key, frame)?.let { return it }
-        val bitmap = make()
-        if (bitmap == null) {
-            layout.putEmpty(key)
-            return AtlasEntry.EMPTY
-        }
-        val size = layout.size
-        val entry = layout.place(key, bitmap.width, bitmap.height, bitmap.left, bitmap.top, bitmap.isColor, frame) ?: return null
-        if (layout.size != size) texture = device.sharedTexture(layout.size, layout.size) ?: return null
-        bitmap.pixels.usePinned { pinned ->
-            texture.replaceRegion(
-                region(entry.x, entry.y, bitmap.width, bitmap.height),
-                0u,
-                pinned.addressOf(0),
-                (bitmap.width * 4).toULong(),
-            )
-        }
-        return entry
-    }
+    ): AtlasEntry? = cache.entry(key, frame, make)
 
     fun touch(
         shelf: Int,
         frame: Long,
-    ) = layout.touch(shelf, frame)
+    ) = cache.touch(shelf, frame)
 
     companion object {
         fun create(
             device: MTLDeviceProtocol,
             size: Int = 1024,
         ): GlyphAtlas? {
-            val layout = AtlasLayout(size)
-            return device.sharedTexture(size, size)?.let { GlyphAtlas(device, layout, it) }
+            val store = Store(device)
+            return GlyphCache.create(store, size)?.let { GlyphAtlas(store, it) }
         }
     }
 }
