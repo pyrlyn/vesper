@@ -41,4 +41,6 @@ tasks.withType<KotlinNativeTest>().configureEach {
     environment("VESPER_TESTS_DIR", testsDir.absolutePath)
     // The fixtures are read at run time, so Gradle must be told that editing one reruns the tests.
     inputs.dir(testsDir).withPropertyName("fixtures").withPathSensitivity(PathSensitivity.RELATIVE)
+    // The Windows tests run only on CI, where the log is all there is: a failure shows its message.
+    testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
 }
