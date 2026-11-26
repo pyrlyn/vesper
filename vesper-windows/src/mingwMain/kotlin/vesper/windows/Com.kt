@@ -1,13 +1,17 @@
 package vesper.windows
 
+import kotlinx.cinterop.COpaquePointerVar
+import kotlinx.cinterop.CPointed
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.invoke
+import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
+import kotlinx.cinterop.value
 import platform.posix._GUID
 import platform.windows.IUnknown
 
@@ -32,6 +36,24 @@ internal fun release(pointer: CPointer<*>?) {
         .pointed.Release!!
         .invoke(unknown)
 }
+
+/** Asks [from] for another of its interfaces; the caller releases what comes back. */
+internal inline fun <reified T : CPointed> query(
+    from: CPointer<*>,
+    id: CPointer<_GUID>,
+    call: String,
+): CPointer<T> =
+    memScoped {
+        val unknown = from.reinterpret<IUnknown>()
+        val to = alloc<COpaquePointerVar>()
+        checkHr(
+            unknown.pointed.lpVtbl!!
+                .pointed.QueryInterface!!
+                .invoke(unknown, id, to.ptr),
+            call,
+        )
+        to.value!!.reinterpret()
+    }
 
 /**
  * An interface id that lives as long as the process, as COM takes ids by pointer. The DirectWrite

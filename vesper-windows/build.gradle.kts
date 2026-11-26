@@ -29,6 +29,11 @@ kotlin {
         compilations.getByName("main").cinterops.create("directx") {
             includeDirs(zigHeaders)
         }
+        binaries.executable {
+            entryPoint = "vesper.windows.main"
+            // A GUI program: no console window opens beside it.
+            linkerOpts("-Wl,--subsystem,windows")
+        }
     }
 
     sourceSets {
