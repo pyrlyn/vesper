@@ -50,7 +50,7 @@ private fun rowFor(
 private fun locate(spec: Spec): Path? {
     val dirs = environment("PATH")?.split(pathSeparator)?.filter { it.isNotEmpty() }.orEmpty()
     for (program in spec.programs) {
-        dirs.map { it.toPath() / program }.firstOrNull(::isFile)?.let { return it }
+        dirs.map { it.toPath() / programFile(program) }.firstOrNull(::isFile)?.let { return it }
     }
     return spec.fallback?.toPath()?.takeIf(::isFile)
 }
@@ -58,7 +58,15 @@ private fun locate(spec: Spec): Path? {
 private fun isFile(path: Path): Boolean = FileSystem.SYSTEM.metadataOrNull(path)?.isRegularFile == true
 
 @OptIn(ExperimentalNativeApi::class)
-private val pathSeparator: Char = if (Platform.osFamily == OsFamily.WINDOWS) ';' else ':'
+private val isWindows = Platform.osFamily == OsFamily.WINDOWS
+
+private val pathSeparator: Char = if (isWindows) ';' else ':'
+
+/** The file [program] is in a `PATH` directory: Windows names programs with an extension, `.exe` for every terminal here. */
+internal fun programFile(
+    program: String,
+    windows: Boolean = isWindows,
+): String = if (windows) "$program.exe" else program
 
 /** `<cpu> / <os>` for the table header. */
 @OptIn(ExperimentalNativeApi::class)

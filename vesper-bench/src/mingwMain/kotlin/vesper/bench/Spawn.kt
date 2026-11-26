@@ -2,7 +2,7 @@ package vesper.bench
 
 import kotlin.time.Duration
 
-// ConPTY spawning for the bench belongs to the Windows host; until then the row reports a failure.
+// Only kitty has a headless feed, and kitty has no Windows build, so no row on Windows comes here.
 internal actual fun feedStdin(
     program: String,
     args: List<String>,
