@@ -1,4 +1,4 @@
-package vesper.macos
+package vesper.host
 
 import vesper.grid.Attrs
 import vesper.grid.Color
@@ -38,20 +38,20 @@ private val ANSI =
 private val CUBE_LEVELS = intArrayOf(0, 95, 135, 175, 215, 255)
 
 /** Foreground and background of a cell as 0xRRGGBB. */
-internal data class CellColors(
-    val fg: Int,
-    val bg: Int,
+public data class CellColors(
+    public val fg: Int,
+    public val bg: Int,
 )
 
 /** Colours as the core names them (default, palette index or RGB) resolved to sRGB, xterm's palette until themes arrive (T20). */
-internal class Palette(
-    val foreground: Int = 0xE5E5E5,
-    val background: Int = 0x141414,
-    val cursor: Int = 0xE5E5E5,
+public class Palette(
+    public val foreground: Int = 0xE5E5E5,
+    public val background: Int = 0x141414,
+    public val cursor: Int = 0xE5E5E5,
     // Dark enough that the default foreground stays readable on each.
-    val selection: Int = 0x264F78,
-    val match: Int = 0x5A4A14,
-    val currentMatch: Int = 0x9A6700,
+    public val selection: Int = 0x264F78,
+    public val match: Int = 0x5A4A14,
+    public val currentMatch: Int = 0x9A6700,
 ) {
     private val indexed =
         IntArray(256).also { table ->
@@ -65,7 +65,7 @@ internal class Palette(
         }
 
     /** The sRGB value of [color], [fallback] for the default. */
-    fun resolve(
+    public fun resolve(
         color: Color,
         fallback: Int,
     ): Int =
@@ -80,7 +80,7 @@ internal class Palette(
      * A highlight in [flags] ([FrameCell] bits) takes the background: the current match first, then
      * the selection, then any match.
      */
-    fun colors(
+    public fun colors(
         style: Style,
         flags: Int = 0,
     ): CellColors {
@@ -92,7 +92,7 @@ internal class Palette(
     }
 
     /** The background a highlight in [flags] paints, or null for none. */
-    fun highlight(flags: Int): Int? =
+    public fun highlight(flags: Int): Int? =
         when {
             flags and FrameCell.CURRENT_MATCH != 0 -> currentMatch
             flags and FrameCell.SELECTED != 0 -> selection
@@ -101,20 +101,20 @@ internal class Palette(
         }
 }
 
-internal fun rgb(
+public fun rgb(
     red: Int,
     green: Int,
     blue: Int,
 ): Int = (red shl RED_SHIFT) or (green shl GREEN_SHIFT) or blue
 
-internal fun red(color: Int): Int = (color shr RED_SHIFT) and CHANNEL
+public fun red(color: Int): Int = (color shr RED_SHIFT) and CHANNEL
 
-internal fun green(color: Int): Int = (color shr GREEN_SHIFT) and CHANNEL
+public fun green(color: Int): Int = (color shr GREEN_SHIFT) and CHANNEL
 
-internal fun blue(color: Int): Int = color and CHANNEL
+public fun blue(color: Int): Int = color and CHANNEL
 
 /** The colour halfway between [a] and [b]. */
-internal fun blend(
+public fun blend(
     a: Int,
     b: Int,
 ): Int = rgb((red(a) + red(b)) / 2, (green(a) + green(b)) / 2, (blue(a) + blue(b)) / 2)

@@ -4,6 +4,10 @@ import vesper.harness.BASELINE_BYTES
 import vesper.harness.BASELINE_COLUMNS
 import vesper.harness.baselineInput
 import vesper.harness.fixed
+import vesper.host.Cells
+import vesper.host.Palette
+import vesper.host.RowSources
+import vesper.host.viewSize
 import vesper.term.Frame
 import vesper.term.Terminal
 import kotlin.time.Duration

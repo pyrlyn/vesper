@@ -1,42 +1,42 @@
-package vesper.macos
+package vesper.host
 
 /** Ints per quad: the 32 bytes the shaders' `Quad` struct takes. */
-internal const val QUAD_INTS = 8
+public const val QUAD_INTS: Int = 8
 
 /** A quad filled with its colour. */
-internal const val SOLID = 0
+public const val SOLID: Int = 0
 
 /** Atlas coverage tinted with the quad's colour. */
-internal const val TINTED = 1
+public const val TINTED: Int = 1
 
 /** An atlas texel's own colour (emoji), faded by the quad's alpha. */
-internal const val COLOR_GLYPH = 2
+public const val COLOR_GLYPH: Int = 2
 
 /** An image texture's texels. */
-internal const val IMAGE = 3
+public const val IMAGE: Int = 3
 
 private const val HALF = 16
 private const val SHORT = 0xFFFF
 private const val BYTE = 0xFF
 
 /**
- * Quads laid out as the shaders read them, so a row's list is copied into a Metal buffer as it is:
+ * Quads laid out as the shaders read them, so a row's list is copied into a GPU buffer as it is:
  * x, y, width, height as floats in pixels; the atlas texel as two 16-bit halves; RGBA with red in the
  * low byte; the kind; and for an image, the texels it spans.
  */
-internal class Quads(
+public class Quads(
     capacity: Int = 16,
 ) {
-    var data = IntArray(capacity * QUAD_INTS)
+    public var data: IntArray = IntArray(capacity * QUAD_INTS)
         private set
-    var count = 0
+    public var count: Int = 0
         private set
 
-    fun clear() {
+    public fun clear() {
         count = 0
     }
 
-    fun add(
+    public fun add(
         x: Float,
         y: Float,
         w: Float,
@@ -61,20 +61,20 @@ internal class Quads(
         count++
     }
 
-    fun x(index: Int): Float = Float.fromBits(data[index * QUAD_INTS])
+    public fun x(index: Int): Float = Float.fromBits(data[index * QUAD_INTS])
 
-    fun y(index: Int): Float = Float.fromBits(data[index * QUAD_INTS + 1])
+    public fun y(index: Int): Float = Float.fromBits(data[index * QUAD_INTS + 1])
 
-    fun w(index: Int): Float = Float.fromBits(data[index * QUAD_INTS + 2])
+    public fun w(index: Int): Float = Float.fromBits(data[index * QUAD_INTS + 2])
 
-    fun h(index: Int): Float = Float.fromBits(data[index * QUAD_INTS + 3])
+    public fun h(index: Int): Float = Float.fromBits(data[index * QUAD_INTS + 3])
 
-    fun color(index: Int): Int = data[index * QUAD_INTS + 5]
+    public fun color(index: Int): Int = data[index * QUAD_INTS + 5]
 
-    fun kind(index: Int): Int = data[index * QUAD_INTS + 6]
+    public fun kind(index: Int): Int = data[index * QUAD_INTS + 6]
 
     /** Appends quad [index] of [from], moved down by [dy] and recoloured. */
-    fun addCopy(
+    public fun addCopy(
         from: Quads,
         index: Int,
         dy: Float,
@@ -99,7 +99,7 @@ internal class Quads(
 }
 
 /** [rgb] (0xRRGGBB) with [alpha] as the shaders unpack it: red in the low byte. */
-internal fun shaderColor(
+public fun shaderColor(
     rgb: Int,
     alpha: Int = BYTE,
 ): Int = red(rgb) or (green(rgb) shl 8) or (blue(rgb) shl HALF) or (alpha shl 24)

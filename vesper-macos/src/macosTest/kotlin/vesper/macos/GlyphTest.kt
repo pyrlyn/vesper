@@ -3,10 +3,12 @@ package vesper.macos
 import platform.Metal.MTLCreateSystemDefaultDevice
 import vesper.grid.Underline
 import vesper.host.Bitmap
+import vesper.host.CellMetrics
 import vesper.host.isSpriteKey
 import vesper.host.keyFont
 import vesper.host.keyGlyph
 import vesper.host.keySprite
+import vesper.host.underlineSprite
 import kotlin.math.ceil
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -143,10 +145,10 @@ class GlyphAtlasTest {
         val atlas = assertNotNull(GlyphAtlas.create(device, size = 256))
         var made = 0
         val bitmap = { Bitmap.draw(10, 12, 0, 10, false) { made++ } }
-        val entry = assertNotNull(atlas.entry(1, 1, bitmap))
-        assertEquals(entry, atlas.entry(1, 2, bitmap))
+        val entry = assertNotNull(atlas.cache.entry(1, 1, bitmap))
+        assertEquals(entry, atlas.cache.entry(1, 2, bitmap))
         assertEquals(1, made)
-        assertTrue(assertNotNull(atlas.entry(2, 2) { null }).isEmpty)
+        assertTrue(assertNotNull(atlas.cache.entry(2, 2) { null }).isEmpty)
         assertEquals(256uL, atlas.texture.width)
     }
 }

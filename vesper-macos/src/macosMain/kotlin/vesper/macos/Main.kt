@@ -24,6 +24,8 @@ import platform.darwin.NSObject
 import platform.darwin.NSObjectProtocol
 import platform.posix.fflush
 import platform.posix.stdout
+import vesper.host.Cells
+import vesper.host.viewSize
 
 /** The size a new window opens at. */
 private val DEFAULT_GRID = Cells(80, 24)

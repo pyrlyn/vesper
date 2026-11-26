@@ -67,6 +67,17 @@ import vesper.grid.Attrs
 import vesper.grid.Style
 import vesper.grid.Underline
 import vesper.host.Bitmap
+import vesper.host.CellMetrics
+import vesper.host.Cells
+import vesper.host.PADDING
+import vesper.host.Palette
+import vesper.host.RowSources
+import vesper.host.blue
+import vesper.host.cellAt
+import vesper.host.green
+import vesper.host.gridSize
+import vesper.host.preeditLines
+import vesper.host.red
 import vesper.input.KeyAction
 import vesper.input.MouseAction
 import vesper.input.MouseButton

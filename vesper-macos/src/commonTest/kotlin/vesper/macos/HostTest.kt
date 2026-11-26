@@ -3,6 +3,15 @@ package vesper.macos
 import vesper.grid.Attrs
 import vesper.grid.Color
 import vesper.grid.Style
+import vesper.host.CellColors
+import vesper.host.CellSize
+import vesper.host.Cells
+import vesper.host.PADDING
+import vesper.host.Palette
+import vesper.host.cellAt
+import vesper.host.gridSize
+import vesper.host.rgb
+import vesper.host.viewSize
 import vesper.input.Key
 import vesper.input.KeyAction
 import vesper.input.KeypadKey
@@ -16,34 +25,6 @@ private const val SHIFT = 1L shl 17
 private const val CONTROL = 1L shl 18
 private const val OPTION = 1L shl 19
 private const val COMMAND = 1L shl 20
-
-class PaletteTest {
-    private val palette = Palette()
-
-    @Test
-    fun indexedColoursAreXterms() {
-        assertEquals(0xCD0000, palette.resolve(Color.indexed(1), 0))
-        assertEquals(0x000000, palette.resolve(Color.indexed(16), 0))
-        assertEquals(0x5F87AF, palette.resolve(Color.indexed(67), 0))
-        assertEquals(0xFFFFFF, palette.resolve(Color.indexed(231), 0))
-        assertEquals(0x080808, palette.resolve(Color.indexed(232), 0))
-        assertEquals(0xEEEEEE, palette.resolve(Color.indexed(255), 0))
-    }
-
-    @Test
-    fun directAndDefaultColours() {
-        assertEquals(0x123456, palette.resolve(Color.rgb(0x12, 0x34, 0x56), 0))
-        assertEquals(0xABCDEF, palette.resolve(Color.DEFAULT, 0xABCDEF))
-    }
-
-    @Test
-    fun reverseVideoSwapsAndDimBlends() {
-        assertEquals(CellColors(palette.foreground, palette.background), palette.colors(Style.DEFAULT))
-        assertEquals(CellColors(palette.background, palette.foreground), palette.colors(Style(attrs = Attrs.INVERSE)))
-        val dim = palette.colors(Style(fg = Color.rgb(200, 100, 0), bg = Color.rgb(0, 0, 0), attrs = Attrs.DIM))
-        assertEquals(CellColors(rgb(100, 50, 0), 0), dim)
-    }
-}
 
 class MacKeysTest {
     @Test
@@ -101,27 +82,6 @@ class MacKeysTest {
         val event = macKeyEvent(0x7E, SHIFT, "", "", "", KeyAction.Press)!!
         assertEquals("", event.text)
         assertEquals(Modifiers.SHIFT, event.mods)
-    }
-}
-
-class GeometryTest {
-    private val cell = CellSize(8.0, 16.0)
-
-    @Test
-    fun theGridFitsWholeCellsInsideThePadding() {
-        assertEquals(Cells(80, 24), gridSize(80 * 8 + 2 * PADDING + 7, 24 * 16 + 2 * PADDING + 15, cell))
-        assertEquals(Cells(1, 1), gridSize(0.0, 0.0, cell))
-        val (width, height) = viewSize(Cells(80, 24), cell)
-        assertEquals(Cells(80, 24), gridSize(width, height, cell))
-    }
-
-    @Test
-    fun pointsMapToCellsAndClampAtTheEdges() {
-        val grid = Cells(80, 24)
-        assertEquals(Cells(0, 0), cellAt(PADDING, PADDING, cell, grid))
-        assertEquals(Cells(1, 2), cellAt(PADDING + 8, PADDING + 40, cell, grid))
-        assertEquals(Cells(0, 0), cellAt(-50.0, -50.0, cell, grid))
-        assertEquals(Cells(79, 23), cellAt(5000.0, 5000.0, cell, grid))
     }
 }
 

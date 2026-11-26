@@ -15,6 +15,8 @@ import platform.Foundation.dateWithTimeIntervalSinceNow
 import platform.Foundation.runUntilDate
 import platform.Foundation.writeToFile
 import platform.posix.getenv
+import vesper.host.Cells
+import vesper.host.viewSize
 import kotlin.test.Test
 import kotlin.test.fail
 import kotlin.time.Duration.Companion.seconds

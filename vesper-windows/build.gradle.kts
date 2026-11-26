@@ -37,7 +37,10 @@ kotlin {
     }
 
     sourceSets {
-        mingwMain.dependencies { implementation(projects.vesperHost) }
+        mingwMain.dependencies {
+            implementation(projects.vesperHost)
+            implementation(projects.vesperUnicode)
+        }
         all { languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi") }
     }
 }

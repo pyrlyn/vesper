@@ -16,6 +16,8 @@ import platform.Foundation.appendAttributedString
 import platform.Foundation.create
 import platform.Foundation.dateWithTimeIntervalSinceNow
 import platform.Foundation.runUntilDate
+import vesper.host.Cells
+import vesper.host.viewSize
 import vesper.term.TextRange
 import kotlin.test.Test
 import kotlin.test.assertEquals

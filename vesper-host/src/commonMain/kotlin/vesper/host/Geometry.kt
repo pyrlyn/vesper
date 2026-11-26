@@ -1,14 +1,14 @@
-package vesper.macos
+package vesper.host
 
 import kotlin.math.floor
 
 /** Space between the window's edge and the text, in points. */
-internal const val PADDING = 4.0
+public const val PADDING: Double = 4.0
 
 /** One cell in points. */
-internal data class CellSize(
-    val width: Double,
-    val height: Double,
+public data class CellSize(
+    public val width: Double,
+    public val height: Double,
 ) {
     init {
         require(width > 0 && height > 0) { "a cell of $width by $height" }
@@ -16,13 +16,13 @@ internal data class CellSize(
 }
 
 /** A size or position in whole cells. */
-internal data class Cells(
-    val cols: Int,
-    val rows: Int,
+public data class Cells(
+    public val cols: Int,
+    public val rows: Int,
 )
 
 /** How many whole cells fit in a view of [width] by [height] points; at least one each way. */
-internal fun gridSize(
+public fun gridSize(
     width: Double,
     height: Double,
     cell: CellSize,
@@ -33,13 +33,13 @@ internal fun gridSize(
     )
 
 /** The view size, in points, that holds [cells] exactly. */
-internal fun viewSize(
+public fun viewSize(
     cells: Cells,
     cell: CellSize,
 ): Pair<Double, Double> = cells.cols * cell.width + 2 * PADDING to cells.rows * cell.height + 2 * PADDING
 
 /** The cell under ([x], [y]) in a top-down view, clamped to the [grid] so a drag past the edge still lands on it. */
-internal fun cellAt(
+public fun cellAt(
     x: Double,
     y: Double,
     cell: CellSize,

@@ -15,6 +15,11 @@ import platform.CoreGraphics.kCGColorSpaceSRGB
 import platform.Foundation.writeToFile
 import platform.posix.getenv
 import vesper.host.Bitmap
+import vesper.host.Cells
+import vesper.host.PADDING
+import vesper.host.Palette
+import vesper.host.RowSources
+import vesper.host.viewSize
 import vesper.term.Frame
 import vesper.term.SelectionKind
 import vesper.term.Terminal

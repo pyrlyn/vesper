@@ -1,6 +1,5 @@
 package vesper.macos
 
-import vesper.term.FramePreedit
 import vesper.term.PreeditClause
 import vesper.term.PreeditKind
 import vesper.term.TextRange
@@ -122,18 +121,3 @@ internal class TextInput {
         }
     }
 }
-
-/** An underline under [cols] preedit columns from [col]; [thick] under the clause being converted. */
-internal data class PreeditLine(
-    val col: Int,
-    val cols: Int,
-    val thick: Boolean,
-)
-
-/** The underlines a shown preedit gets: one per clause, or one plain line when the input method marked none. */
-internal fun preeditLines(preedit: FramePreedit): List<PreeditLine> =
-    if (preedit.spans.isEmpty()) {
-        listOf(PreeditLine(preedit.col, preedit.cols, false))
-    } else {
-        preedit.spans.map { PreeditLine(it.col, it.cols, it.kind == PreeditKind.Target) }
-    }

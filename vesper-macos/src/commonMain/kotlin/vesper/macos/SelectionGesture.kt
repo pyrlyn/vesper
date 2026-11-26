@@ -1,5 +1,6 @@
 package vesper.macos
 
+import vesper.host.Cells
 import vesper.term.SelectionKind
 
 // The pure half of mouse selection: what a press does and when a drag scrolls. The view runs the

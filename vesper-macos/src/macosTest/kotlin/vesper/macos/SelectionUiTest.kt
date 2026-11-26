@@ -20,6 +20,10 @@ import platform.Foundation.NSRunLoop
 import platform.Foundation.NSSelectorFromString
 import platform.Foundation.dateWithTimeIntervalSinceNow
 import platform.Foundation.runUntilDate
+import vesper.host.Cells
+import vesper.host.PADDING
+import vesper.host.Palette
+import vesper.host.viewSize
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

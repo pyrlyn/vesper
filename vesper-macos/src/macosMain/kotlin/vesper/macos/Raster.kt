@@ -31,42 +31,18 @@ import platform.CoreText.CTFontRef
 import platform.CoreText.kCTFontOrientationDefault
 import platform.CoreText.kCTFontTraitColorGlyphs
 import vesper.host.Bitmap
+import vesper.host.CellMetrics
+import vesper.host.CellSize
 import kotlin.math.ceil
 import kotlin.math.floor
-import kotlin.math.max
-import kotlin.math.min
 
-/** Half up, as pixel snapping wants; Kotlin's own rounding goes half to even. */
-internal fun snap(value: Double): Double = floor(value + 0.5)
-
-/** Cell geometry in pixels, shared by the renderer and the sprites. */
-internal class CellMetrics(
-    /** Cell size; whole points times the scale. */
-    val width: Double,
-    val height: Double,
-    /** From the cell's top to the baseline. */
-    val baseline: Double,
-    /** From the cell's top to the middle of the underline. */
-    val underline: Double,
-    /** A light line. */
-    val thickness: Double,
-    /** From the baseline up to a strike-through. */
-    val strike: Double,
-) {
-    companion object {
-        fun of(
-            font: CTFontRef?,
-            cell: CellSize,
-            scale: Double,
-        ): CellMetrics {
-            val height = cell.height * scale
-            val baseline = snap(CTFontGetAscent(font) * scale)
-            val thickness = max(1.0, snap(CTFontGetUnderlineThickness(font) * scale))
-            val underline = min(baseline - CTFontGetUnderlinePosition(font) * scale, height - thickness * 2)
-            return CellMetrics(cell.width * scale, height, baseline, underline, thickness, CTFontGetXHeight(font) * scale / 2)
-        }
-    }
-}
+/** The metrics of [cell] at [scale] pixels per point, measured from [font]. */
+internal fun CellMetrics.Companion.of(
+    font: CTFontRef?,
+    cell: CellSize,
+    scale: Double,
+): CellMetrics =
+    of(cell, scale, CTFontGetAscent(font), CTFontGetUnderlinePosition(font), CTFontGetUnderlineThickness(font), CTFontGetXHeight(font))
 
 /** Draws [body] into a fresh transparent bitmap, in CoreGraphics' bottom-up coordinates. */
 internal fun Bitmap.Companion.draw(

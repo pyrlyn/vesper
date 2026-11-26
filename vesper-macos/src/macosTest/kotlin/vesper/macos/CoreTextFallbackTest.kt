@@ -18,6 +18,10 @@ import platform.Foundation.writeToFile
 import platform.posix.chmod
 import platform.posix.getpid
 import platform.posix.unlink
+import vesper.host.Bitmap
+import vesper.host.Cells
+import vesper.host.PADDING
+import vesper.host.viewSize
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

@@ -38,25 +38,15 @@ import platform.CoreText.CTRunGetStringIndices
 import platform.CoreText.CTRunRef
 import platform.CoreText.kCTFontAttributeName
 import platform.Foundation.CFBridgingRelease
+import vesper.host.Clusters
+import vesper.host.ShapeCache
+import vesper.host.ShapedGlyph
 import vesper.host.glyphKey
 import vesper.host.spriteKey
-import vesper.unicode.GraphemeState
-import vesper.unicode.forEachCodePoint
 
 // Shapes the core's text runs with CoreText. CoreText brings ligatures and font fallback (colour
-// emoji among them), but its advances belong to whichever font it fell back to; the core alone
-// decides columns, so each glyph is pinned to the column of its cluster and keeps only its offset
-// inside that cluster.
-
-private const val SUPPLEMENTARY = 0x10000
-
-/** One glyph of a shaped run: its atlas key, its cluster's column from the run's first, and points from the cluster's pen (y up). */
-internal data class ShapedGlyph(
-    val key: Long,
-    val column: Int,
-    val dx: Double,
-    val dy: Double,
-)
+// emoji among them), but its advances belong to whichever font it fell back to, so each glyph keeps
+// only its offset inside its cluster (see Clusters).
 
 /** The fonts glyph keys refer to: the four faces first, then each fallback font CoreText picks, numbered as they turn up. */
 internal class FontRegistry {
@@ -78,22 +68,12 @@ internal class FontRegistry {
 
 internal class RunShaper(
     text: TextStyle,
-    private val cacheLimit: Int = 4096,
+    cacheLimit: Int = 4096,
 ) {
     val registry = FontRegistry()
     private val faces = text.faces
     private val attributes: List<CFDictionaryRef?> = faces.map(::shapingAttributes)
-
-    private data class Key(
-        val text: String,
-        val face: Int,
-        val width: Int,
-    )
-
-    // Two generations make a bounded cache that keeps what is still in use: a hit in the old one moves
-    // forward, and the old one is dropped whole when the new one fills.
-    private var recent = HashMap<Key, List<ShapedGlyph>>()
-    private var older = HashMap<Key, List<ShapedGlyph>>()
+    private val cache = ShapeCache(cacheLimit, ::layout)
 
     init {
         faces.forEach(registry::id)
@@ -104,57 +84,24 @@ internal class RunShaper(
         text: String,
         face: Int,
         width: Int,
-    ): List<ShapedGlyph> {
-        val key = Key(text, face.coerceIn(faces.indices), width.coerceAtLeast(1))
-        recent[key]?.let { return it }
-        val glyphs = older.remove(key) ?: layout(text, key.face, key.width)
-        if (recent.size >= cacheLimit) {
-            older = recent
-            recent = HashMap()
-        }
-        recent[key] = glyphs
-        return glyphs
-    }
+    ): List<ShapedGlyph> = cache.shape(text, face, width)
 
     private fun layout(
         text: String,
         face: Int,
         width: Int,
     ): List<ShapedGlyph> {
-        // Column and cluster start of every UTF-16 offset, as CoreText reports string indices in UTF-16.
-        val column = IntArray(text.length)
-        val clusterStart = IntArray(text.length)
+        val clusters = Clusters(text, width)
         val sprites = HashSet<Int>()
         val out = ArrayList<ShapedGlyph>()
-        val graphemes = GraphemeState()
-        var cluster = -1
-        var start = 0
-        var at = 0
-        // (start, first code point, units) of each cluster.
-        val clusters = ArrayList<Triple<Int, Int, Int>>()
-        text.forEachCodePoint { cp ->
-            val units = if (cp >= SUPPLEMENTARY) 2 else 1
-            if (graphemes.next(cp)) {
-                cluster++
-                start = at
-                clusters.add(Triple(at, cp, 0))
-            }
-            clusters[cluster] = clusters[cluster].copy(third = at + units - start)
-            for (unit in at until at + units) {
-                column[unit] = cluster * width
-                clusterStart[unit] = start
-            }
-            at += units
-        }
         // A sprite stands alone in its cell; a cluster with marks goes to the font.
-        for ((index, entry) in clusters.withIndex()) {
-            val (first, cp, units) = entry
-            if (!isSprite(cp) || units != (if (cp >= SUPPLEMENTARY) 2 else 1)) continue
-            sprites.add(first)
-            out.add(ShapedGlyph(spriteKey(cp), index * width, 0.0, 0.0))
+        for ((index, cluster) in clusters.clusters.withIndex()) {
+            if (!isSprite(cluster.codePoint) || !cluster.isSingle) continue
+            sprites.add(cluster.start)
+            out.add(ShapedGlyph(spriteKey(cluster.codePoint), index * width, 0.0, 0.0))
         }
-        if (text.isEmpty() || sprites.size == clusters.size) return out
-        placeGlyphs(text, face, column, clusterStart, sprites, out)
+        if (text.isEmpty() || sprites.size == clusters.clusters.size) return out
+        placeGlyphs(text, face, clusters.column, clusters.start, sprites, out)
         return out
     }
 

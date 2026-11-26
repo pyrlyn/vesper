@@ -25,6 +25,9 @@ import platform.CoreGraphics.CGRectMake
 import platform.CoreGraphics.CGRectStandardize
 import vesper.grid.Underline
 import vesper.host.Bitmap
+import vesper.host.CellMetrics
+import vesper.host.snap
+import vesper.host.spriteUnderline
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -36,11 +39,7 @@ import kotlin.math.sin
 // separators and the underline kinds. A font's own box glyphs rarely fill the cell exactly, so lines
 // break between rows; drawn to the cell's own size they always meet.
 
-private const val UNDERLINE_BASE = 0x110000
 private val SPRITE_RANGES = listOf(0x2500..0x259F, 0xE0B0..0xE0BF)
-
-/** The sprite code of an underline kind: past Unicode's last code point, so no character has it. */
-internal fun underlineSprite(kind: Underline): Int = UNDERLINE_BASE + kind.ordinal
 
 /** Whether [codePoint] is drawn from geometry. */
 internal fun isSprite(codePoint: Int): Boolean = SPRITE_RANGES.any { codePoint in it }
@@ -50,8 +49,7 @@ internal fun spriteBitmap(
     code: Int,
     cell: CellMetrics,
 ): Bitmap? {
-    val underline = code - UNDERLINE_BASE
-    if (!isSprite(code) && underline !in Underline.Single.ordinal..Underline.Dashed.ordinal) return null
+    if (!isSprite(code) && spriteUnderline(code) == null) return null
     val width = ceil(cell.width).toInt()
     val height = ceil(cell.height).toInt()
     return Bitmap.draw(width, height, 0, cell.baseline.toInt(), false) { context ->
@@ -180,7 +178,7 @@ private class Painter(
             }
 
             else -> {
-                underline(Underline.entries[code - UNDERLINE_BASE])
+                spriteUnderline(code)?.let(::underline)
             }
         }
     }

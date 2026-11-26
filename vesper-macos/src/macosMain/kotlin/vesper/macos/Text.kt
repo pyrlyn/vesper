@@ -40,6 +40,11 @@ import platform.CoreText.kCTFontUIFontUserFixedPitch
 import platform.CoreText.kCTForegroundColorFromContextAttributeName
 import platform.CoreText.kCTKernAttributeName
 import platform.darwin.UniCharVar
+import vesper.host.CellSize
+import vesper.host.FACES
+import vesper.host.face
+import vesper.host.isBoldFace
+import vesper.host.isItalicFace
 import kotlin.math.ceil
 
 /** Points; T20 makes it a setting. */
@@ -47,9 +52,6 @@ private const val FONT_SIZE = 13.0
 
 // What a fixed-pitch face's advance is, as a share of its size, should it report none.
 private const val FALLBACK_ADVANCE = 0.6
-
-private const val BOLD = 1
-private const val ITALIC = 2
 
 /**
  * The user's fixed-pitch font and its bold and italic faces, and one line of text drawn with
@@ -71,7 +73,7 @@ internal class TextStyle {
         val regular = CTFontCreateUIFontForLanguage(kCTFontUIFontUserFixedPitch, FONT_SIZE, null)
         // A face the font lacks comes back null; the regular face stands in for it.
         faces =
-            (0..(BOLD or ITALIC)).map { traits ->
+            (0 until FACES).map { traits ->
                 val mask = traitMask(traits)
                 if (traits == 0) regular else CTFontCreateCopyWithSymbolicTraits(regular, 0.0, null, mask, mask) ?: regular
             }
@@ -103,7 +105,7 @@ internal class TextStyle {
     }
 
     private fun traitMask(traits: Int): UInt =
-        (if (traits and BOLD != 0) kCTFontTraitBold else 0u) or (if (traits and ITALIC != 0) kCTFontTraitItalic else 0u)
+        (if (isBoldFace(traits)) kCTFontTraitBold else 0u) or (if (isItalicFace(traits)) kCTFontTraitItalic else 0u)
 
     private fun attributesFor(
         face: CTFontRef?,
@@ -130,12 +132,6 @@ internal class TextStyle {
                 ?: FONT_SIZE * FALLBACK_ADVANCE
         }
 }
-
-/** The index in [TextStyle.faces] of a style's face. */
-internal fun face(
-    bold: Boolean,
-    italic: Boolean,
-): Int = (if (bold) BOLD else 0) or (if (italic) ITALIC else 0)
 
 /** The text of one code point, for a cell drawn on its own. */
 internal fun codePointText(codePoint: Int): String =
