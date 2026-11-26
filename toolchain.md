@@ -13,7 +13,7 @@
 | hk | mise (`mise.toml` pins 2.5.0) | Runs jactionlint as a pre-push hook (`hk.pkl`) | https://github.com/jdx/hk |
 | shellcheck | mise (`mise.toml` pins 0.11.0; CI uses the runner image's copy) | Checks `run:` scripts inside jactionlint | https://github.com/koalaman/shellcheck |
 
-The PTY bindings (POSIX PTY, ConPTY) need no package: `vesper-pty` declares them in its own cinterop `.def` files, compiled by the clang that ships with Kotlin/Native (`plan/T8/task.md` says why). A fuzz/property-test runner is chosen and recorded here in T25.
+The PTY bindings (POSIX PTY, ConPTY) need no package: `vesper-pty` declares them in its own cinterop `.def` files, compiled by the clang that ships with Kotlin/Native (`plan/T8/task.md` says why). `vesper-macos` binds the Mach-O section calls the same way (`macho.def`, headers only). A fuzz/property-test runner is chosen and recorded here in T25.
 
 ## Kotlin/Native platform libraries
 
@@ -29,6 +29,12 @@ The PTY bindings (POSIX PTY, ConPTY) need no package: `vesper-pty` declares them
 | org.jlleitschuh.gradle:ktlint-gradle 14.2.0 | local (`gradle/libs.versions.toml`, used by `build-logic`) | https://github.com/JLLeitschuh/ktlint-gradle | Runs ktlint 1.8.0 as part of `check` |
 | org.jetbrains.kotlin:kotlin-test | local (every module's `commonTest`, version from the Kotlin plugin) | https://github.com/JetBrains/kotlin | Test API of the native tests |
 | com.squareup.okio:okio 3.18.2 | local (`vesper-harness`, `vesper-bench`) | https://github.com/square/okio | Multiplatform file access: the harness reads the golden frames and the conformance fixtures in `tests/`, the bench writes `docs/benchmarks/baseline.md`; Kotlin/Native has no `java.io` |
+
+## Bundled assets
+
+| Asset | Where | Source | Why here |
+| --- | --- | --- | --- |
+| Symbols Nerd Font Mono 3.5.1 (MIT) | local (`vesper-macos/fonts/`, with its `LICENSE`; linked into every macOS binary with `-sectcreate __TEXT __nerd_symbols`) | https://github.com/ryanoasis/nerd-fonts | Powerline extras and Nerd Font icons in prompts draw with no Nerd Font installed; the macOS renderer falls back to it before the system fonts |
 
 ## Linkers
 

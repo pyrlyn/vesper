@@ -1,0 +1,5 @@
+# The Mach-O calls the platform libraries leave out: the symbols font is read from a section of the
+# running executable (see build.gradle.kts). Bindings only; no code of our own.
+package = vesper.macos.macho
+headers = mach-o/getsect.h mach-o/dyld.h
+headerFilter = mach-o/getsect.h mach-o/dyld.h
