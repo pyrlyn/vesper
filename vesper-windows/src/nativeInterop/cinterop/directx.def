@@ -1,0 +1,11 @@
+# Direct3D 11, DXGI and DirectWrite, which the platform.windows bindings leave out. Headers only,
+# with no code of our own: every interface comes as a C struct with a vtable. dwrite*.h and
+# dcommon.h come from Zig (see build.gradle.kts), the rest from Kotlin/Native's mingw sysroot.
+package = vesper.windows.dx
+headers = d3d11.h dxgi1_2.h dwrite_2.h
+headerFilter = d3d11.h d3dcommon.h dxgi.h dxgi1_2.h dxgiformat.h dxgitype.h dxgicommon.h dwrite.h dwrite_1.h dwrite_2.h dcommon.h
+# WINE_NO_UNICODE_MACROS keeps wingdi.h from renaming IDWriteFontFace::GetGlyphIndices to its "A" form.
+compilerOpts = -D_WIN32_WINNT=0x0A00 -DWINE_NO_UNICODE_MACROS
+# dxguid holds the Direct3D and DXGI interface ids; the DirectWrite ones are not in any mingw
+# library, so the code spells those out.
+linkerOpts = -ld3d11 -ldxgi -ldwrite -ldxguid

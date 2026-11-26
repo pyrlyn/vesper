@@ -12,8 +12,9 @@
 | jactionlint | mise (`mise.toml` pins `github:jdx/jactionlint` 2.0.2) | Lint the workflows (the `jactionlint` CI job, the pre-push hook and `mise x -- jactionlint`) | https://github.com/jdx/jactionlint |
 | hk | mise (`mise.toml` pins 2.5.0) | Runs jactionlint as a pre-push hook (`hk.pkl`) | https://github.com/jdx/hk |
 | shellcheck | mise (`mise.toml` pins 0.11.0; CI uses the runner image's copy) | Checks `run:` scripts inside jactionlint | https://github.com/koalaman/shellcheck |
+| Zig | mise (`mise.toml` pins 0.17.1) | Supplies mingw-w64's IDL-generated DirectWrite headers (`dwrite*.h`, `dcommon.h`) that `vesper-windows` binds with cinterop; the Kotlin/Native sysroot's copies do not compile as C (`research.md` §6.2). No Zig code is built | https://codeberg.org/ziglang/zig |
 
-The PTY bindings (POSIX PTY, ConPTY) need no package: `vesper-pty` declares them in its own cinterop `.def` files, compiled by the clang that ships with Kotlin/Native (`plan/T8/task.md` says why). A fuzz/property-test runner is chosen and recorded here in T25.
+The PTY bindings (POSIX PTY, ConPTY) need no package: `vesper-pty` declares them in its own cinterop `.def` files, compiled by the clang that ships with Kotlin/Native (`plan/T8/task.md` says why). `vesper-windows` binds Direct3D 11, DXGI and DirectWrite the same way (`directx.def`, headers only), linking the sysroot's `d3d11`, `dxgi`, `dxguid` and `dwrite` import libraries. A fuzz/property-test runner is chosen and recorded here in T25.
 
 ## Kotlin/Native platform libraries
 
