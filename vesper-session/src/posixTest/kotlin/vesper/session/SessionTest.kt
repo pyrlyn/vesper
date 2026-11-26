@@ -7,6 +7,8 @@ import vesper.input.KeyEvent
 import vesper.pty.SpawnOptions
 import vesper.term.Event
 import vesper.term.Frame
+import vesper.term.SelectionKind
+import vesper.term.TextRange
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.incrementAndFetch
@@ -72,6 +74,40 @@ class SessionTest {
             session.key(KeyEvent(Key.Enter))
             // The line discipline echoes the line, then cat writes it back.
             session.await(Frame()) { text -> text.lines().count { it == "abc" } == 2 }
+        }
+    }
+
+    @Test
+    fun aSelectionInViewportCellsReadsBackInTheViewportText() {
+        Session.spawn(SpawnOptions.command("cat")) {}.use { session ->
+            session.text("hello world")
+            session.await(Frame()) { it.startsWith("hello world") }
+            session.select(SelectionKind.Word, 0, 7)
+            val text = session.viewportText()
+            assertEquals(listOf(TextRange(6, 11)), text.selected)
+            session.selectClear()
+            assertEquals(emptyList(), session.viewportText().selected)
+        }
+    }
+
+    @Test
+    fun theSelectionCopiesAndASearchStepsAndCounts() {
+        Session.spawn(SpawnOptions.command("cat")) {}.use { session ->
+            assertEquals(false, session.hasSelection)
+            assertEquals("", session.selectionText())
+            session.text("one Two two")
+            session.await(Frame()) { it.startsWith("one Two two") }
+            session.select(SelectionKind.Word, 0, 5)
+            assertEquals(true, session.hasSelection)
+            assertEquals("Two", session.selectionText())
+            session.search("two", caseSensitive = false)
+            assertEquals(2, session.searchCount())
+            assertEquals(true, session.searchStep(forward = true))
+            session.search("two", caseSensitive = true)
+            assertEquals(1, session.searchCount())
+            session.search("", caseSensitive = true)
+            assertEquals(0, session.searchCount(), "an empty pattern ends the search")
+            assertEquals(false, session.searchStep(forward = false))
         }
     }
 

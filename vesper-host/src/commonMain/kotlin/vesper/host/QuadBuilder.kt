@@ -148,6 +148,23 @@ public class QuadBuilder(
         return under to over
     }
 
+    /** Underlines under the shown preedit in grid pixels, added to [out]: one per clause with a gap between them, thick under the target. */
+    public fun preeditQuads(
+        frame: Frame,
+        out: Quads,
+    ) {
+        val preedit = frame.preedit ?: return
+        if (preedit.row !in 0 until rows) return
+        val t = metrics.thickness.toFloat()
+        val bottom = ((preedit.row + 1) * metrics.height).toFloat()
+        val color = shaderColor(palette.foreground)
+        for (line in preeditLines(preedit)) {
+            val height = if (line.thick) 2 * t else t
+            val left = x(line.col) + t
+            out.add(left, bottom - height, x(line.col + line.cols) - t - left, height, color)
+        }
+    }
+
     private fun allocate(
         cols: Int,
         rows: Int,
@@ -175,7 +192,14 @@ public class QuadBuilder(
         var start = 0
         var current = palette.background
         for (col in 0..cols) {
-            val bg = if (col == cols) palette.background else palette.colors(style(frame, frame.cell(row, col).style)).bg
+            val bg =
+                if (col ==
+                    cols
+                ) {
+                    palette.background
+                } else {
+                    frame.cell(row, col).let { palette.colors(style(frame, it.style), it.flags).bg }
+                }
             if (bg == current && col < cols) continue
             if (current != palette.background && col > start) {
                 out.bg.add(x(start), 0f, x(col) - x(start), metrics.height.toFloat(), shaderColor(current))

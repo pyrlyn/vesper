@@ -12,6 +12,8 @@ A Kotlin/Native Windows app (`vesper-windows`, `mingwX64`) over Win32: a window 
 
 First step, a spike: Win32 and Direct3D 11 have C interfaces that Kotlin/Native cinterop can bind (`windows.h`, `d3d11.h` and `dxgi1_2.h` with `COBJMACROS`), but `dwrite.h` is C++ only. Pick how DirectWrite is reached (a small Zig shim exposing a C API is the first choice, C++ only if Zig cannot) and record it in `research.md` and `toolchain.md`.
 
+Box drawing, block elements and the Powerline separators U+E0B0–U+E0BF are drawn from the cell's own geometry, as the macOS sprites are (`vesper-macos` `Sprites.kt`; T28), so prompt segments meet without seams; the code that both hosts then share moves into a common module.
+
 The removed C# app in `windows/` at eaeb20f (its renderer, app shell, input mapping and event policy) is the reference design. The execution plan is written at claim time and split into slices of at most 500 lines.
 
 Check: `./gradlew check` on the Windows runner, renderer tests on WARP into an offscreen texture; how the app looks on a desktop needs a human.
