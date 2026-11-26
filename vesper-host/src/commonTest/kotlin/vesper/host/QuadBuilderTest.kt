@@ -136,4 +136,17 @@ class QuadBuilderTest {
         assertTrue(f.row(2).version > versions[2])
         assertEquals(rasterised, f.glyphs.rasterised, "cached glyphs are not rasterised again")
     }
+
+    @Test
+    fun anImageIsOneQuadOverItsCellsInsideItsTexture() {
+        val f = fixture(6, 3)
+        // A 2 by 2 RGBA image over two cells of the second row.
+        f.feed("\r\n${ESC}_Ga=T,f=32,s=2,v=2,c=2,r=1;AAD//wAA//8AAP//AAD//w==$ESC\\")
+        val placement = f.frame.placements.single()
+        assertTrue(f.builder.shows(placement))
+        val quad = f.builder.imageQuad(placement, 2, 2)!!
+        assertEquals(listOf(0f, 16f, 2 * 8f, 16f), listOf(quad.x(0), quad.y(0), quad.w(0), quad.h(0)))
+        assertEquals(IMAGE, quad.kind(0))
+        assertEquals(null, f.builder.imageQuad(placement, 0, 2), "a texture without pixels shows nothing")
+    }
 }

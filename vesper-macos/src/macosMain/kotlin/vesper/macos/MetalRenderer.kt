@@ -65,6 +65,7 @@ import vesper.host.keyGlyph
 import vesper.host.keySprite
 import vesper.host.red
 import vesper.host.snap
+import vesper.host.spriteBitmap
 import vesper.host.spriteKey
 import vesper.term.Frame
 import vesper.term.FramePlacement
@@ -374,27 +375,10 @@ internal class MetalRenderer private constructor(
         val kept = HashMap<Long, MTLTextureProtocol>()
         val out = ArrayList<Triple<MTLTextureProtocol, Quads, Boolean>>()
         for (p in frame.placements) {
-            if (p.cols <= 0 || p.rows <= 0 || p.sourceWidth <= 0 || p.sourceHeight <= 0) continue
+            if (!builder.shows(p)) continue
             val texture = kept[p.image.id] ?: images[p.image.id] ?: upload(p) ?: continue
             kept[p.image.id] = texture
-            // The source rectangle stays inside the pixels, and within the quad's 16-bit texel fields.
-            val srcX = p.sourceX.coerceIn(0, texture.width.toInt() - 1)
-            val srcY = p.sourceY.coerceIn(0, texture.height.toInt() - 1)
-            val srcW = p.sourceWidth.coerceAtMost(texture.width.toInt() - srcX)
-            val srcH = p.sourceHeight.coerceAtMost(texture.height.toInt() - srcY)
-            val quad = Quads(1)
-            quad.add(
-                x(p.col) + p.offsetX,
-                floor(p.row * metrics.height).toFloat() + p.offsetY,
-                (p.cols * metrics.width).toFloat(),
-                (p.rows * metrics.height).toFloat(),
-                -1,
-                IMAGE,
-                srcX,
-                srcY,
-                srcW,
-                srcH,
-            )
+            val quad = builder.imageQuad(p, texture.width.toInt(), texture.height.toInt()) ?: continue
             out.add(Triple(texture, quad, p.z < 0))
         }
         images.clear()

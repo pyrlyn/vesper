@@ -35,6 +35,7 @@ import platform.Foundation.NSEdgeInsetsMake
 import platform.Foundation.NSNotification
 import platform.Foundation.NSSelectorFromString
 import platform.darwin.NSObject
+import vesper.host.FindState
 
 private const val FIELD_WIDTH = 180.0
 private const val CORNER_RADIUS = 8.0

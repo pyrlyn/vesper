@@ -5,6 +5,7 @@ import vesper.grid.Color
 import vesper.grid.Style
 import vesper.grid.Underline
 import vesper.term.Frame
+import vesper.term.FramePlacement
 import kotlin.math.floor
 import kotlin.math.max
 
@@ -112,6 +113,38 @@ public class QuadBuilder(
 
     /** The left edge of column [col] in pixels, on the pixel grid. */
     public fun x(col: Int): Float = floor(col * metrics.width).toFloat()
+
+    /** Whether placement [p] covers any cells with any pixels, so it is worth a texture. */
+    public fun shows(p: FramePlacement): Boolean = p.cols > 0 && p.rows > 0 && p.sourceWidth > 0 && p.sourceHeight > 0
+
+    /**
+     * Placement [p] as one quad in grid pixels over its cells, drawn from a texture of [textureWidth]
+     * by [textureHeight]; null when it shows nothing. The source rectangle stays inside the texture's
+     * pixels, and so within the quad's 16-bit texel fields.
+     */
+    public fun imageQuad(
+        p: FramePlacement,
+        textureWidth: Int,
+        textureHeight: Int,
+    ): Quads? {
+        if (!shows(p) || textureWidth <= 0 || textureHeight <= 0) return null
+        val srcX = p.sourceX.coerceIn(0, textureWidth - 1)
+        val srcY = p.sourceY.coerceIn(0, textureHeight - 1)
+        val quad = Quads(1)
+        quad.add(
+            x(p.col) + p.offsetX,
+            floor(p.row * metrics.height).toFloat() + p.offsetY,
+            (p.cols * metrics.width).toFloat(),
+            (p.rows * metrics.height).toFloat(),
+            -1,
+            IMAGE,
+            srcX,
+            srcY,
+            p.sourceWidth.coerceAtMost(textureWidth - srcX),
+            p.sourceHeight.coerceAtMost(textureHeight - srcY),
+        )
+        return quad
+    }
 
     /** The cursor's quads in grid pixels: what goes under the text, and what goes over it. */
     public fun cursorQuads(

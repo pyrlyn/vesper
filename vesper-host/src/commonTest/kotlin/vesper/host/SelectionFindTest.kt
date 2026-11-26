@@ -1,4 +1,4 @@
-package vesper.macos
+package vesper.host
 
 import vesper.term.MAX_SEARCH_MATCHES
 import vesper.term.SelectionKind
@@ -11,9 +11,9 @@ class SelectionGestureTest {
     private fun press(
         clicks: Int = 1,
         shift: Boolean = false,
-        option: Boolean = false,
+        block: Boolean = false,
         hasSelection: Boolean = false,
-    ) = selectionPress(clicks, shift, option, hasSelection)
+    ) = selectionPress(clicks, shift, block, hasSelection)
 
     @Test
     fun clicksPickTheKind() {
@@ -21,8 +21,8 @@ class SelectionGestureTest {
         assertEquals(SelectionPress.Start(SelectionKind.Word), press(clicks = 2))
         assertEquals(SelectionPress.Start(SelectionKind.Line), press(clicks = 3))
         assertEquals(SelectionPress.Start(SelectionKind.Line), press(clicks = 5), "more clicks stay on lines")
-        assertEquals(SelectionPress.Start(SelectionKind.Block), press(option = true))
-        assertEquals(SelectionPress.Start(SelectionKind.Word), press(clicks = 2, option = true), "Option only changes a drag")
+        assertEquals(SelectionPress.Start(SelectionKind.Block), press(block = true))
+        assertEquals(SelectionPress.Start(SelectionKind.Word), press(clicks = 2, block = true), "Option only changes a drag")
     }
 
     @Test
@@ -35,7 +35,7 @@ class SelectionGestureTest {
     @Test
     fun onlyAPlainClickClearsOnRelease() {
         assertTrue(press().clearsOnRelease)
-        assertTrue(press(option = true).clearsOnRelease)
+        assertTrue(press(block = true).clearsOnRelease)
         assertFalse(press(clicks = 2).clearsOnRelease)
         assertFalse(press(clicks = 3).clearsOnRelease)
         assertFalse(SelectionPress.Extend.clearsOnRelease)

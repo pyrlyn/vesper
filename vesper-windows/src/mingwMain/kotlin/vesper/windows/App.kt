@@ -23,6 +23,7 @@ import vesper.host.RowSources
 import vesper.host.cellAt
 import vesper.host.clipboardText
 import vesper.host.gridSize
+import vesper.host.launchEnvironment
 import vesper.host.windowTitle
 import vesper.pty.PtySize
 import vesper.pty.SpawnOptions
@@ -101,7 +102,9 @@ class App(
         grid = currentGrid()
         // The window's handle as a number: the wakeup runs on the PTY's thread and only posts to it.
         val hwnd = window.hwnd.toLong()
-        val options = SpawnOptions(program, args, getenv("USERPROFILE")?.toKString(), size = PtySize(grid.rows, grid.cols))
+        // Programs under WSL or ssh read TERM and the locale; native ones ignore them.
+        val environment = launchEnvironment { name -> getenv(name)?.toKString() }
+        val options = SpawnOptions(program, args, getenv("USERPROFILE")?.toKString(), environment, PtySize(grid.rows, grid.cols))
         val started = Session.spawn(options) { PostMessageW(hwnd.toCPointer<HWND__>(), WM_WAKE.convert(), 0u, 0) }
         session = started
         cellPixels = currentCellPixels()

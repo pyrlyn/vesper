@@ -42,6 +42,7 @@ import vesper.host.Clusters
 import vesper.host.ShapeCache
 import vesper.host.ShapedGlyph
 import vesper.host.glyphKey
+import vesper.host.isSprite
 import vesper.host.spriteKey
 
 // Shapes the core's text runs with CoreText. CoreText brings ligatures and font fallback (colour

@@ -11,9 +11,13 @@ import vesper.host.ShapedGlyph
 import vesper.host.glyphKey
 import vesper.host.isBoldFace
 import vesper.host.isItalicFace
+import vesper.host.isSprite
 import vesper.host.isSpriteKey
 import vesper.host.keyFont
 import vesper.host.keyGlyph
+import vesper.host.keySprite
+import vesper.host.spriteBitmap
+import vesper.host.spriteKey
 import vesper.unicode.forEachCodePoint
 import kotlin.math.ceil
 
@@ -31,7 +35,8 @@ private class Font(
 /**
  * The user's fixed-pitch [family] in its four faces, as the renderer's [GlyphSource]. Glyphs come
  * from each face's character map, one cluster at a time, and a cluster the face lacks goes to the
- * system's font fallback. There is no shaping yet: no ligatures, and a joined emoji sequence draws
+ * system's font fallback. Box drawing, blocks and Powerline separators are the shared sprites, drawn
+ * from the cell's geometry so neighbouring cells meet. There is no shaping yet: no ligatures, and a joined emoji sequence draws
  * its parts on top of each other.
  */
 class TextStyle private constructor(
@@ -84,8 +89,7 @@ class TextStyle private constructor(
         metrics: CellMetrics,
         scale: Double,
     ): Bitmap? {
-        // Box drawing and the underlines come from slice 3's shared sprite rasteriser.
-        if (isSpriteKey(key)) return null
+        if (isSpriteKey(key)) return spriteBitmap(keySprite(key), metrics)
         val font = registry.getOrNull(keyFont(key)) ?: return null
         return fonts.glyphBitmap(font.face, keyGlyph(key), (font.size * scale).toFloat())
     }
@@ -97,6 +101,11 @@ class TextStyle private constructor(
     ): List<ShapedGlyph> {
         val out = ArrayList<ShapedGlyph>()
         for ((index, cluster) in Clusters(text, width).clusters.withIndex()) {
+            // A sprite stands alone in its cell; a cluster with marks goes to the font.
+            if (isSprite(cluster.codePoint) && cluster.isSingle) {
+                out.add(ShapedGlyph(spriteKey(cluster.codePoint), index * width, 0.0, 0.0))
+                continue
+            }
             val part = text.substring(cluster.start, cluster.start + cluster.units)
             val font = fontFor(part, face)
             val drawn = registry[font].face

@@ -1,8 +1,14 @@
 package vesper.windows
 
+import vesper.grid.Underline
 import vesper.host.Bitmap
 import vesper.host.GlyphCache
 import vesper.host.glyphKey
+import vesper.host.isSpriteKey
+import vesper.host.keySprite
+import vesper.host.spriteKey
+import vesper.host.underlineSprite
+import kotlin.math.ceil
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -68,6 +74,26 @@ class GlyphTest {
             assertEquals(1, han.length)
             assertNotEquals(0, assertNotNull(han.face).glyph('中'.code))
             listOf(own, emoji, han).forEach { it.face?.close() }
+        }
+    }
+
+    /** The Windows half of T28: box drawing and the underlines are the shared sprites, not the font's glyphs. */
+    @Test
+    fun boxLinesAndUnderlinesAreSprites() {
+        FontSystem.create().use { fonts ->
+            assertNotNull(TextStyle.create(fonts)).use { style ->
+                val metrics = style.metrics(2.0)
+                val glyphs = style.shape("\u2500a\uE0B0", 0, 1)
+                assertEquals(listOf(true, false, true), glyphs.map { isSpriteKey(it.key) })
+                assertEquals(0x2500, keySprite(glyphs[0].key))
+                val line = assertNotNull(style.rasterize(glyphs[0].key, metrics, 2.0))
+                assertEquals(ceil(metrics.width).toInt(), line.width)
+                // The line crosses the whole cell, so it meets the next one without a gap.
+                val middle = (0 until line.height).first { line.pixel(0, it) ushr 24 == 255 }
+                assertTrue((0 until line.width).all { line.pixel(it, middle) ushr 24 == 255 })
+                val underline = assertNotNull(style.rasterize(spriteKey(underlineSprite(Underline.Curly)), metrics, 2.0))
+                assertTrue(underline.pixels().any { it ushr 24 > 0 })
+            }
         }
     }
 
