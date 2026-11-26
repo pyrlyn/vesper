@@ -4,7 +4,10 @@ import platform.CoreGraphics.CGContextAddPath
 import platform.CoreGraphics.CGContextFillPath
 import platform.CoreGraphics.CGContextFillRect
 import platform.CoreGraphics.CGContextRef
+import platform.CoreGraphics.CGContextRestoreGState
+import platform.CoreGraphics.CGContextSaveGState
 import platform.CoreGraphics.CGContextScaleCTM
+import platform.CoreGraphics.CGContextSetAlpha
 import platform.CoreGraphics.CGContextSetGrayFillColor
 import platform.CoreGraphics.CGContextSetGrayStrokeColor
 import platform.CoreGraphics.CGContextSetLineWidth
@@ -58,6 +61,26 @@ internal fun spriteBitmap(
         CGContextSetGrayStrokeColor(context, 1.0, 1.0)
         Painter(context, width.toDouble(), height.toDouble(), cell).paint(code)
     }
+}
+
+/**
+ * Paints character [code]'s sprite straight into [context] over the cell whose top-left corner is
+ * ([x], [y]), in the context's fill and stroke colours; [context] is top-down. False when [code] is
+ * drawn from the font. The CoreText fallback draws with this, so it has no seams either.
+ */
+internal fun drawSprite(
+    context: CGContextRef?,
+    code: Int,
+    cell: CellMetrics,
+    x: Double,
+    y: Double,
+): Boolean {
+    if (!isSprite(code)) return false
+    CGContextSaveGState(context)
+    CGContextTranslateCTM(context, x, y)
+    Painter(context, cell.width, cell.height, cell).paint(code)
+    CGContextRestoreGState(context)
+    return true
 }
 
 /** Arms of U+2500..U+257F as up, right, down, left: 0 none, 1 light, 2 heavy, 3 double. Dashes, arcs and diagonals are drawn apart (0000). */
@@ -128,9 +151,11 @@ private class Painter(
             }
 
             in 0x2591..0x2593 -> {
-                // Shades as even coverage, not a dither that beats against the pixel grid.
-                CGContextSetGrayFillColor(context, 1.0, (code - 0x2590) / 4.0)
+                // Shades as even coverage, not a dither that beats against the pixel grid. The alpha
+                // keeps the context's colour, which the CoreText fallback draws in.
+                CGContextSetAlpha(context, (code - 0x2590) / 4.0)
                 fill(0.0, 0.0, 1.0, 1.0)
+                CGContextSetAlpha(context, 1.0)
             }
 
             0x2594 -> {

@@ -15,6 +15,7 @@ import platform.CoreGraphics.kCGColorSpaceSRGB
 import platform.Foundation.writeToFile
 import platform.posix.getenv
 import vesper.term.Frame
+import vesper.term.SelectionKind
 import vesper.term.Terminal
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -136,6 +137,40 @@ class MetalRendererTest {
         assertEquals(0xC80000, scrolled.cell(0, 1))
         assertEquals(0x0000C8, scrolled.cell(0, 2))
         assertEquals(palette.background, scrolled.cell(0, 0))
+    }
+
+    @Test
+    fun aPreeditIsUnderlinedAtTheBottomOfItsRow() {
+        val f = fixture(6, 2) ?: return
+        f.frame.setPreedit("ab")
+        val bitmap = f.render("")
+        // The row's last pixel row lies inside the underline and below any glyph's ink.
+        val bottom = ((PADDING + text.cell.height) * SCALE).toInt() - 1
+        val x = ((PADDING + 0.5 * text.cell.width) * SCALE).toInt()
+        assertEquals(palette.foreground, bitmap.pixel(x, bottom) and RGB)
+        assertEquals(palette.background, bitmap.cell(4, 0, dy = 0.98), "past the preedit there is no line")
+        assertEquals(palette.cursor, bitmap.cell(2, 0), "the cursor waits after the preedit")
+    }
+
+    @Test
+    fun selectedMatchingAndCurrentCellsAreHighlighted() {
+        val f = fixture(16, 2) ?: return
+        f.render("one two two")
+        f.terminal.selectStart(SelectionKind.Word, f.terminal.viewportPoint(0, 1))
+        f.terminal.searchSet("two", caseSensitive = false)
+        f.terminal.searchNext(f.terminal.viewportPoint(0, 0))
+        val bitmap = f.render("")
+
+        // Corners: a glyph's ink never reaches them.
+        fun bg(col: Int) = bitmap.cell(col, 0, dx = 0.05, dy = 0.05)
+        assertEquals(palette.selection, bg(0))
+        assertEquals(palette.selection, bg(2))
+        assertEquals(palette.background, bg(3))
+        assertEquals(palette.currentMatch, bg(4), "the first match after the top is current")
+        assertEquals(palette.currentMatch, bg(6))
+        assertEquals(palette.match, bg(8))
+        assertEquals(palette.match, bg(10))
+        assertEquals(palette.background, bg(13), "past the cursor after the text")
     }
 
     @OptIn(ExperimentalEncodingApi::class)

@@ -13,7 +13,9 @@ import vesper.pty.SpawnOptions
 import vesper.pty.withLock
 import vesper.term.Event
 import vesper.term.Frame
+import vesper.term.SelectionKind
 import vesper.term.Terminal
+import vesper.term.ViewportText
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.TimeSource
@@ -122,6 +124,47 @@ public class Session private constructor(
 
     /** Scrolls the view by [delta] lines, up when positive; the next [update] shows it. */
     public fun scrollDisplay(delta: Int): Unit = guarded(Unit) { terminal.scrollDisplay(delta) }
+
+    /** The viewport's text and the selection in it, for a screen reader. */
+    public fun viewportText(): ViewportText = guarded(ViewportText.EMPTY) { terminal.viewportText() }
+
+    /** Starts a selection of [kind] at viewport cell [row], [col], replacing any other; the next [update] shows it. */
+    public fun select(
+        kind: SelectionKind,
+        row: Int,
+        col: Int,
+    ): Unit = guarded(Unit) { terminal.selectStart(kind, terminal.viewportPoint(row, col)) }
+
+    /** Moves the selection's free end to viewport cell [row], [col]. */
+    public fun selectExtend(
+        row: Int,
+        col: Int,
+    ): Unit = guarded(Unit) { terminal.selectExtend(terminal.viewportPoint(row, col)) }
+
+    /** Drops the selection. */
+    public fun selectClear(): Unit = guarded(Unit) { terminal.selectClear() }
+
+    /** Whether anything is selected. */
+    public val hasSelection: Boolean get() = guarded(false) { terminal.selection != null }
+
+    /** The selected text, as [Terminal.selectionText] reads it; empty without a selection. */
+    public fun selectionText(): String = guarded("") { terminal.selectionText() }
+
+    /** Searches the history for [pattern], literally; an empty pattern ends the search. The next [update] marks the matches. */
+    public fun search(
+        pattern: String,
+        caseSensitive: Boolean,
+    ): Unit =
+        guarded(Unit) {
+            if (pattern.isEmpty()) terminal.searchClear() else terminal.searchSet(pattern, caseSensitive)
+        }
+
+    /** Steps to the next match ([forward]) or the previous one and scrolls to it; false when there is none. */
+    public fun searchStep(forward: Boolean): Boolean =
+        guarded(false) { (if (forward) terminal.searchNext() else terminal.searchPrev()) != null }
+
+    /** How many matches there are, counting up to [vesper.term.MAX_SEARCH_MATCHES]. */
+    public fun searchCount(): Int = guarded(0) { terminal.searchCount() }
 
     /**
      * Sets the size in cells and the cell size in pixels, then tells the child. During an
