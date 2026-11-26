@@ -45,6 +45,16 @@ class AtlasLayoutTest {
         assertEquals(0, big.y)
         assertNull(atlas.get(1, 1))
         assertNull(atlas.place(3, 100, 10, 0, 0, false, frame = 1))
+        assertNotNull(atlas.get(2, 1), "what can never fit leaves the atlas as it was")
+    }
+
+    @Test
+    fun anImageLargerThanTheAtlasGrowsIt() {
+        val atlas = AtlasLayout(initialSize = 8, maxSize = 64)
+        val glyph = assertNotNull(atlas.place(1, 14, 18, 0, 0, false, frame = 1))
+        assertEquals(32, atlas.size)
+        assertEquals(2, atlas.generation)
+        assertEquals(0 to 0, glyph.x to glyph.y)
     }
 
     @Test

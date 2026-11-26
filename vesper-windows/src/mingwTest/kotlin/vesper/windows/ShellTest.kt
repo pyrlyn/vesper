@@ -134,6 +134,8 @@ class ShellTest {
     @Test
     fun aDpiChangeKeepsTheGridAndScalesTheCell() {
         withShell { app ->
+            // Small enough that twice its size still fits a CI machine's screen, which caps a window's size.
+            app.window.setClientSize(400, 240)
             val before = app.sessionSize
             val dpi = app.window.dpi * 2
             // What Windows sends on moving to a monitor of twice the DPI: the window twice as large.
@@ -146,7 +148,7 @@ class ShellTest {
                 SendMessageW(app.window.hwnd, WM_DPICHANGED.convert(), (dpi or (dpi shl 16)).convert(), rect.ptr.toLong())
             }
             val after = app.sessionSize
-            assertEquals(before.first, after.first)
+            assertEquals(before.first, after.first, "$before became $after")
             assertNotEquals(before.second, after.second)
             assertTrue(after.second.first in before.second.first * 2 - 1..before.second.first * 2 + 1, "$before became $after")
             app.paint()

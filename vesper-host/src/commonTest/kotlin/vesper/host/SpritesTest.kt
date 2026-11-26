@@ -1,0 +1,86 @@
+package vesper.host
+
+import vesper.grid.Underline
+import kotlin.math.ceil
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+private fun alpha(pixel: Int) = pixel ushr 24
+
+class SpritesTest {
+    // Menlo 13's measures at a scale of 2, so the pixels are what a Retina Mac draws.
+    private val cell = CellMetrics.of(CellSize(8.0, 16.0), 2.0, 12.06, -1.6, 0.9, 7.1)
+
+    @Test
+    fun aLightLineCrossesTheWholeCellAtItsMiddle() {
+        val line = assertNotNull(spriteBitmap(0x2500, cell))
+        val middle = (line.height / 2 - 1 until line.height / 2 + 1).first { alpha(line.pixel(0, it)) == 255 }
+        for (x in 0 until line.width) assertEquals(255, alpha(line.pixel(x, middle)), "column $x")
+        assertEquals(0, alpha(line.pixel(0, 0)))
+        assertEquals(0, alpha(line.pixel(0, line.height - 1)))
+    }
+
+    @Test
+    fun blocksAndShadesFillTheirShare() {
+        val full = assertNotNull(spriteBitmap(0x2588, cell))
+        assertEquals(255, alpha(full.pixel(0, 0)))
+        assertEquals(255, alpha(full.pixel(full.width - 1, full.height - 1)))
+        val lower = assertNotNull(spriteBitmap(0x2584, cell))
+        assertEquals(0, alpha(lower.pixel(0, 0)))
+        assertEquals(255, alpha(lower.pixel(0, lower.height - 1)))
+        val light = assertNotNull(spriteBitmap(0x2591, cell))
+        assertTrue(alpha(light.pixel(1, 1)) in 60..70)
+    }
+
+    @Test
+    fun underlinesSitOnTheUnderlineRow() {
+        val single = assertNotNull(spriteBitmap(underlineSprite(Underline.Single), cell))
+        val row = cell.underline.toInt()
+        assertTrue((row - 1..row).any { alpha(single.pixel(single.width / 2, it)) == 255 })
+        assertEquals(0, alpha(single.pixel(single.width / 2, 0)))
+        assertNull(spriteBitmap(underlineSprite(Underline.None), cell))
+        assertNull(spriteBitmap('A'.code, cell))
+    }
+
+    /** The T28 check: every Powerline separator is a sprite that reaches the cell's edges. */
+    @Test
+    fun powerlineSeparatorsReachTheCellEdges() {
+        // The sides each solid shape stands on: up, right, down, left.
+        val flat =
+            mapOf(
+                0xE0B0 to "l",
+                0xE0B2 to "r",
+                0xE0B4 to "l",
+                0xE0B6 to "r",
+                0xE0B8 to "ld",
+                0xE0BA to "rd",
+                0xE0BC to "lu",
+                0xE0BE to "ru",
+            )
+        for (code in 0xE0B0..0xE0BF) {
+            val name = "U+${code.toString(16).uppercase()}"
+            assertTrue(isSprite(code), name)
+            val sprite = assertNotNull(spriteBitmap(code, cell), name)
+            val w = sprite.width
+            val h = sprite.height
+            val edges =
+                mapOf(
+                    'u' to (0 until w).map { sprite.pixel(it, 0) },
+                    'r' to (0 until h).map { sprite.pixel(w - 1, it) },
+                    'd' to (0 until w).map { sprite.pixel(it, h - 1) },
+                    'l' to (0 until h).map { sprite.pixel(0, it) },
+                )
+            for ((side, pixels) in edges) assertTrue(pixels.any { alpha(it) > 0 }, "$name leaves its $side edge bare")
+            // A flat side is covered all along, so the next segment's colour meets it without a seam;
+            // only its ends may be cut, by a slanted side as steep as the cell is tall for its width.
+            val cut = ceil(h.toDouble() / w).toInt() + 1
+            for (side in flat[code].orEmpty()) {
+                val pixels = edges.getValue(side)
+                assertTrue(pixels.drop(cut).dropLast(cut).all { alpha(it) == 255 }, "$name's $side side has a gap")
+            }
+        }
+    }
+}

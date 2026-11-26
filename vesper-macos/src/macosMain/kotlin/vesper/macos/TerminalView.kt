@@ -38,6 +38,7 @@ import platform.AppKit.translatesAutoresizingMaskIntoConstraints
 import platform.AppKit.voiceOverEnabled
 import platform.CoreGraphics.CGAffineTransformMakeScale
 import platform.CoreGraphics.CGContextFillRect
+import platform.CoreGraphics.CGContextGetUserSpaceToDeviceSpaceTransform
 import platform.CoreGraphics.CGContextRef
 import platform.CoreGraphics.CGContextSetRGBFillColor
 import platform.CoreGraphics.CGContextSetRGBStrokeColor
@@ -69,16 +70,25 @@ import vesper.grid.Underline
 import vesper.host.Bitmap
 import vesper.host.CellMetrics
 import vesper.host.Cells
+import vesper.host.FindEffect
+import vesper.host.FindState
 import vesper.host.PADDING
 import vesper.host.Palette
 import vesper.host.RowSources
+import vesper.host.SelectionDrag
+import vesper.host.SelectionPress
 import vesper.host.blue
 import vesper.host.cellAt
+import vesper.host.clearsOnRelease
 import vesper.host.clipboardText
+import vesper.host.dragScroll
 import vesper.host.green
 import vesper.host.gridSize
+import vesper.host.isSprite
+import vesper.host.launchEnvironment
 import vesper.host.preeditLines
 import vesper.host.red
+import vesper.host.selectionPress
 import vesper.host.windowTitle
 import vesper.input.KeyAction
 import vesper.input.MouseAction
@@ -93,6 +103,7 @@ import vesper.term.SelectionKind
 import vesper.term.TextRange
 import vesper.term.ViewportText
 import kotlin.math.abs
+import kotlin.math.hypot
 
 private const val CHANNEL_MAX = 255.0
 
@@ -216,6 +227,8 @@ internal class TerminalView(
     fun stop() {
         session?.close()
         session = null
+        spriteMasks?.close()
+        spriteMasks = null
     }
 
     /** Reads the new frame and the events since the last look; runs on the main queue. */
@@ -675,7 +688,7 @@ internal class TerminalView(
             selectionPress(
                 event.clickCount.toInt(),
                 shift = flags and NSEventModifierFlagShift != 0uL,
-                option = flags and NSEventModifierFlagOption != 0uL,
+                block = flags and NSEventModifierFlagOption != 0uL,
                 hasSelection = current.hasSelection,
             )
         when (press) {
@@ -775,8 +788,15 @@ internal class TerminalView(
         drawCells(NSGraphicsContext.currentContext?.CGContext ?: return)
     }
 
-    // Sprites drawn straight into the view's context, in points.
-    private val spriteCell by lazy { CellMetrics.of(text.faces[0], text.cell, 1.0) }
+    // Sprites drawn straight into the view's context, rasterised at its device scale so they stay sharp.
+    private var spriteMasks: SpriteMasks? = null
+
+    private fun spriteMasks(context: CGContextRef): SpriteMasks {
+        val scale = CGContextGetUserSpaceToDeviceSpaceTransform(context).useContents { hypot(a, b) }.takeIf { it > 0 } ?: 1.0
+        spriteMasks?.takeIf { it.scale == scale }?.let { return it }
+        spriteMasks?.close()
+        return SpriteMasks(CellMetrics.of(text.faces[0], text.cell, scale), scale).also { spriteMasks = it }
+    }
 
     /** The CoreText fallback's drawing into [context], top-down in points as the flipped view's is. */
     internal fun drawCells(context: CGContextRef) {
@@ -785,6 +805,7 @@ internal class TerminalView(
         fill(context, palette.background)
         bounds.useContents { CGContextFillRect(context, CGRectMake(0.0, 0.0, size.width, size.height)) }
         val cell = text.cell
+        val sprites = spriteMasks(context)
         for (r in 0 until screen.rows) {
             val row = screen.row(r) ?: continue
             val top = PADDING + r * cell.height
@@ -815,7 +836,7 @@ internal class TerminalView(
                     text.draw(context, runText, left, top + text.ascent, style.attrs and Attrs.BOLD != 0, style.attrs and Attrs.ITALIC != 0)
                 }
                 for (c in run.col until run.col + run.cols) {
-                    drawSprite(context, screen.cell(r, c).codePoint, spriteCell, PADDING + c * cell.width, top)
+                    sprites.draw(context, screen.cell(r, c).codePoint, PADDING + c * cell.width, top)
                 }
                 if (style.underline != Underline.None) CGContextFillRect(context, CGRectMake(left, top + text.ascent + 1, width, 1.0))
                 if (style.attrs and Attrs.STRIKE != 0) CGContextFillRect(context, CGRectMake(left, top + cell.height / 2, width, 1.0))
@@ -859,7 +880,7 @@ internal class TerminalView(
             fill(context, palette.background)
             stroke(context, palette.background)
             val left = rect.useContents { origin.x }
-            if (drawSprite(context, under.codePoint, spriteCell, left, PADDING + cursor.row * cell.height)) return
+            if (spriteMasks(context).draw(context, under.codePoint, left, PADDING + cursor.row * cell.height)) return
             text.draw(
                 context,
                 codePointText(under.codePoint),

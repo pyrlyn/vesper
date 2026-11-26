@@ -1,35 +1,9 @@
-package vesper.macos
+package vesper.host
 
-import platform.CoreGraphics.CGContextAddPath
-import platform.CoreGraphics.CGContextFillPath
-import platform.CoreGraphics.CGContextFillRect
-import platform.CoreGraphics.CGContextRef
-import platform.CoreGraphics.CGContextRestoreGState
-import platform.CoreGraphics.CGContextSaveGState
-import platform.CoreGraphics.CGContextScaleCTM
-import platform.CoreGraphics.CGContextSetAlpha
-import platform.CoreGraphics.CGContextSetGrayFillColor
-import platform.CoreGraphics.CGContextSetGrayStrokeColor
-import platform.CoreGraphics.CGContextSetLineWidth
-import platform.CoreGraphics.CGContextStrokePath
-import platform.CoreGraphics.CGContextTranslateCTM
-import platform.CoreGraphics.CGMutablePathRef
-import platform.CoreGraphics.CGPathAddArcToPoint
-import platform.CoreGraphics.CGPathAddEllipseInRect
-import platform.CoreGraphics.CGPathAddLineToPoint
-import platform.CoreGraphics.CGPathCloseSubpath
-import platform.CoreGraphics.CGPathCreateMutable
-import platform.CoreGraphics.CGPathMoveToPoint
-import platform.CoreGraphics.CGPathRelease
-import platform.CoreGraphics.CGRectMake
-import platform.CoreGraphics.CGRectStandardize
 import vesper.grid.Underline
-import vesper.host.Bitmap
-import vesper.host.CellMetrics
-import vesper.host.snap
-import vesper.host.spriteUnderline
 import kotlin.math.PI
 import kotlin.math.ceil
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -37,49 +11,38 @@ import kotlin.math.sin
 
 // Characters drawn from geometry instead of the font: box drawing, block elements, Powerline
 // separators and the underline kinds. A font's own box glyphs rarely fill the cell exactly, so lines
-// break between rows; drawn to the cell's own size they always meet.
+// break between rows; drawn to the cell's own size they always meet. The geometry is rasterised here
+// in plain Kotlin, so every host draws the same pixels without a platform graphics library.
 
 private val SPRITE_RANGES = listOf(0x2500..0x259F, 0xE0B0..0xE0BF)
 
-/** Whether [codePoint] is drawn from geometry. */
-internal fun isSprite(codePoint: Int): Boolean = SPRITE_RANGES.any { codePoint in it }
+/** Samples per pixel side for shapes that are not rectangles: 65 coverage levels, enough for an 8-bit alpha. */
+private const val SAMPLES = 8
 
-/** The sprite for [code] at [cell]'s size, or null when it is none. */
-internal fun spriteBitmap(
+/** Sides of the polygon an ellipse is drawn as; its error stays far under a pixel at any cell size. */
+private const val ELLIPSE_STEPS = 96
+
+/** Segments of a rounded corner's quarter circle. */
+private const val ARC_STEPS = 24
+
+/** Whether [codePoint] is drawn from geometry. */
+public fun isSprite(codePoint: Int): Boolean = SPRITE_RANGES.any { codePoint in it }
+
+/**
+ * The sprite for [code] at [cell]'s size, or null when it is none: white coverage, premultiplied,
+ * with the pen at the cell's left edge and the baseline where the cell has it.
+ */
+public fun spriteBitmap(
     code: Int,
     cell: CellMetrics,
 ): Bitmap? {
     if (!isSprite(code) && spriteUnderline(code) == null) return null
     val width = ceil(cell.width).toInt()
     val height = ceil(cell.height).toInt()
-    return Bitmap.draw(width, height, 0, cell.baseline.toInt(), false) { context ->
-        // Top-down, like the cell rows.
-        CGContextTranslateCTM(context, 0.0, height.toDouble())
-        CGContextScaleCTM(context, 1.0, -1.0)
-        CGContextSetGrayFillColor(context, 1.0, 1.0)
-        CGContextSetGrayStrokeColor(context, 1.0, 1.0)
-        Painter(context, width.toDouble(), height.toDouble(), cell).paint(code)
-    }
-}
-
-/**
- * Paints character [code]'s sprite straight into [context] over the cell whose top-left corner is
- * ([x], [y]), in the context's fill and stroke colours; [context] is top-down. False when [code] is
- * drawn from the font. The CoreText fallback draws with this, so it has no seams either.
- */
-internal fun drawSprite(
-    context: CGContextRef?,
-    code: Int,
-    cell: CellMetrics,
-    x: Double,
-    y: Double,
-): Boolean {
-    if (!isSprite(code)) return false
-    CGContextSaveGState(context)
-    CGContextTranslateCTM(context, x, y)
-    Painter(context, cell.width, cell.height, cell).paint(code)
-    CGContextRestoreGState(context)
-    return true
+    if (width !in 1..Bitmap.MAX_SIDE || height !in 1..Bitmap.MAX_SIDE) return null
+    val canvas = Canvas(width, height)
+    Painter(canvas, width.toDouble(), height.toDouble(), cell).paint(code)
+    return canvas.bitmap(cell.baseline.toInt())
 }
 
 /** Arms of U+2500..U+257F as up, right, down, left: 0 none, 1 light, 2 heavy, 3 double. Dashes, arcs and diagonals are drawn apart (0000). */
@@ -101,8 +64,186 @@ private val ARMS: ByteArray =
 /** Quadrants of U+2596..U+259F: 1 upper left, 2 upper right, 4 lower left, 8 lower right. */
 private val QUADRANTS = intArrayOf(4, 8, 1, 13, 9, 7, 11, 2, 6, 14)
 
+/** Coverage from 0 to 1 per pixel, top row first; paint lands over what is there at [opacity]. */
+private class Canvas(
+    val width: Int,
+    val height: Int,
+) {
+    private val alpha = FloatArray(width * height)
+    var opacity = 1.0
+
+    private fun cover(
+        x: Int,
+        y: Int,
+        coverage: Double,
+    ) {
+        if (coverage <= 0) return
+        val at = y * width + x
+        val paint = min(coverage, 1.0) * opacity
+        alpha[at] = (alpha[at] + paint * (1 - alpha[at])).toFloat()
+    }
+
+    /** A rectangle, either corner first, each pixel covered by the share of it the rectangle takes. */
+    fun rect(
+        x: Double,
+        y: Double,
+        w: Double,
+        h: Double,
+    ) {
+        val x0 = min(x, x + w)
+        val x1 = max(x, x + w)
+        val y0 = min(y, y + h)
+        val y1 = max(y, y + h)
+        for (py in max(0, floor(y0).toInt()) until min(height, ceil(y1).toInt())) {
+            val down = min(y1, py + 1.0) - max(y0, py.toDouble())
+            for (px in max(0, floor(x0).toInt()) until min(width, ceil(x1).toInt())) {
+                cover(px, py, down * (min(x1, px + 1.0) - max(x0, px.toDouble())))
+            }
+        }
+    }
+
+    /** The pixels between ([x0], [y0]) and ([x1], [y1]), each covered by its share of samples [inside] takes. */
+    fun sample(
+        x0: Double,
+        y0: Double,
+        x1: Double,
+        y1: Double,
+        inside: (Double, Double) -> Boolean,
+    ) {
+        for (py in max(0, floor(y0).toInt()) until min(height, ceil(y1).toInt())) {
+            for (px in max(0, floor(x0).toInt()) until min(width, ceil(x1).toInt())) {
+                var hits = 0
+                for (j in 0 until SAMPLES) {
+                    for (i in 0 until SAMPLES) {
+                        if (inside(px + (i + 0.5) / SAMPLES, py + (j + 0.5) / SAMPLES)) hits++
+                    }
+                }
+                cover(px, py, hits.toDouble() / (SAMPLES * SAMPLES))
+            }
+        }
+    }
+
+    /** White at each pixel's coverage, premultiplied, as the atlas takes glyphs. */
+    fun bitmap(top: Int): Bitmap {
+        val pixels = ByteArray(width * height * 4)
+        for (i in alpha.indices) {
+            val value = (alpha[i] * 255 + 0.5).toInt().coerceIn(0, 255).toByte()
+            pixels.fill(value, i * 4, i * 4 + 4)
+        }
+        return Bitmap(width, height, 0, top, false, pixels)
+    }
+}
+
+/** Polylines as flat x, y pairs; a closed one ends on its first point. */
+private class Path {
+    val lines = ArrayList<DoubleArray>()
+    private var current: ArrayList<Double>? = null
+
+    fun moveTo(
+        x: Double,
+        y: Double,
+    ) {
+        finish()
+        current = arrayListOf(x, y)
+    }
+
+    fun lineTo(
+        x: Double,
+        y: Double,
+    ) {
+        current?.apply {
+            add(x)
+            add(y)
+        }
+    }
+
+    fun close() {
+        current?.let { lineTo(it[0], it[1]) }
+        finish()
+    }
+
+    fun ellipse(
+        x: Double,
+        y: Double,
+        w: Double,
+        h: Double,
+    ) {
+        val rx = w / 2
+        val ry = h / 2
+        moveTo(x + w, y + ry)
+        for (i in 1 until ELLIPSE_STEPS) {
+            val a = 2 * PI * i / ELLIPSE_STEPS
+            lineTo(x + rx + rx * cos(a), y + ry + ry * sin(a))
+        }
+        close()
+    }
+
+    fun finish() {
+        current?.takeIf { it.size >= 4 }?.let { lines.add(it.toDoubleArray()) }
+        current = null
+    }
+
+    /** Even-odd, with every polyline taken as closed. */
+    fun contains(
+        x: Double,
+        y: Double,
+    ): Boolean {
+        var inside = false
+        for (line in lines) {
+            val n = line.size / 2
+            var j = n - 1
+            for (i in 0 until n) {
+                val xi = line[i * 2]
+                val yi = line[i * 2 + 1]
+                val xj = line[j * 2]
+                val yj = line[j * 2 + 1]
+                if ((yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside
+                j = i
+            }
+        }
+        return inside
+    }
+
+    /** Whether ([x], [y]) is within [reach] of a segment. */
+    fun near(
+        x: Double,
+        y: Double,
+        reach: Double,
+    ): Boolean {
+        val limit = reach * reach
+        for (line in lines) {
+            for (i in 0 until line.size / 2 - 1) {
+                val ax = line[i * 2]
+                val ay = line[i * 2 + 1]
+                val dx = line[i * 2 + 2] - ax
+                val dy = line[i * 2 + 3] - ay
+                val length = dx * dx + dy * dy
+                val along = if (length == 0.0) 0.0 else (((x - ax) * dx + (y - ay) * dy) / length).coerceIn(0.0, 1.0)
+                val ex = ax + along * dx - x
+                val ey = ay + along * dy - y
+                if (ex * ex + ey * ey <= limit) return true
+            }
+        }
+        return false
+    }
+
+    /** The bounds of every point, as left, top, right, bottom. */
+    fun bounds(): DoubleArray {
+        val box = doubleArrayOf(Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE)
+        for (line in lines) {
+            for (i in 0 until line.size / 2) {
+                box[0] = min(box[0], line[i * 2])
+                box[1] = min(box[1], line[i * 2 + 1])
+                box[2] = max(box[2], line[i * 2])
+                box[3] = max(box[3], line[i * 2 + 1])
+            }
+        }
+        return box
+    }
+}
+
 private class Painter(
-    val context: CGContextRef?,
+    val canvas: Canvas,
     val w: Double,
     val h: Double,
     val cell: CellMetrics,
@@ -150,11 +291,10 @@ private class Painter(
             }
 
             in 0x2591..0x2593 -> {
-                // Shades as even coverage, not a dither that beats against the pixel grid. The alpha
-                // keeps the context's colour, which the CoreText fallback draws in.
-                CGContextSetAlpha(context, (code - 0x2590) / 4.0)
+                // Shades as even coverage, not a dither that beats against the pixel grid.
+                canvas.opacity = (code - 0x2590) / 4.0
                 fill(0.0, 0.0, 1.0, 1.0)
-                CGContextSetAlpha(context, 1.0)
+                canvas.opacity = 1.0
             }
 
             0x2594 -> {
@@ -188,7 +328,7 @@ private class Painter(
         y: Double,
         width: Double,
         height: Double,
-    ) = CGContextFillRect(context, CGRectStandardize(CGRectMake(x, y, width, height)))
+    ) = canvas.rect(x, y, width, height)
 
     private fun fill(
         x0: Double,
@@ -280,10 +420,19 @@ private class Painter(
         val down = code == 0x256D || code == 0x256E
         val right = code == 0x256D || code == 0x2570
         val edge = if (right) w else 0.0
+        val radius = max(1.0, min(w, h) / 2 - t)
+        // Towards the edge the corner turns to, and towards the edge it comes from.
+        val sx = if (right) 1.0 else -1.0
+        val sy = if (down) 1.0 else -1.0
+        val ox = px + sx * radius
+        val oy = py + sy * radius
         path(fill = false) { path ->
-            CGPathMoveToPoint(path, null, px, if (down) h else 0.0)
-            CGPathAddArcToPoint(path, null, px, py, edge, py, max(1.0, min(w, h) / 2 - t))
-            CGPathAddLineToPoint(path, null, edge, py)
+            path.moveTo(px, if (down) h else 0.0)
+            for (i in 0..ARC_STEPS) {
+                val a = PI / 2 * i / ARC_STEPS
+                path.lineTo(ox - sx * radius * cos(a), oy - sy * radius * sin(a))
+            }
+            path.lineTo(edge, py)
         }
     }
 
@@ -301,8 +450,8 @@ private class Painter(
         val solid = code % 2 == 0
         path(fill = solid) { path ->
             val points = { coords: DoubleArray ->
-                CGPathMoveToPoint(path, null, coords[0] * w, coords[1] * h)
-                for (i in 2 until coords.size step 2) CGPathAddLineToPoint(path, null, coords[i] * w, coords[i + 1] * h)
+                path.moveTo(coords[0] * w, coords[1] * h)
+                for (i in 2 until coords.size step 2) path.lineTo(coords[i] * w, coords[i + 1] * h)
             }
             when (code) {
                 0xE0B0, 0xE0B1 -> {
@@ -318,7 +467,7 @@ private class Painter(
                     // the whole stroke stays in the cell.
                     val inset = if (solid) 0.0 else t / 2
                     val x = if (code < 0xE0B6) -w else inset
-                    CGPathAddEllipseInRect(path, null, CGRectMake(x, inset, w * 2 - inset, h - inset * 2))
+                    path.ellipse(x, inset, w * 2 - inset, h - inset * 2)
                 }
 
                 0xE0B8 -> {
@@ -346,35 +495,35 @@ private class Painter(
                     points(doubleArrayOf(1.0, 0.0, 0.0, 1.0))
                 }
             }
-            if (solid) CGPathCloseSubpath(path)
+            if (solid) path.close()
         }
     }
 
     private fun line(
-        path: CGMutablePathRef?,
+        path: Path,
         x0: Double,
         y0: Double,
         x1: Double,
         y1: Double,
     ) {
-        CGPathMoveToPoint(path, null, x0, y0)
-        CGPathAddLineToPoint(path, null, x1, y1)
+        path.moveTo(x0, y0)
+        path.lineTo(x1, y1)
     }
 
+    /** Fills [build]'s polylines, or strokes them a light line wide. */
     private fun path(
         fill: Boolean,
-        build: (CGMutablePathRef?) -> Unit,
+        build: (Path) -> Unit,
     ) {
-        val path = CGPathCreateMutable()
+        val path = Path()
         build(path)
-        CGContextAddPath(context, path)
-        if (fill) {
-            CGContextFillPath(context)
-        } else {
-            CGContextSetLineWidth(context, t)
-            CGContextStrokePath(context)
+        path.finish()
+        if (path.lines.isEmpty()) return
+        val reach = if (fill) 0.0 else t / 2
+        val (left, top, right, bottom) = path.bounds()
+        canvas.sample(left - reach, top - reach, right + reach, bottom + reach) { x, y ->
+            if (fill) path.contains(x, y) else path.near(x, y, reach)
         }
-        CGPathRelease(path)
     }
 
     private fun underline(kind: Underline) {
@@ -389,10 +538,10 @@ private class Painter(
                 path(fill = false) { path ->
                     // One period per cell, so neighbouring cells join.
                     val amplitude = max(1.0, t)
-                    CGPathMoveToPoint(path, null, 0.0, y)
+                    path.moveTo(0.0, y)
                     var x = 1.0
                     while (x <= w) {
-                        CGPathAddLineToPoint(path, null, x, y - amplitude * sin(2 * PI * x / w))
+                        path.lineTo(x, y - amplitude * sin(2 * PI * x / w))
                         x += 1.0
                     }
                 }

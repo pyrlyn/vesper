@@ -1,47 +1,46 @@
-package vesper.macos
+package vesper.host
 
-import vesper.host.Cells
 import vesper.term.SelectionKind
 
 // The pure half of mouse selection: what a press does and when a drag scrolls. The view runs the
 // result against the session. Ported from the removed Swift host's `SelectionGesture`.
 
 /** What a left press does to the selection. */
-internal sealed interface SelectionPress {
-    data class Start(
-        val kind: SelectionKind,
+public sealed interface SelectionPress {
+    public data class Start(
+        public val kind: SelectionKind,
     ) : SelectionPress
 
-    data object Extend : SelectionPress
+    public data object Extend : SelectionPress
 }
 
 /**
- * Two clicks take a word, three a line; Option drags a block. Shift grows a selection that is there,
- * or starts one when there is none.
+ * Two clicks take a word, three a line; the [block] modifier (Option on macOS, Alt on Windows) drags a
+ * block. Shift grows a selection that is there, or starts one when there is none.
  */
-internal fun selectionPress(
+public fun selectionPress(
     clicks: Int,
     shift: Boolean,
-    option: Boolean,
+    block: Boolean,
     hasSelection: Boolean,
 ): SelectionPress =
     when {
         shift && hasSelection -> SelectionPress.Extend
         clicks == 2 -> SelectionPress.Start(SelectionKind.Word)
         clicks >= 3 -> SelectionPress.Start(SelectionKind.Line)
-        option -> SelectionPress.Start(SelectionKind.Block)
+        block -> SelectionPress.Start(SelectionKind.Block)
         else -> SelectionPress.Start(SelectionKind.Cell)
     }
 
 /** A plain click that never moves selects nothing once released; a word or line click keeps what it took. */
-internal val SelectionPress.clearsOnRelease: Boolean
+public val SelectionPress.clearsOnRelease: Boolean
     get() = this is SelectionPress.Start && (kind == SelectionKind.Cell || kind == SelectionKind.Block)
 
 /**
  * Lines to scroll the history while a drag is past the view's top (up, positive) or bottom edge
  * ([y] in top-down view points). The selection is anchored to the history, so it grows as it scrolls.
  */
-internal fun dragScroll(
+public fun dragScroll(
     y: Double,
     height: Double,
 ): Int =
@@ -52,7 +51,7 @@ internal fun dragScroll(
     }
 
 /** A left-button gesture the view took for selection: the cell it last reached. */
-internal data class SelectionDrag(
-    val cell: Cells,
-    val clearsOnRelease: Boolean,
+public data class SelectionDrag(
+    public val cell: Cells,
+    public val clearsOnRelease: Boolean,
 )

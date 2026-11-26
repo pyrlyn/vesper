@@ -116,8 +116,12 @@ public class AtlasLayout(
     ): AtlasEntry? {
         val slotWidth = width + 1
         val slotHeight = (height + 1 + SHELF_STEP - 1) / SHELF_STEP * SHELF_STEP
-        while (slotWidth <= size && slotHeight <= size) {
-            val index = shelfWithRoom(slotWidth, slotHeight) ?: newShelf(slotHeight, frame) ?: evict(slotHeight, frame)
+        // Larger than the largest atlas: growing would only drop what is there.
+        if (slotWidth > maxSize || slotHeight > maxSize) return null
+        while (true) {
+            // An image larger than the whole atlas grows it too, rather than being turned away.
+            val fits = slotWidth <= size && slotHeight <= size
+            val index = if (fits) shelfWithRoom(slotWidth, slotHeight) ?: newShelf(slotHeight, frame) ?: evict(slotHeight, frame) else null
             if (index != null) {
                 val shelf = shelves[index]
                 val entry = AtlasEntry(shelf.x, shelf.y, width, height, left, top, isColor, index)
@@ -127,9 +131,8 @@ public class AtlasLayout(
                 entries[key] = entry
                 return entry
             }
-            if (!grow()) break
+            if (!grow()) return null
         }
-        return null
     }
 
     private fun shelfWithRoom(
