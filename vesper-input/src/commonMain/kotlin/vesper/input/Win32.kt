@@ -134,6 +134,71 @@ internal fun win32Key(key: Key): Win32Key =
         is Key.System -> systemKey(key.key)
     }
 
+// An input method holds the key (VK_PROCESSKEY) or SendInput typed a character (VK_PACKET):
+// whatever text follows is not this key's.
+private const val VK_PROCESSKEY = 0xE5
+private const val VK_PACKET = 0xE7
+private const val VK_SHIFT = 0x10
+private const val SCAN_RIGHT_SHIFT = 0x36
+
+/**
+ * Every key but the main block's, by virtual key and extended bit, read off the table above so the
+ * two directions cannot disagree. Of keys that share both, the last listed wins: Play Pause for the
+ * one media key Windows has for play, pause and both.
+ */
+private val byVirtualKey: Map<Pair<Int, Boolean>, Key> by lazy {
+    val keys =
+        listOf(
+            Key.Escape,
+            Key.Enter,
+            Key.Tab,
+            Key.Backspace,
+            Key.Insert,
+            Key.Delete,
+            Key.Left,
+            Key.Right,
+            Key.Up,
+            Key.Down,
+            Key.PageUp,
+            Key.PageDown,
+            Key.Home,
+            Key.End,
+        ) + (F1..F24).map { Key.F(it) } + KeypadKey.entries.map { Key.Keypad(it) } +
+            MediaKey.entries.map { Key.Media(it) } + ModifierKey.entries.map { Key.Modifier(it) } +
+            SystemKey.entries.map { Key.System(it) }
+    buildMap {
+        for (key in keys) {
+            val windows = win32Key(key)
+            if (windows.vk != 0) put(windows.vk to windows.enhanced, key)
+        }
+    }
+}
+
+/**
+ * The key Windows reports as virtual key [vk] with [scan] code and the [extended] bit of its
+ * `WM_KEYDOWN`, or null for one with no name here: an input method's `VK_PROCESSKEY`, SendInput's
+ * `VK_PACKET`, a key the US layout lacks (the ISO key by Left Shift). The main block goes by scan
+ * code, its position, so a key keeps its name on every layout, as [Key.Character] requires.
+ */
+public fun windowsKey(
+    vk: Int,
+    scan: Int,
+    extended: Boolean,
+): Key? {
+    if (vk == VK_PROCESSKEY || vk == VK_PACKET) return null
+    // Windows names Shift without a side; only the scan code gives it.
+    if (vk == VK_SHIFT) return Key.Modifier(if (scan == SCAN_RIGHT_SHIFT) ModifierKey.RightShift else ModifierKey.LeftShift)
+    byVirtualKey[vk to extended]?.let { return it }
+    if (extended) return null
+    val char =
+        when (scan) {
+            SCAN_SPACE -> ' '
+            SCAN_BACKSLASH -> '\\'
+            else -> SCAN_ROWS.firstNotNullOfOrNull { (first, row) -> row.getOrNull(scan - first) }
+        }
+    return char?.let { Key.Character(it.code) }
+}
+
 private fun mediaKey(k: MediaKey): Win32Key =
     when (k) {
         MediaKey.Play, MediaKey.Pause, MediaKey.PlayPause -> ext(0xB3, 0x22)

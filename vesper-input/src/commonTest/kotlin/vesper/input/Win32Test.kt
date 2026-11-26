@@ -100,4 +100,48 @@ class Win32Test {
     fun altKeepsTheTypedCharacter() {
         assertEquals("\u001b[65;30;97;1;2;1_", enc(event(char('a'), ALT, "a")))
     }
+
+    @Test
+    fun windowsNamesEveryKeyItsRecordsCarry() {
+        val keys =
+            "1234567890-=qwertyuiop[]asdfghjkl;'`\\zxcvbnm,./ ".map(::char) +
+                listOf(Key.Escape, Key.Enter, Key.Insert, Key.Delete, Key.Left, Key.End, Key.F(1), Key.F(11), Key.F(24)) +
+                KeypadKey.entries.map { Key.Keypad(it) } + SystemKey.entries.map { Key.System(it) } +
+                listOf(
+                    ModifierKey.LeftShift,
+                    ModifierKey.RightShift,
+                    ModifierKey.RightControl,
+                    ModifierKey.RightSuper,
+                ).map { Key.Modifier(it) }
+        for (key in keys) {
+            val w = win32Key(key)
+            assertEquals(key, windowsKey(w.vk, w.scan, w.enhanced), "$key")
+        }
+    }
+
+    @Test
+    fun windowsKeysByPositionAndTheOnesWithoutAName() {
+        // The main block goes by position: the key right of Tab is q on any layout (vk 0x51 on QWERTY, 0x41 on AZERTY).
+        assertEquals(char('q'), windowsKey(0x41, 0x10, false))
+        assertEquals(Key.Media(MediaKey.PlayPause), windowsKey(0xB3, 0x22, true))
+        assertEquals(null, windowsKey(0xE5, 0x1E, false), "an input method's key")
+        assertEquals(null, windowsKey(0xE7, 0, false), "a SendInput character")
+        assertEquals(null, windowsKey(0xE2, 0x56, false), "the ISO key")
+        assertEquals(null, windowsKey(0x41, 0x1E, true))
+    }
+
+    @Test
+    fun theKeysThatTypeText() {
+        assertEquals(
+            listOf(true, true, false, true, false, false),
+            listOf(
+                char('a'),
+                Key.Keypad(KeypadKey.Digit5),
+                Key.Keypad(KeypadKey.Enter),
+                Key.Keypad(KeypadKey.Separator),
+                Key.Keypad(KeypadKey.Left),
+                Key.F(1),
+            ).map { it.typesText },
+        )
+    }
 }

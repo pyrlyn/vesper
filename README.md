@@ -30,7 +30,7 @@ Lints (ktlint) and runs the native tests of every module for the host's targets.
 ./gradlew :vesper-windows:linkDebugExecutableMingwX64 && vesper-windows/build/bin/mingwX64/debugExecutable/vesper-windows.exe
 ```
 
-A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it runs only on Windows. For now it opens an empty window: the Direct3D renderer is tested offscreen, and the shell comes in a later slice of T17.
+A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it runs only on Windows. It runs the user's shell (`COMSPEC`) in one window drawn with Direct3D 11, with keys, mouse, wheel, paste (Ctrl+Shift+V, Shift+Insert) and focus; live resize, DPI changes and the shell's title, directory and clipboard events come in a later slice of T17.
 
 ## Layout
 

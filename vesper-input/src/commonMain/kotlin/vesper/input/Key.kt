@@ -258,6 +258,9 @@ public sealed interface Key {
     ) : Key
 }
 
+/** Whether the key types text: the main block, and the keypad's digits and signs. */
+public val Key.typesText: Boolean get() = this is Key.Character || (this is Key.Keypad && key.textChar() != null)
+
 /**
  * One key event from the platform.
  *

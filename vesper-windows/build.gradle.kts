@@ -24,7 +24,7 @@ val copyZigHeaders =
     }
 
 kotlin {
-    // Only the Windows target has code; the others build empty so the module sits in every gate.
+    // The input policy is common code, so every runner tests it; the Win32 code is Windows-only.
     mingwX64 {
         compilations.getByName("main").cinterops.create("directx") {
             includeDirs(zigHeaders)
@@ -37,8 +37,12 @@ kotlin {
     }
 
     sourceSets {
+        commonMain.dependencies {
+            implementation(projects.vesperInput)
+        }
         mingwMain.dependencies {
             implementation(projects.vesperHost)
+            implementation(projects.vesperSession)
             implementation(projects.vesperUnicode)
         }
         all { languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi") }
