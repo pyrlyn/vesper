@@ -144,6 +144,28 @@ public class Session private constructor(
     /** Drops the selection. */
     public fun selectClear(): Unit = guarded(Unit) { terminal.selectClear() }
 
+    /** Whether anything is selected. */
+    public val hasSelection: Boolean get() = guarded(false) { terminal.selection != null }
+
+    /** The selected text, as [Terminal.selectionText] reads it; empty without a selection. */
+    public fun selectionText(): String = guarded("") { terminal.selectionText() }
+
+    /** Searches the history for [pattern], literally; an empty pattern ends the search. The next [update] marks the matches. */
+    public fun search(
+        pattern: String,
+        caseSensitive: Boolean,
+    ): Unit =
+        guarded(Unit) {
+            if (pattern.isEmpty()) terminal.searchClear() else terminal.searchSet(pattern, caseSensitive)
+        }
+
+    /** Steps to the next match ([forward]) or the previous one and scrolls to it; false when there is none. */
+    public fun searchStep(forward: Boolean): Boolean =
+        guarded(false) { (if (forward) terminal.searchNext() else terminal.searchPrev()) != null }
+
+    /** How many matches there are, counting up to [vesper.term.MAX_SEARCH_MATCHES]. */
+    public fun searchCount(): Int = guarded(0) { terminal.searchCount() }
+
     /**
      * Sets the size in cells and the cell size in pixels, then tells the child. During an
      * interactive resize, call [pauseOutput] first and this once at the final size.

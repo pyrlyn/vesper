@@ -93,7 +93,13 @@ private fun mainMenu(): NSMenu {
     app.addItemWithTitle("Quit vesper", NSSelectorFromString("terminate:"), "q")
     menu.addItem(NSMenuItem().also { it.submenu = app })
     val edit = NSMenu(title = "Edit")
+    edit.addItemWithTitle("Copy", NSSelectorFromString("copy:"), "c")
     edit.addItemWithTitle("Paste", NSSelectorFromString("paste:"), "v")
+    edit.addItem(NSMenuItem.separatorItem())
+    // A capital key equivalent adds Shift.
+    edit.addItemWithTitle("Find…", NSSelectorFromString("showFind:"), "f")
+    edit.addItemWithTitle("Find Next", NSSelectorFromString("findNext:"), "g")
+    edit.addItemWithTitle("Find Previous", NSSelectorFromString("findPrevious:"), "G")
     menu.addItem(NSMenuItem().also { it.submenu = edit })
     return menu
 }

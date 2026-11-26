@@ -91,6 +91,27 @@ class SessionTest {
     }
 
     @Test
+    fun theSelectionCopiesAndASearchStepsAndCounts() {
+        Session.spawn(SpawnOptions.command("cat")) {}.use { session ->
+            assertEquals(false, session.hasSelection)
+            assertEquals("", session.selectionText())
+            session.text("one Two two")
+            session.await(Frame()) { it.startsWith("one Two two") }
+            session.select(SelectionKind.Word, 0, 5)
+            assertEquals(true, session.hasSelection)
+            assertEquals("Two", session.selectionText())
+            session.search("two", caseSensitive = false)
+            assertEquals(2, session.searchCount())
+            assertEquals(true, session.searchStep(forward = true))
+            session.search("two", caseSensitive = true)
+            assertEquals(1, session.searchCount())
+            session.search("", caseSensitive = true)
+            assertEquals(0, session.searchCount(), "an empty pattern ends the search")
+            assertEquals(false, session.searchStep(forward = false))
+        }
+    }
+
+    @Test
     fun oneWakeupUntilTheHostLooks() {
         val wakeups = AtomicInt(0)
         val script = "printf a; sleep 0.1; printf b; sleep 0.1; printf c; sleep 30"

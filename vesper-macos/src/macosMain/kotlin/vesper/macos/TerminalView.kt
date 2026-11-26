@@ -13,10 +13,14 @@ import platform.AppKit.NSAccessibilityTextAreaRole
 import platform.AppKit.NSAccessibilityValueChangedNotification
 import platform.AppKit.NSBeep
 import platform.AppKit.NSEvent
+import platform.AppKit.NSEventModifierFlagOption
+import platform.AppKit.NSEventModifierFlagShift
 import platform.AppKit.NSFont
 import platform.AppKit.NSFontAttributeName
 import platform.AppKit.NSGraphicsContext
 import platform.AppKit.NSMarkedClauseSegmentAttributeName
+import platform.AppKit.NSMenuItem
+import platform.AppKit.NSMenuItemValidationProtocol
 import platform.AppKit.NSPasteboard
 import platform.AppKit.NSPasteboardTypeString
 import platform.AppKit.NSTextInputClientProtocol
@@ -28,6 +32,9 @@ import platform.AppKit.NSUnderlineStyleAttributeName
 import platform.AppKit.NSView
 import platform.AppKit.NSViewLayerContentsRedrawOnSetNeedsDisplay
 import platform.AppKit.NSWorkspace
+import platform.AppKit.topAnchor
+import platform.AppKit.trailingAnchor
+import platform.AppKit.translatesAutoresizingMaskIntoConstraints
 import platform.AppKit.voiceOverEnabled
 import platform.CoreGraphics.CGAffineTransformMakeScale
 import platform.CoreGraphics.CGContextFillRect
@@ -45,6 +52,8 @@ import platform.Foundation.NSHomeDirectory
 import platform.Foundation.NSNotFound
 import platform.Foundation.NSRange
 import platform.Foundation.NSRangePointer
+import platform.Foundation.NSSelectorFromString
+import platform.Foundation.NSTimer
 import platform.Foundation.NSURL
 import platform.Foundation.NSValue
 import platform.Foundation.create
@@ -74,6 +83,10 @@ import kotlin.math.abs
 
 private const val CHANNEL_MAX = 255.0
 
+// Typing waits this long before the history-wide step and count.
+private const val FIND_SETTLE_SECONDS = 0.25
+private const val FIND_BAR_MARGIN = 6.0
+
 /**
  * One terminal in a window: draws the frame with CoreText, sends keys, mouse and paste to the
  * session, and follows its size. Everything here runs on the main thread; the session's wakeup
@@ -83,7 +96,8 @@ internal class TerminalView(
     private val text: TextStyle,
     frame: CValue<CGRect>,
 ) : NSView(frame),
-    NSTextInputClientProtocol {
+    NSTextInputClientProtocol,
+    NSMenuItemValidationProtocol {
     private val palette = Palette()
     private val screen = Frame()
     private var session: Session? = null
@@ -158,6 +172,9 @@ internal class TerminalView(
     var onDirectory: (NSURL) -> Unit = {}
     var onExit: () -> Unit = {}
 
+    /** Where Copy, Paste and the program's OSC 52 writes go; a test swaps in a private one. */
+    internal var pasteboard: NSPasteboard = NSPasteboard.generalPasteboard
+
     /** The frame's text, row by row, as drawn (a preedit included); what the tests check. */
     val screenText: String get() =
         (0 until screen.rows).joinToString("\n") {
@@ -218,7 +235,6 @@ internal class TerminalView(
     private fun writeClipboard(data: ByteArray) {
         // The child's bytes need not be text; anything that is not UTF-8 is dropped.
         val string = runCatching { data.decodeToString(throwOnInvalidSequence = true) }.getOrNull() ?: return
-        val pasteboard = NSPasteboard.generalPasteboard
         pasteboard.clearContents()
         pasteboard.setString(string, NSPasteboardTypeString)
     }
@@ -510,20 +526,176 @@ internal class TerminalView(
     @OptIn(BetaInteropApi::class)
     @ObjCAction
     fun paste(sender: NSObject?) {
-        NSPasteboard.generalPasteboard.stringForType(NSPasteboardTypeString)?.let { session?.paste(it) }
+        pasteboard.stringForType(NSPasteboardTypeString)?.let { session?.paste(it) }
     }
 
-    // Mouse: reported to a program that asked; otherwise the wheel scrolls the history.
+    /** Puts the selected text on the [pasteboard]. */
+    @OptIn(BetaInteropApi::class)
+    @ObjCAction
+    fun copy(sender: NSObject?) {
+        val selected = session?.selectionText()?.takeIf { it.isNotEmpty() } ?: return
+        pasteboard.clearContents()
+        pasteboard.setString(selected, NSPasteboardTypeString)
+    }
+
+    override fun validateMenuItem(menuItem: NSMenuItem): Boolean =
+        when (menuItem.action) {
+            NSSelectorFromString("copy:") -> session?.hasSelection == true
+            NSSelectorFromString("findNext:"), NSSelectorFromString("findPrevious:") -> find.canStep
+            else -> true
+        }
+
+    // Find in this pane's history. The menu's Find commands arrive through the responder chain, also
+    // from the bar's own search field, which sits inside the view.
+    internal val find = FindState()
+    internal var findBar: FindBar? = null
+        private set
+    private var findSettle: NSTimer? = null
+
+    @OptIn(BetaInteropApi::class)
+    @ObjCAction
+    fun showFind(sender: NSObject?) {
+        val bar = findBar ?: makeFindBar()
+        findChanged(find.open())
+        window?.makeFirstResponder(bar.searchField)
+        bar.searchField.selectText(null)
+    }
+
+    @OptIn(BetaInteropApi::class)
+    @ObjCAction
+    fun findNext(sender: NSObject?) = findStep(forward = true)
+
+    @OptIn(BetaInteropApi::class)
+    @ObjCAction
+    fun findPrevious(sender: NSObject?) = findStep(forward = false)
+
+    private fun findStep(forward: Boolean) {
+        findSettle?.invalidate()
+        apply(find.step(forward))
+    }
+
+    internal fun findEdited(text: String) = findChanged(find.edit(text))
+
+    /** Runs a changed pattern's effects at once, so visible matches light up while typing, and the history-wide step and count after a pause. */
+    private fun findChanged(effects: List<FindEffect>) {
+        apply(effects)
+        findSettle?.invalidate()
+        findSettle = null
+        if (!find.unsettled) return
+        findSettle = NSTimer.scheduledTimerWithTimeInterval(FIND_SETTLE_SECONDS, repeats = false) { _ -> settleFind() }
+    }
+
+    internal fun settleFind() {
+        findSettle?.invalidate()
+        findSettle = null
+        apply(find.settle())
+    }
+
+    internal fun closeFind() {
+        findSettle?.invalidate()
+        findSettle = null
+        apply(find.close())
+        findBar?.removeFromSuperview()
+        findBar = null
+        window?.makeFirstResponder(this)
+    }
+
+    private fun apply(effects: List<FindEffect>) {
+        val current = session ?: return
+        for (effect in effects) {
+            when (effect) {
+                is FindEffect.Search -> current.search(effect.pattern, effect.matchCase)
+                is FindEffect.Step -> current.searchStep(effect.forward)
+                FindEffect.Count -> find.count = current.searchCount()
+            }
+        }
+        findBar?.show(find)
+        refresh()
+    }
+
+    private fun makeFindBar(): FindBar {
+        val bar = FindBar()
+        bar.pattern = find.pattern
+        bar.onEdit = ::findEdited
+        bar.onStep = ::findStep
+        bar.onToggleCase = { findChanged(find.toggleCase()) }
+        bar.onClose = ::closeFind
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(bar)
+        bar.topAnchor.constraintEqualToAnchor(topAnchor, FIND_BAR_MARGIN).active = true
+        bar.trailingAnchor.constraintEqualToAnchor(trailingAnchor, -FIND_BAR_MARGIN).active = true
+        findBar = bar
+        return bar
+    }
+
+    // Mouse: reported to a program that asked; otherwise the left button selects and the wheel
+    // scrolls the history. Shift selects even while a program tracks the mouse, as in xterm.
+    private var selectionDrag: SelectionDrag? = null
+
     override fun mouseDown(event: NSEvent) {
-        mouse(event, MouseAction.Press, MouseButton.Left)
+        if (event.modifierFlags and NSEventModifierFlagShift == 0uL && mouse(event, MouseAction.Press, MouseButton.Left)) return
+        selectionPress(event)
     }
 
     override fun mouseUp(event: NSEvent) {
-        mouse(event, MouseAction.Release, MouseButton.Left)
+        if (selectionDrag == null) {
+            mouse(event, MouseAction.Release, MouseButton.Left)
+            return
+        }
+        if (selectionDrag?.clearsOnRelease == true) session?.selectClear()
+        selectionDrag = null
+        selectionChanged()
     }
 
     override fun mouseDragged(event: NSEvent) {
-        mouse(event, MouseAction.Motion, MouseButton.Left)
+        if (selectionDrag == null) {
+            mouse(event, MouseAction.Motion, MouseButton.Left)
+            return
+        }
+        selectionDragged(event)
+    }
+
+    private fun selectionPress(event: NSEvent) {
+        val current = session ?: return
+        val at = cellUnder(event) ?: return
+        val flags = event.modifierFlags
+        val press =
+            selectionPress(
+                event.clickCount.toInt(),
+                shift = flags and NSEventModifierFlagShift != 0uL,
+                option = flags and NSEventModifierFlagOption != 0uL,
+                hasSelection = current.hasSelection,
+            )
+        when (press) {
+            SelectionPress.Extend -> current.selectExtend(at.rows, at.cols)
+            is SelectionPress.Start -> current.select(press.kind, at.rows, at.cols)
+        }
+        selectionDrag = SelectionDrag(at, press.clearsOnRelease)
+        selectionChanged()
+    }
+
+    private fun selectionDragged(event: NSEvent) {
+        val current = session ?: return
+        val drag = selectionDrag ?: return
+        val y = convertPoint(event.locationInWindow, fromView = null).useContents { y }
+        val scroll = bounds.useContents { dragScroll(y, size.height) }
+        if (scroll != 0) current.scrollDisplay(scroll)
+        val at = cellUnder(event) ?: return
+        if (scroll == 0 && at == drag.cell) return
+        current.selectExtend(at.rows, at.cols)
+        selectionDrag = SelectionDrag(at, clearsOnRelease = false)
+        selectionChanged()
+    }
+
+    private fun selectionChanged() {
+        refresh()
+        postSelectionChange()
+    }
+
+    /** The viewport cell under [event], clamped to the grid; null before the terminal has one. */
+    private fun cellUnder(event: NSEvent): Cells? {
+        if (grid.cols <= 0 || grid.rows <= 0) return null
+        return convertPoint(event.locationInWindow, fromView = null).useContents { cellAt(x, y, text.cell, grid) }
     }
 
     override fun rightMouseDown(event: NSEvent) {
@@ -598,14 +770,22 @@ internal class TerminalView(
             val row = screen.row(r) ?: continue
             val top = PADDING + r * cell.height
             for (run in row.runs) {
+                val bg = palette.colors(screen.style(run.style) ?: Style.DEFAULT).bg
+                if (bg == palette.background) continue
+                fill(context, bg)
+                CGContextFillRect(context, CGRectMake(PADDING + run.col * cell.width, top, run.cols * cell.width, cell.height))
+            }
+            // Highlights go over the run backgrounds and cover blank cells too, which belong to no run.
+            for (c in 0 until screen.cols) {
+                val highlight = palette.highlight(screen.cell(r, c).flags) ?: continue
+                fill(context, highlight)
+                CGContextFillRect(context, CGRectMake(PADDING + c * cell.width, top, cell.width, cell.height))
+            }
+            for (run in row.runs) {
                 val style = screen.style(run.style) ?: Style.DEFAULT
                 val colors = palette.colors(style)
                 val left = PADDING + run.col * cell.width
                 val width = run.cols * cell.width
-                if (colors.bg != palette.background) {
-                    fill(context, colors.bg)
-                    CGContextFillRect(context, CGRectMake(left, top, width, cell.height))
-                }
                 if (style.attrs and Attrs.HIDDEN != 0) continue
                 fill(context, colors.fg)
                 val runText = row.runText(run)

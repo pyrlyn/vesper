@@ -283,7 +283,7 @@ internal class MetalRenderer private constructor(
                 ) {
                     palette.background
                 } else {
-                    palette.colors(style(frame, frame.cell(row, col).style)).bg
+                    frame.cell(row, col).let { palette.colors(style(frame, it.style), it.flags).bg }
                 }
             if (bg == current && col < cols) continue
             if (current != palette.background && col > start) {
