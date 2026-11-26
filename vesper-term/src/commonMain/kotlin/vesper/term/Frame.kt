@@ -23,6 +23,7 @@ import vesper.unicode.firstCodePoint
 internal const val MISSING_CLUSTER: String = "\uFFFD"
 
 private const val WIDE_COLS = 2
+private const val SUPPLEMENTARY_FIRST = 0x10000
 
 /** One cell as the UI paints it. */
 public data class FrameCell(
@@ -173,9 +174,26 @@ public class Frame {
     /** The images in the viewport, lowest z first; the rows under any that changed are in the damage's dirty rows. */
     public val placements: List<FramePlacement> get() = placementList
 
-    /** The cursor; null when hidden or outside the viewport. */
+    /** The cursor; null when hidden or outside the viewport. While a preedit is shown, its caret, even under a hidden cursor. */
     public var cursor: FrameCursor? = null
         private set
+
+    private val composing = Preedit()
+    private var shownPreedit: PreeditLayout? = null
+
+    /** Where the last update showed the preedit; null when it did not. */
+    public val preedit: FramePreedit? get() = shownPreedit?.shown
+
+    /**
+     * Sets the input method's composing text, laid over the cursor row by the next update; an empty
+     * [text] ends it. [caret] and the [clauses] are UTF-16 offsets into [text], cut to it by
+     * [Preedit.set]; the text is capped at [MAX_PREEDIT_LENGTH].
+     */
+    public fun setPreedit(
+        text: String,
+        caret: Int = text.length,
+        clauses: List<PreeditClause> = emptyList(),
+    ): Unit = composing.set(text, caret, clauses)
 
     /** What the last update changed: blit the scrolls from the previous picture, then repaint the dirty rows. */
     public val damage: Damage = Damage()
@@ -229,15 +247,24 @@ public class Frame {
         for (r in 0 until rows) stamps += grid.visibleRow(r)?.let(RowStamp::of) ?: RowStamp.NONE
         oldMarks = marks
         marks = collectMarks(term)
-        damage.compute(oldStamps, stamps, full) { from, to -> sameSpans(oldMarks[from], marks[to]) }
+        val oldPreedit = shownPreedit
+        shownPreedit = cursorCell(term)?.let { composing.layout(it.row, it.col, cols, term.widthOptions, term.clusterPolicy) }
+        damage.compute(oldStamps, stamps, full) { from, to -> sameSpans(oldMarks[from], marks[to]) && keepsPreedit(oldPreedit, from, to) }
         collectPlacements(term, full)
         applyScrolls()
         for (r in damage.dirty) {
             paint(grid, r)
             applyMarks(r)
         }
-        cursor = cursorIn(term)
+        cursor = shownPreedit?.let { FrameCursor(it.shown.row, it.caret) } ?: cursorIn(term)
     }
+
+    /** Whether row [from] of the last picture can stand for row [to] as far as the preedit goes: only in place, and only when it did not change. */
+    private fun keepsPreedit(
+        old: PreeditLayout?,
+        from: Int,
+        to: Int,
+    ): Boolean = (from != old?.shown?.row && to != shownPreedit?.shown?.row) || (from == to && old == shownPreedit)
 
     private fun collectPlacements(
         term: Terminal,
@@ -323,11 +350,21 @@ public class Frame {
         text.clear()
         runs.clear()
         val row = grid.visibleRow(r)
+        val over = shownPreedit?.takeIf { it.shown.row == r }
+        val overStart = over?.shown?.col ?: cols
+        val overEnd = over?.let { it.shown.col + it.shown.cols } ?: cols
         var seen = -1
-        for (col in 0 until cols) {
+        var col = 0
+        while (col < cols) {
             val at = r * cols + col
+            if (col == overStart && over != null) {
+                pushPreedit(r, over, grid)
+                col = overEnd
+                continue
+            }
             if (row == null) {
                 setCell(at, 0, 0, 0, 0)
+                col++
                 continue
             }
             val cell = row.cell(col)
@@ -335,9 +372,35 @@ public class Frame {
                 seen = cell.style.value
                 refreshStyle(grid, cell.style)
             }
-            push(at, col, cell, grid)
+            // A wide character the preedit covers half of shows as a blank, as a line editor's overwrite would leave it.
+            val cut = (cell.hasFlags(CellFlags.WIDE) && col + 1 == overStart) || (cell.hasFlags(CellFlags.SPACER) && col == overEnd)
+            if (cut) setCell(at, 0, cell.style.value, 1, 0) else push(at, col, cell, grid)
+            col++
         }
         line.set(text.toString(), runs, row?.links.orEmpty())
+    }
+
+    /** Writes the preedit's clusters at its columns of row [r], in the default style. */
+    private fun pushPreedit(
+        r: Int,
+        layout: PreeditLayout,
+        grid: Grid,
+    ) {
+        refreshStyle(grid, StyleId.DEFAULT)
+        var col = layout.shown.col
+        for (k in layout.clusters.indices) {
+            val cluster = layout.clusters[k]
+            val width = layout.widths[k]
+            val at = r * cols + col
+            val start = text.length
+            text.append(cluster)
+            val codePoint = cluster.firstCodePoint()
+            val single = cluster.length == (if (codePoint >= SUPPLEMENTARY_FIRST) 2 else 1)
+            setCell(at, codePoint, StyleId.DEFAULT.value, width, if (single) 0 else FrameCell.CLUSTER)
+            if (width == WIDE_COLS) setCell(at + 1, 0, StyleId.DEFAULT.value, 0, 0)
+            extendRun(col, StyleId.DEFAULT.value, width, start)
+            col += width
+        }
     }
 
     private fun setCell(
@@ -417,8 +480,10 @@ public class Frame {
     }
 
     /** The cursor in viewport rows, when it is shown and the viewport is not scrolled back past it. */
-    private fun cursorIn(term: Terminal): FrameCursor? {
-        if (!term.modes.cursorVisible) return null
+    private fun cursorIn(term: Terminal): FrameCursor? = if (term.modes.cursorVisible) cursorCell(term) else null
+
+    /** The cursor's cell in viewport rows, shown or not, unless the viewport is scrolled back past it. */
+    private fun cursorCell(term: Terminal): FrameCursor? {
         val row = term.cursor.row + term.grid.displayOffset
         return if (row < term.grid.screenRows) FrameCursor(row, term.cursor.col) else null
     }

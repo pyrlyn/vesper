@@ -4,7 +4,7 @@ A terminal for macOS and Windows, written in Kotlin. A Kotlin/Native core parses
 
 ## Status
 
-The core is built and tested: the VT parser, Unicode tables, grid and scrollback with reflow, terminal state, input encoders, selection and search, images (kitty, iTerm2, sixel) and the PTY layer. The macOS app runs the user's shell in one window, drawn with Metal (CoreText where there is no GPU); input methods, accessibility and the Windows host come next; the plan is in [`PLAN.md`](PLAN.md) and the tasks in [`plan/`](plan/README.md).
+The core is built and tested: the VT parser, Unicode tables, grid and scrollback with reflow, terminal state, input encoders, selection and search, images (kitty, iTerm2, sixel) and the PTY layer. The macOS app runs the user's shell in one window, drawn with Metal (CoreText where there is no GPU), with input methods (CJK composition), VoiceOver reading, mouse selection, copy and a find bar; the Windows host comes next; the plan is in [`PLAN.md`](PLAN.md) and the tasks in [`plan/`](plan/README.md).
 
 ## Requirements
 
