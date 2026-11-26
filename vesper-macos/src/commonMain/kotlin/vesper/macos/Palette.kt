@@ -3,6 +3,7 @@ package vesper.macos
 import vesper.grid.Attrs
 import vesper.grid.Color
 import vesper.grid.Style
+import vesper.term.FrameCell
 
 private const val CHANNEL = 0xFF
 private const val RED_SHIFT = 16
@@ -47,6 +48,10 @@ internal class Palette(
     val foreground: Int = 0xE5E5E5,
     val background: Int = 0x141414,
     val cursor: Int = 0xE5E5E5,
+    // Dark enough that the default foreground stays readable on each.
+    val selection: Int = 0x264F78,
+    val match: Int = 0x5A4A14,
+    val currentMatch: Int = 0x9A6700,
 ) {
     private val indexed =
         IntArray(256).also { table ->
@@ -70,14 +75,30 @@ internal class Palette(
             else -> fallback
         }
 
-    /** What a cell of [style] shows: reverse video swaps the two, dim halves the way to the background. */
-    fun colors(style: Style): CellColors {
+    /**
+     * What a cell of [style] shows: reverse video swaps the two, dim halves the way to the background.
+     * A highlight in [flags] ([FrameCell] bits) takes the background: the current match first, then
+     * the selection, then any match.
+     */
+    fun colors(
+        style: Style,
+        flags: Int = 0,
+    ): CellColors {
         var fg = resolve(style.fg, foreground)
         var bg = resolve(style.bg, background)
         if (style.attrs and Attrs.INVERSE != 0) fg = bg.also { bg = fg }
         if (style.attrs and Attrs.DIM != 0) fg = blend(fg, bg)
-        return CellColors(fg, bg)
+        return CellColors(fg, highlight(flags) ?: bg)
     }
+
+    /** The background a highlight in [flags] paints, or null for none. */
+    fun highlight(flags: Int): Int? =
+        when {
+            flags and FrameCell.CURRENT_MATCH != 0 -> currentMatch
+            flags and FrameCell.SELECTED != 0 -> selection
+            flags and FrameCell.MATCH != 0 -> match
+            else -> null
+        }
 }
 
 internal fun rgb(

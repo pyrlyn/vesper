@@ -283,7 +283,7 @@ internal class MetalRenderer private constructor(
                 ) {
                     palette.background
                 } else {
-                    palette.colors(style(frame, frame.cell(row, col).style)).bg
+                    frame.cell(row, col).let { palette.colors(style(frame, it.style), it.flags).bg }
                 }
             if (bg == current && col < cols) continue
             if (current != palette.background && col > start) {
@@ -406,6 +406,7 @@ internal class MetalRenderer private constructor(
         val uniforms = floatArrayOf(target.width.toFloat(), target.height.toFloat(), pad, pad)
         val stride = capacityBg + capacityFg
         val (under, over) = cursorQuads(frame, focused)
+        preeditQuads(frame, over)
         val placed = placeImages(frame)
         for (layer in 0..1) {
             encoder.setVertexBuffer(buffers[index].buffer, 0u, 0u)
@@ -501,6 +502,23 @@ internal class MetalRenderer private constructor(
             }
         }
         return under to over
+    }
+
+    /** Underlines under the shown preedit in grid pixels: one per clause with a gap between them, thick under the target. */
+    private fun preeditQuads(
+        frame: Frame,
+        out: Quads,
+    ) {
+        val preedit = frame.preedit ?: return
+        if (preedit.row !in 0 until rows) return
+        val t = metrics.thickness.toFloat()
+        val bottom = ((preedit.row + 1) * metrics.height).toFloat()
+        val color = shaderColor(palette.foreground)
+        for (line in preeditLines(preedit)) {
+            val height = if (line.thick) 2 * t else t
+            val left = x(line.col) + t
+            out.add(left, bottom - height, x(line.col + line.cols) - t - left, height, color)
+        }
     }
 
     /** The frame's images as textured quads; textures of images no longer placed are dropped. */
