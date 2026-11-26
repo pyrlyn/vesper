@@ -305,6 +305,7 @@ internal class MetalRenderer private constructor(
         val uniforms = floatArrayOf(target.width.toFloat(), target.height.toFloat(), pad, pad)
         val stride = builder.capacityBg + builder.capacityFg
         val (under, over) = builder.cursorQuads(frame, focused)
+        builder.preeditQuads(frame, over)
         val placed = placeImages(frame)
         for (layer in 0..1) {
             encoder.setVertexBuffer(buffers[index].buffer, 0u, 0u)
