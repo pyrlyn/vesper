@@ -74,6 +74,13 @@ interface WindowListener {
     fun paint() {}
 
     fun closed() {}
+
+    /** Any other message (input, focus, the owner's own); true when handled, false for the default. */
+    fun message(
+        message: Int,
+        wParam: ULong,
+        lParam: Long,
+    ): Boolean = false
 }
 
 /** A top-level Win32 window of [width] by [height] device-independent pixels of client area. */
@@ -207,7 +214,7 @@ class Window(
             }
 
             else -> {
-                null
+                if (listener.message(message, wParam, lParam)) 0 else null
             }
         }
 
@@ -236,9 +243,9 @@ class Window(
     }
 }
 
-private fun loWord(value: Long) = (value and 0xFFFF).toInt()
+internal fun loWord(value: Long) = (value and 0xFFFF).toInt()
 
-private fun hiWord(value: Long) = ((value shr 16) and 0xFFFF).toInt()
+internal fun hiWord(value: Long) = ((value shr 16) and 0xFFFF).toInt()
 
 private const val CLASS_NAME = "VesperWindow"
 
