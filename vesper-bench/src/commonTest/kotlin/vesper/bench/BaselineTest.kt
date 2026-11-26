@@ -39,6 +39,12 @@ class BaselineTest {
     }
 
     @Test
+    fun windowsLooksForTheExecutable() {
+        assertEquals("wezterm.exe", programFile("wezterm", windows = true))
+        assertEquals("wezterm", programFile("wezterm", windows = false))
+    }
+
+    @Test
     fun durationsRenderWithFixedDecimals() {
         assertEquals("0.001422", fixed(1.422.milliseconds.inWholeMicroseconds / 1e6, 6))
         assertEquals("670.56", fixed(670.5612, 2))

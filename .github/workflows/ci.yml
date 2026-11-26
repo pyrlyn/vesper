@@ -117,6 +117,16 @@ jobs:
         name: Check (tests and ktlint)
         run: ./gradlew check --console=plain
 
+      # No machine here runs Windows, so this is where the T3 bench runs on it. The tables go to the
+      # job summary rather than docs/benchmarks: a CI VM's numbers describe that run only.
+      - if: env.RUN == 'true' && env.SKIP_TESTS != 'true' && matrix.target == 'mingwX64'
+        name: Benchmark (baseline and terminal tables)
+        run: |
+          ./gradlew :vesper-bench:linkReleaseExecutableMingwX64 --console=plain
+          bench=vesper-bench/build/bin/mingwX64/releaseExecutable/vesper-bench.exe
+          "$bench" build/baseline.md >> "$GITHUB_STEP_SUMMARY"
+          "$bench" term >> "$GITHUB_STEP_SUMMARY"
+
       - if: env.RUN == 'true' && env.SKIP_TESTS == 'true'
         name: tests skipped (SKIP_CI_TESTS)
         run: echo "::notice title=SKIP_CI_TESTS::tests skipped by SKIP_CI_TESTS"

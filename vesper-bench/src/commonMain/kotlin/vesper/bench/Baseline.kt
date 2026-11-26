@@ -93,7 +93,7 @@ internal fun render(
                 "after a warm-up. A missing binary is `not installed`. A terminal with no headless stdin feed " +
                 "is `unavailable` and is not compared. Numbers are this run only.\n\n",
         )
-        append("Reproduce with `./gradlew :vesper-bench:runReleaseExecutableMacosArm64` (or `LinuxX64`).\n\n")
+        append("Reproduce with `./gradlew :vesper-bench:runReleaseExecutableMacosArm64` (or `LinuxX64`, or `MingwX64` on Windows).\n\n")
         append("| terminal | status | bytes | seconds | MiB/s |\n")
         append("| --- | --- | --- | --- | --- |\n")
         rows.forEach { row ->
