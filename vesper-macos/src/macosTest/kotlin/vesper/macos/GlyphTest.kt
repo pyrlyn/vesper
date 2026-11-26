@@ -7,6 +7,7 @@ import vesper.host.isSpriteKey
 import vesper.host.keyFont
 import vesper.host.keyGlyph
 import vesper.host.keySprite
+import kotlin.math.ceil
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -49,6 +50,45 @@ class SpritesTest {
         assertEquals(0, alpha(single.pixel(single.width / 2, 0)))
         assertNull(spriteBitmap(underlineSprite(Underline.None), cell))
         assertNull(spriteBitmap('A'.code, cell))
+    }
+
+    /** The T28 check: every Powerline separator is a sprite that reaches the cell's edges. */
+    @Test
+    fun powerlineSeparatorsReachTheCellEdges() {
+        // The sides each solid shape stands on: up, right, down, left.
+        val flat =
+            mapOf(
+                0xE0B0 to "l",
+                0xE0B2 to "r",
+                0xE0B4 to "l",
+                0xE0B6 to "r",
+                0xE0B8 to "ld",
+                0xE0BA to "rd",
+                0xE0BC to "lu",
+                0xE0BE to "ru",
+            )
+        for (code in 0xE0B0..0xE0BF) {
+            val name = "U+${code.toString(16).uppercase()}"
+            assertTrue(isSprite(code), name)
+            val sprite = assertNotNull(spriteBitmap(code, cell), name)
+            val w = sprite.width
+            val h = sprite.height
+            val edges =
+                mapOf(
+                    'u' to (0 until w).map { sprite.pixel(it, 0) },
+                    'r' to (0 until h).map { sprite.pixel(w - 1, it) },
+                    'd' to (0 until w).map { sprite.pixel(it, h - 1) },
+                    'l' to (0 until h).map { sprite.pixel(0, it) },
+                )
+            for ((side, pixels) in edges) assertTrue(pixels.any { alpha(it) > 0 }, "$name leaves its $side edge bare")
+            // A flat side is covered all along, so the next segment's colour meets it without a seam;
+            // only its ends may be cut, by a slanted side as steep as the cell is tall for its width.
+            val cut = ceil(h.toDouble() / w).toInt() + 1
+            for (side in flat[code].orEmpty()) {
+                val pixels = edges.getValue(side)
+                assertTrue(pixels.drop(cut).dropLast(cut).all { alpha(it) == 255 }, "$name's $side side has a gap")
+            }
+        }
     }
 }
 
