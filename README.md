@@ -30,7 +30,7 @@ Lints (ktlint) and runs the native tests of every module for the host's targets.
 ./gradlew :vesper-windows:linkDebugExecutableMingwX64 && vesper-windows/build/bin/mingwX64/debugExecutable/vesper-windows.exe
 ```
 
-A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it runs only on Windows. For now it opens an empty window: the renderer and the shell come in the later slices of T17.
+A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it runs only on Windows. For now it opens an empty window: the Direct3D renderer is tested offscreen, and the shell comes in a later slice of T17.
 
 ## Layout
 
@@ -38,7 +38,7 @@ A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it
 | --- | --- |
 | `vesper-unicode`, `vesper-parser`, `vesper-grid`, `vesper-input`, `vesper-pty`, `vesper-term` | The Kotlin/Native core, layered as `PLAN.md` section 3 describes |
 | `vesper-session` | A terminal and the child it runs, under one lock: what each window holds |
-| `vesper-host` | What both apps draw with that no graphics API owns: the glyph atlas's layout and cache, and its bitmaps |
+| `vesper-host` | What both apps draw with that no graphics API owns: the palette, the frame turned into quads, the glyph atlas's layout and cache, and its bitmaps |
 | `vesper-macos` | The macOS app over AppKit, Metal and CoreText |
 | `vesper-windows` | The Windows app over Win32, Direct3D 11 and DirectWrite (in progress, T17) |
 | `vesper-png`, `vesper-image` | Allocation-capped PNG decoding and the image store with the kitty, iTerm2 and sixel decoders |

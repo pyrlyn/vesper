@@ -1,23 +1,23 @@
-package vesper.macos
+package vesper.host
 
 import vesper.term.Damage
 
 /** In [RowSources.sources]: the row must be repainted. */
-internal const val REPAINT = -1
+public const val REPAINT: Int = -1
 
 /**
  * The damage of every frame update since the last draw, composed. The core reports damage per update,
  * but the view may update several times (output, a key, a resize) before it draws once.
  */
-internal class RowSources {
+public class RowSources {
     /**
      * For each row of the latest frame, the row of the last drawn picture it still shows unchanged, or
      * [REPAINT]. Empty until the first update: everything is to be painted.
      */
-    var sources = IntArray(0)
+    public var sources: IntArray = IntArray(0)
         private set
 
-    fun absorb(
+    public fun absorb(
         damage: Damage,
         rows: Int,
     ) {
@@ -36,7 +36,7 @@ internal class RowSources {
     }
 
     /** The picture of [rows] rows was drawn: nothing has changed since. */
-    fun drawn(rows: Int) {
+    public fun drawn(rows: Int) {
         sources = IntArray(rows) { it }
     }
 }
@@ -45,14 +45,14 @@ internal class RowSources {
  * Which buffer slot holds each row's quads. A scroll only reorders this table: rows that moved keep
  * their slots, and only rows that lost theirs are built again.
  */
-internal class RowSlots(
+public class RowSlots(
     rows: Int,
 ) {
-    var slotOfRow = IntArray(rows) { it }
+    public var slotOfRow: IntArray = IntArray(rows) { it }
         private set
 
     /** Moves reused rows' slots to their new rows; answers the rows that got a free slot. */
-    fun remap(sources: IntArray): List<Int> {
+    public fun remap(sources: IntArray): List<Int> {
         val taken = BooleanArray(slotOfRow.size)
         val next = IntArray(sources.size) { REPAINT }
         for ((row, source) in sources.withIndex()) {

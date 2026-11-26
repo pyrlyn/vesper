@@ -48,20 +48,31 @@ import vesper.grid.Style
 import vesper.grid.Underline
 import vesper.host.AtlasEntry
 import vesper.host.Bitmap
+import vesper.host.CellMetrics
+import vesper.host.GlyphSource
+import vesper.host.IMAGE
+import vesper.host.PADDING
+import vesper.host.Palette
+import vesper.host.QUAD_INTS
+import vesper.host.QuadBuilder
+import vesper.host.Quads
+import vesper.host.RowSources
+import vesper.host.blue
+import vesper.host.green
 import vesper.host.isSpriteKey
 import vesper.host.keyFont
 import vesper.host.keyGlyph
 import vesper.host.keySprite
+import vesper.host.red
+import vesper.host.snap
 import vesper.host.spriteKey
 import vesper.term.Frame
 import vesper.term.FramePlacement
 import kotlin.math.floor
 import kotlin.math.max
 
-// Draws a frame with Metal: every cell background, glyph, sprite and decoration is one instanced quad.
-// Rows are built on the CPU only when the damage says they changed, kept in slots and reached through
-// a row-to-slot table, so a scroll only reorders the table. Each of the in-flight buffers copies a
-// slot only when its copy is older than the row.
+// Draws a frame with Metal: QuadBuilder turns it into quads, kept per row slot; each of the in-flight
+// buffers copies a slot only when its copy is older than the row.
 
 private const val FRAMES_IN_FLIGHT = 3
 private const val QUAD_BYTES = QUAD_INTS * 4
@@ -104,13 +115,6 @@ fragment float4 quad_fragment(Fragment in [[stage_in]], texture2d<float> atlas [
 }
 """
 
-private class RowContent {
-    val bg = Quads()
-    val fg = Quads()
-    val shelves = HashSet<Int>()
-    var version = 0L
-}
-
 private class InFlight(
     val buffer: MTLBufferProtocol,
     val versions: LongArray,
@@ -127,19 +131,35 @@ internal class MetalRenderer private constructor(
     private val shaper = RunShaper(text)
     private var atlas = GlyphAtlas.create(device) ?: error("no atlas texture")
     private val images = HashMap<Long, MTLTextureProtocol>()
-    private var scale = 0.0
-    private var metrics = CellMetrics.of(text.faces[0], text.cell, 1.0)
-    private var frameNumber = 0L
-    private var version = 0L
-    private var cols = 0
-    private var rows = 0
-    private var content = emptyArray<RowContent>()
-    private var slots = RowSlots(0)
+    private val builder =
+        QuadBuilder(
+            palette,
+            object : GlyphSource {
+                override fun shape(
+                    text: String,
+                    face: Int,
+                    width: Int,
+                ) = shaper.shape(text, face, width)
+
+                override fun rasterize(
+                    key: Long,
+                    metrics: CellMetrics,
+                    scale: Double,
+                ): Bitmap? =
+                    if (isSpriteKey(key)) {
+                        spriteBitmap(keySprite(key), metrics)
+                    } else {
+                        shaper.registry.font(keyFont(key))?.let { Bitmap.glyph(keyGlyph(key), it, scale) }
+                    }
+            },
+            atlas.cache,
+            CellMetrics.of(text.faces[0], text.cell, 1.0),
+            0.0,
+        )
+    private val metrics get() = builder.metrics
+    private val scale get() = builder.scale
     private var buffers = emptyList<InFlight>()
     private var nextBuffer = 0
-    private var capacityBg = 0
-    private var capacityFg = 0
-    private var needsRebuild = true
     private var offscreen: MTLTextureProtocol? = null
     private val inFlight = dispatch_semaphore_create(FRAMES_IN_FLIGHT.toLong())
 
@@ -217,154 +237,26 @@ internal class MetalRenderer private constructor(
         scale: Double,
     ) {
         if (scale != this.scale && scale > 0) {
-            this.scale = scale
-            metrics = CellMetrics.of(text.faces[0], text.cell, scale)
             // Glyphs rasterised at the old scale are the wrong size.
             atlas = GlyphAtlas.create(device) ?: atlas
-            needsRebuild = true
+            builder.rescale(scale, CellMetrics.of(text.faces[0], text.cell, scale), atlas.cache)
         }
-        if (frame.cols != cols || frame.rows != rows) allocate(frame.cols, frame.rows)
-        frameNumber++
-        val dirty =
-            if (needsRebuild || sources.sources.size != rows) (0 until rows).toList() else slots.remap(sources.sources)
-        needsRebuild = false
-        sources.drawn(rows)
-        // Shelves that reused rows draw from must survive this frame's evictions.
-        for (slot in slots.slotOfRow) for (shelf in content[slot].shelves) atlas.touch(shelf, frameNumber)
-        var generation = atlas.generation
-        dirty.forEach { build(it, frame) }
-        // A grown atlas dropped every entry, so rows built before the growth point at texels that are gone.
-        repeat(4) {
-            if (atlas.generation == generation) return
-            generation = atlas.generation
-            for (row in 0 until rows) build(row, frame)
-        }
+        if (builder.update(frame, sources)) allocate()
     }
 
-    private fun allocate(
-        cols: Int,
-        rows: Int,
-    ) {
-        this.cols = cols
-        this.rows = rows
-        // A row has at most one background per cell; the cap on the rest keeps a flood of combining
-        // marks from growing the buffers.
-        capacityBg = cols
-        capacityFg = cols * 4 + 16
-        content = Array(rows) { RowContent() }
-        slots = RowSlots(rows)
-        val length = max(1, rows * (capacityBg + capacityFg)) * QUAD_BYTES
+    private fun allocate() {
+        val length = max(1, builder.rows * (builder.capacityBg + builder.capacityFg)) * QUAD_BYTES
         buffers =
             (0 until FRAMES_IN_FLIGHT).mapNotNull {
-                device.newBufferWithLength(length.toULong(), MTLResourceStorageModeShared)?.let { InFlight(it, LongArray(rows) { -1 }) }
+                device
+                    .newBufferWithLength(
+                        length.toULong(),
+                        MTLResourceStorageModeShared,
+                    )?.let { InFlight(it, LongArray(builder.rows) { -1 }) }
             }
-        needsRebuild = true
     }
 
-    private fun x(col: Int): Float = floor(col * metrics.width).toFloat()
-
-    private fun entry(key: Long): AtlasEntry? =
-        atlas.entry(key, frameNumber) {
-            if (isSpriteKey(key)) {
-                spriteBitmap(keySprite(key), metrics)
-            } else {
-                shaper.registry.font(keyFont(key))?.let { Bitmap.glyph(keyGlyph(key), it, scale) }
-            }
-        }
-
-    private fun build(
-        row: Int,
-        frame: Frame,
-    ) {
-        val out = content[slots.slotOfRow[row]]
-        out.bg.clear()
-        out.fg.clear()
-        out.shelves.clear()
-        // Neighbouring cells of one colour share a quad.
-        var start = 0
-        var current = palette.background
-        for (col in 0..cols) {
-            val bg =
-                if (col ==
-                    cols
-                ) {
-                    palette.background
-                } else {
-                    palette.colors(style(frame, frame.cell(row, col).style)).bg
-                }
-            if (bg == current && col < cols) continue
-            if (current != palette.background && col > start) {
-                out.bg.add(x(start), 0f, x(col) - x(start), metrics.height.toFloat(), shaderColor(current))
-            }
-            start = col
-            current = bg
-        }
-        val line = frame.row(row)
-        if (line != null) for (run in line.runs) addRun(run.col, run.cols, run.width, line.runText(run), style(frame, run.style), out)
-        out.version = ++version
-    }
-
-    private fun style(
-        frame: Frame,
-        id: Int,
-    ): Style = frame.style(id) ?: Style.DEFAULT
-
-    private fun addRun(
-        first: Int,
-        count: Int,
-        width: Int,
-        runText: String,
-        style: Style,
-        out: RowContent,
-    ) {
-        if (style.attrs and Attrs.HIDDEN != 0) return
-        val fg = palette.colors(style).fg
-        val color = shaderColor(fg)
-        val face = face(style.attrs and Attrs.BOLD != 0, style.attrs and Attrs.ITALIC != 0)
-        for (glyph in shaper.shape(runText, face, width)) {
-            if (out.fg.count >= capacityFg) break
-            val entry = entry(glyph.key)?.takeIf { !it.isEmpty } ?: continue
-            val col = (first + glyph.column) * metrics.width
-            // Sprites start on the cell's pixel edge, as backgrounds do.
-            val pen = if (isSpriteKey(glyph.key)) floor(col) else snap(col + glyph.dx * scale)
-            val baseline = metrics.baseline - snap(glyph.dy * scale)
-            out.fg.add(
-                (pen + entry.left).toFloat(),
-                (baseline - entry.top).toFloat(),
-                entry.width.toFloat(),
-                entry.height.toFloat(),
-                if (entry.isColor) shaderColor(0xFFFFFF) else color,
-                if (entry.isColor) COLOR_GLYPH else TINTED,
-                entry.x,
-                entry.y,
-            )
-            out.shelves.add(entry.shelf)
-        }
-        val end = first + count
-        if (style.underline != Underline.None) {
-            val entry = entry(spriteKey(underlineSprite(style.underline)))?.takeIf { !it.isEmpty }
-            if (entry != null) {
-                val tint = if (style.underlineColor == Color.DEFAULT) color else shaderColor(palette.resolve(style.underlineColor, fg))
-                for (col in first until end) {
-                    if (out.fg.count >= capacityFg) break
-                    out.fg.add(
-                        x(col),
-                        (metrics.baseline - entry.top).toFloat(),
-                        entry.width.toFloat(),
-                        entry.height.toFloat(),
-                        tint,
-                        TINTED,
-                        entry.x,
-                        entry.y,
-                    )
-                }
-                out.shelves.add(entry.shelf)
-            }
-        }
-        val lineAt = { y: Double -> out.fg.add(x(first), snap(y).toFloat(), x(end) - x(first), metrics.thickness.toFloat(), color) }
-        if (style.attrs and Attrs.STRIKE != 0 && out.fg.count < capacityFg) lineAt(metrics.baseline - metrics.strike)
-        if (style.attrs and Attrs.OVERLINE != 0 && out.fg.count < capacityFg) lineAt(0.0)
-    }
+    private fun x(col: Int): Float = builder.x(col)
 
     private fun encode(
         frame: Frame,
@@ -411,18 +303,18 @@ internal class MetalRenderer private constructor(
         upload(buffers[index])
         val pad = (PADDING * scale).toFloat()
         val uniforms = floatArrayOf(target.width.toFloat(), target.height.toFloat(), pad, pad)
-        val stride = capacityBg + capacityFg
-        val (under, over) = cursorQuads(frame, focused)
+        val stride = builder.capacityBg + builder.capacityFg
+        val (under, over) = builder.cursorQuads(frame, focused)
         val placed = placeImages(frame)
         for (layer in 0..1) {
             encoder.setVertexBuffer(buffers[index].buffer, 0u, 0u)
-            for (row in 0 until rows) {
-                val slot = slots.slotOfRow[row]
-                val count = if (layer == 0) content[slot].bg.count else content[slot].fg.count
+            for (row in 0 until builder.rows) {
+                val slot = builder.slots.slotOfRow[row]
+                val count = if (layer == 0) builder.content[slot].bg.count else builder.content[slot].fg.count
                 if (count == 0) continue
                 uniforms[3] = pad + (row * metrics.height).toFloat()
                 setUniforms(encoder, uniforms)
-                val base = slot * stride + if (layer == 0) 0 else capacityBg
+                val base = slot * stride + if (layer == 0) 0 else builder.capacityBg
                 encoder.drawPrimitives(MTLPrimitiveTypeTriangleStrip, 0u, 4u, count.toULong(), base.toULong())
             }
             // Images with a negative z go under the text, the rest over it. The cursor block goes over
@@ -454,12 +346,12 @@ internal class MetalRenderer private constructor(
     }
 
     private fun upload(target: InFlight) {
-        val stride = capacityBg + capacityFg
+        val stride = builder.capacityBg + builder.capacityFg
         val base = target.buffer.contents() ?: return
-        for (slot in content.indices) {
-            val row = content[slot]
+        for (slot in builder.content.indices) {
+            val row = builder.content[slot]
             if (target.versions[slot] == row.version) continue
-            for ((quads, offset) in listOf(row.bg to 0, row.fg to capacityBg)) {
+            for ((quads, offset) in listOf(row.bg to 0, row.fg to builder.capacityBg)) {
                 if (quads.count == 0) continue
                 quads.data.usePinned {
                     memcpy(
@@ -474,40 +366,6 @@ internal class MetalRenderer private constructor(
             }
             target.versions[slot] = row.version
         }
-    }
-
-    /** The cursor's quads in grid pixels: what goes under the text, and what goes over it. */
-    private fun cursorQuads(
-        frame: Frame,
-        focused: Boolean,
-    ): Pair<Quads, Quads> {
-        val under = Quads(4)
-        val over = Quads(4)
-        val cursor = frame.cursor ?: return under to over
-        if (cursor.row !in 0 until rows || cursor.col !in 0 until cols) return under to over
-        val cell = frame.cell(cursor.row, cursor.col)
-        val top = (cursor.row * metrics.height).toFloat()
-        val left = x(cursor.col)
-        val right = x(cursor.col + max(1, cell.width))
-        val height = metrics.height.toFloat()
-        val t = metrics.thickness.toFloat()
-        val color = shaderColor(palette.cursor)
-        if (!focused) {
-            under.add(left, top, right - left, t, color)
-            under.add(left, top + height - t, right - left, t, color)
-            under.add(left, top, t, height, color)
-            under.add(right - t, top, t, height, color)
-            return under to over
-        }
-        under.add(left, top, right - left, height, color)
-        val glyphs = content[slots.slotOfRow[cursor.row]].fg
-        for (i in 0 until glyphs.count) {
-            val middle = glyphs.x(i) + glyphs.w(i) / 2
-            if (glyphs.kind(i) == TINTED && middle >= left && middle < right && over.count < 16) {
-                over.addCopy(glyphs, i, top, shaderColor(palette.background))
-            }
-        }
-        return under to over
     }
 
     /** The frame's images as textured quads; textures of images no longer placed are dropped. */

@@ -184,6 +184,12 @@ class FontFace internal constructor(
     val unitsPerEm: Int
     val ascent: Int
     val descent: Int
+    val lineGap: Int
+
+    /** Up from the baseline to the underline's middle; below it is negative. */
+    val underlinePosition: Int
+    val underlineThickness: Int
+    val xHeight: Int
 
     init {
         memScoped {
@@ -194,6 +200,10 @@ class FontFace internal constructor(
             unitsPerEm = metrics.designUnitsPerEm.toInt()
             ascent = metrics.ascent.toInt()
             descent = metrics.descent.toInt()
+            lineGap = metrics.lineGap.toInt()
+            underlinePosition = metrics.underlinePosition.toInt()
+            underlineThickness = metrics.underlineThickness.toInt()
+            xHeight = metrics.xHeight.toInt()
         }
     }
 

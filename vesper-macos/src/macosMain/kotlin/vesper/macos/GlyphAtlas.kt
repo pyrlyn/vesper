@@ -51,7 +51,7 @@ internal fun MTLDeviceProtocol.sharedTexture(
 /** The glyphs and sprites in one Metal texture, cached by [GlyphCache]. */
 internal class GlyphAtlas private constructor(
     private val store: Store,
-    private val cache: GlyphCache,
+    val cache: GlyphCache,
 ) {
     private class Store(
         val device: MTLDeviceProtocol,
@@ -79,21 +79,6 @@ internal class GlyphAtlas private constructor(
     }
 
     val texture: MTLTextureProtocol get() = store.texture!!
-
-    /** See [GlyphCache.generation]: entries handed out under an older one are gone. */
-    val generation: Int get() = cache.generation
-
-    /** The entry for [key], rasterised by [make] the first time; null when it fits nowhere. */
-    fun entry(
-        key: Long,
-        frame: Long,
-        make: () -> Bitmap?,
-    ): AtlasEntry? = cache.entry(key, frame, make)
-
-    fun touch(
-        shelf: Int,
-        frame: Long,
-    ) = cache.touch(shelf, frame)
 
     companion object {
         fun create(
