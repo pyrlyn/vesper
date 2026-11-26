@@ -13,7 +13,9 @@ import vesper.pty.SpawnOptions
 import vesper.pty.withLock
 import vesper.term.Event
 import vesper.term.Frame
+import vesper.term.SelectionKind
 import vesper.term.Terminal
+import vesper.term.ViewportText
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.TimeSource
@@ -122,6 +124,25 @@ public class Session private constructor(
 
     /** Scrolls the view by [delta] lines, up when positive; the next [update] shows it. */
     public fun scrollDisplay(delta: Int): Unit = guarded(Unit) { terminal.scrollDisplay(delta) }
+
+    /** The viewport's text and the selection in it, for a screen reader. */
+    public fun viewportText(): ViewportText = guarded(ViewportText.EMPTY) { terminal.viewportText() }
+
+    /** Starts a selection of [kind] at viewport cell [row], [col], replacing any other; the next [update] shows it. */
+    public fun select(
+        kind: SelectionKind,
+        row: Int,
+        col: Int,
+    ): Unit = guarded(Unit) { terminal.selectStart(kind, terminal.viewportPoint(row, col)) }
+
+    /** Moves the selection's free end to viewport cell [row], [col]. */
+    public fun selectExtend(
+        row: Int,
+        col: Int,
+    ): Unit = guarded(Unit) { terminal.selectExtend(terminal.viewportPoint(row, col)) }
+
+    /** Drops the selection. */
+    public fun selectClear(): Unit = guarded(Unit) { terminal.selectClear() }
 
     /**
      * Sets the size in cells and the cell size in pixels, then tells the child. During an
