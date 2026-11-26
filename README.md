@@ -38,6 +38,7 @@ A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it
 | --- | --- |
 | `vesper-unicode`, `vesper-parser`, `vesper-grid`, `vesper-input`, `vesper-pty`, `vesper-term` | The Kotlin/Native core, layered as `PLAN.md` section 3 describes |
 | `vesper-session` | A terminal and the child it runs, under one lock: what each window holds |
+| `vesper-host` | What both apps draw with that no graphics API owns: the glyph atlas's layout and cache, and its bitmaps |
 | `vesper-macos` | The macOS app over AppKit, Metal and CoreText |
 | `vesper-windows` | The Windows app over Win32, Direct3D 11 and DirectWrite (in progress, T17) |
 | `vesper-png`, `vesper-image` | Allocation-capped PNG decoding and the image store with the kitty, iTerm2 and sixel decoders |

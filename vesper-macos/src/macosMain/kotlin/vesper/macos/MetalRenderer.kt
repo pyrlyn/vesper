@@ -46,6 +46,13 @@ import vesper.grid.Attrs
 import vesper.grid.Color
 import vesper.grid.Style
 import vesper.grid.Underline
+import vesper.host.AtlasEntry
+import vesper.host.Bitmap
+import vesper.host.isSpriteKey
+import vesper.host.keyFont
+import vesper.host.keyGlyph
+import vesper.host.keySprite
+import vesper.host.spriteKey
 import vesper.term.Frame
 import vesper.term.FramePlacement
 import kotlin.math.floor

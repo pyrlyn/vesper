@@ -1,4 +1,4 @@
-package vesper.macos
+package vesper.host
 
 private const val FONT_SHIFT = 32
 private const val SPRITE_TAG = 1L shl 62
@@ -8,39 +8,39 @@ private const val GLYPH_MASK = 0xFFFFL
 private const val SHELF_STEP = 4
 
 /** The atlas key of glyph [glyph] of registered font [font]. */
-internal fun glyphKey(
+public fun glyphKey(
     font: Int,
     glyph: Int,
 ): Long = (font.toLong() shl FONT_SHIFT) or (glyph.toLong() and GLYPH_MASK)
 
 /** The atlas key of the sprite for [code] (a code point, or an underline sprite past Unicode). */
-internal fun spriteKey(code: Int): Long = SPRITE_TAG or code.toLong()
+public fun spriteKey(code: Int): Long = SPRITE_TAG or code.toLong()
 
-internal fun isSpriteKey(key: Long): Boolean = key and SPRITE_TAG != 0L
+public fun isSpriteKey(key: Long): Boolean = key and SPRITE_TAG != 0L
 
-internal fun keyFont(key: Long): Int = (key ushr FONT_SHIFT).toInt()
+public fun keyFont(key: Long): Int = (key ushr FONT_SHIFT).toInt()
 
-internal fun keyGlyph(key: Long): Int = (key and GLYPH_MASK).toInt()
+public fun keyGlyph(key: Long): Int = (key and GLYPH_MASK).toInt()
 
-internal fun keySprite(key: Long): Int = (key and 0xFFFF_FFFFL).toInt()
+public fun keySprite(key: Long): Int = (key and 0xFFFF_FFFFL).toInt()
 
 /** Where an image sits in the atlas and how it sits against the pen; [width] 0 is nothing to draw. */
-internal data class AtlasEntry(
-    val x: Int = 0,
-    val y: Int = 0,
-    val width: Int = 0,
-    val height: Int = 0,
+public data class AtlasEntry(
+    public val x: Int = 0,
+    public val y: Int = 0,
+    public val width: Int = 0,
+    public val height: Int = 0,
     /** Pixels from the pen to the image's left edge. */
-    val left: Int = 0,
+    public val left: Int = 0,
     /** Pixels from the baseline up to the image's top edge. */
-    val top: Int = 0,
-    val isColor: Boolean = false,
-    val shelf: Int = 0,
+    public val top: Int = 0,
+    public val isColor: Boolean = false,
+    public val shelf: Int = 0,
 ) {
-    val isEmpty: Boolean get() = width == 0
+    public val isEmpty: Boolean get() = width == 0
 
-    companion object {
-        val EMPTY = AtlasEntry()
+    public companion object {
+        public val EMPTY: AtlasEntry = AtlasEntry()
     }
 }
 
@@ -50,7 +50,7 @@ internal data class AtlasEntry(
  * cheap to track, and no free-rectangle bookkeeping. A shelf drawn within [framesInFlight] frames may
  * still be read by the GPU, so it is never emptied under it.
  */
-internal class AtlasLayout(
+public class AtlasLayout(
     initialSize: Int = 1024,
     maxSize: Int = 8192,
     private val framesInFlight: Long = 3,
@@ -70,15 +70,15 @@ internal class AtlasLayout(
     private var nextY = 0
 
     /** The texture's side; it doubles when nothing fits. */
-    var size = initialSize
+    public var size: Int = initialSize
         private set
 
     /** Bumped when the atlas starts over at a larger size: every entry handed out before is gone. */
-    var generation = 0
+    public var generation: Int = 0
         private set
 
     /** The entry for [key], marking its shelf drawn in [frame]; null when not yet placed. */
-    fun get(
+    public fun get(
         key: Long,
         frame: Long,
     ): AtlasEntry? {
@@ -88,12 +88,12 @@ internal class AtlasLayout(
     }
 
     /** Remembers that [key] draws nothing, so it is not rasterised again. */
-    fun putEmpty(key: Long) {
+    public fun putEmpty(key: Long) {
         entries[key] = AtlasEntry.EMPTY
     }
 
     /** Keeps a shelf that rows reused from an earlier frame draw from. */
-    fun touch(
+    public fun touch(
         shelf: Int,
         frame: Long,
     ) {
@@ -105,7 +105,7 @@ internal class AtlasLayout(
      * Room for a [width] by [height] image under [key]. The atlas may grow on the way (see
      * [generation]); null when it fits nowhere even at the largest size.
      */
-    fun place(
+    public fun place(
         key: Long,
         width: Int,
         height: Int,

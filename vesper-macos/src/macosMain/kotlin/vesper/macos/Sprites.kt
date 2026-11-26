@@ -24,6 +24,7 @@ import platform.CoreGraphics.CGPathRelease
 import platform.CoreGraphics.CGRectMake
 import platform.CoreGraphics.CGRectStandardize
 import vesper.grid.Underline
+import vesper.host.Bitmap
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.floor

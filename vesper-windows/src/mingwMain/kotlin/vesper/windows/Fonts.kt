@@ -2,6 +2,7 @@ package vesper.windows
 
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVar
+import kotlinx.cinterop.FloatVar
 import kotlinx.cinterop.IntVar
 import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.UShortVar
@@ -25,6 +26,7 @@ import vesper.windows.dx.IDWriteFactory2
 import vesper.windows.dx.IDWriteFont
 import vesper.windows.dx.IDWriteFontCollection
 import vesper.windows.dx.IDWriteFontFace
+import vesper.windows.dx.IDWriteFontFallback
 import vesper.windows.dx.IDWriteFontFamily
 
 // From dwrite_2.h: IDWriteFactory2 brings the system font fallback the renderer needs.
@@ -62,22 +64,87 @@ class FontSystem private constructor(
                     ),
                     "GetFirstMatchingFont",
                 )
-                val face = alloc<CPointerVar<IDWriteFontFace>>()
-                val fontPointer = font.value!!
-                checkHr(
-                    fontPointer.pointed.lpVtbl!!
-                        .pointed.CreateFontFace!!
-                        .invoke(fontPointer, face.ptr),
-                    "CreateFontFace",
-                )
-                FontFace(face.value!!)
+                faceOf(font.value!!)
             } finally {
                 release(font.value)
                 release(fontFamily.value)
             }
         }
 
+    /**
+     * The face that draws [text] from its start when [family] cannot: how many UTF-16 units of it
+     * that face covers, and the scale that matches its size to [family]'s. The face is [family]'s
+     * own when it has the characters, and null over a stretch that no installed font has.
+     */
+    fun fallback(
+        text: String,
+        family: String,
+        weight: Int = 400,
+        italic: Boolean = false,
+    ): Fallback =
+        withTextSource(text) { source, length ->
+            memScoped {
+                val mapped = alloc<UIntVar>()
+                val font = alloc<CPointerVar<IDWriteFont>>()
+                val scale = alloc<FloatVar>()
+                checkHr(
+                    systemFallback.pointed.lpVtbl!!.pointed.MapCharacters!!.invoke(
+                        systemFallback,
+                        source,
+                        0u,
+                        length.convert(),
+                        collection,
+                        family.wcstr.ptr,
+                        weight.convert(),
+                        if (italic) DWRITE_FONT_STYLE_ITALIC else DWRITE_FONT_STYLE_NORMAL,
+                        DWRITE_FONT_STRETCH_NORMAL,
+                        mapped.ptr,
+                        font.ptr,
+                        scale.ptr,
+                    ),
+                    "MapCharacters",
+                )
+                val face =
+                    font.value?.let {
+                        try {
+                            faceOf(it)
+                        } finally {
+                            release(it)
+                        }
+                    }
+                Fallback(face, mapped.value.toInt(), scale.value)
+            }
+        }
+
+    private val fallbackOnce =
+        lazy {
+            memScoped {
+                val out = alloc<CPointerVar<IDWriteFontFallback>>()
+                checkHr(
+                    factory.pointed.lpVtbl!!
+                        .pointed.GetSystemFontFallback!!
+                        .invoke(factory, out.ptr),
+                    "GetSystemFontFallback",
+                )
+                out.value!!
+            }
+        }
+    private val systemFallback by fallbackOnce
+
+    private fun faceOf(font: CPointer<IDWriteFont>): FontFace =
+        memScoped {
+            val face = alloc<CPointerVar<IDWriteFontFace>>()
+            checkHr(
+                font.pointed.lpVtbl!!
+                    .pointed.CreateFontFace!!
+                    .invoke(font, face.ptr),
+                "CreateFontFace",
+            )
+            FontFace(face.value!!)
+        }
+
     override fun close() {
+        if (fallbackOnce.isInitialized()) release(systemFallback)
         release(collection)
         release(factory)
     }
@@ -102,6 +169,13 @@ class FontSystem private constructor(
             }
     }
 }
+
+/** What [FontSystem.fallback] found: [face] draws the first [length] UTF-16 units at [scale] times the size. */
+class Fallback(
+    val face: FontFace?,
+    val length: Int,
+    val scale: Float,
+)
 
 /** One font face, measured in its design units. */
 class FontFace internal constructor(

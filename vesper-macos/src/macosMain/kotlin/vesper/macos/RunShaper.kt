@@ -38,6 +38,8 @@ import platform.CoreText.CTRunGetStringIndices
 import platform.CoreText.CTRunRef
 import platform.CoreText.kCTFontAttributeName
 import platform.Foundation.CFBridgingRelease
+import vesper.host.glyphKey
+import vesper.host.spriteKey
 import vesper.unicode.GraphemeState
 import vesper.unicode.forEachCodePoint
 
