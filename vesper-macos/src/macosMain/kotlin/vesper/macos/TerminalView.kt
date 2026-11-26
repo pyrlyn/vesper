@@ -760,7 +760,14 @@ internal class TerminalView(
     }
 
     override fun drawRect(dirtyRect: CValue<CGRect>) {
-        val context = NSGraphicsContext.currentContext?.CGContext ?: return
+        drawCells(NSGraphicsContext.currentContext?.CGContext ?: return)
+    }
+
+    // Sprites drawn straight into the view's context, in points.
+    private val spriteCell by lazy { CellMetrics.of(text.faces[0], text.cell, 1.0) }
+
+    /** The CoreText fallback's drawing into [context], top-down in points as the flipped view's is. */
+    internal fun drawCells(context: CGContextRef) {
         // The view is flipped, so text would come out upside down without this.
         CGContextSetTextMatrix(context, CGAffineTransformMakeScale(1.0, -1.0))
         fill(context, palette.background)
@@ -788,9 +795,15 @@ internal class TerminalView(
                 val width = run.cols * cell.width
                 if (style.attrs and Attrs.HIDDEN != 0) continue
                 fill(context, colors.fg)
-                val runText = row.runText(run)
+                stroke(context, colors.fg)
+                // Box drawing and Powerline separators come from the cell's geometry, as in the Metal
+                // renderer; a font's glyphs leave seams. Spaces hold their columns in the text.
+                val runText = row.runText(run).map { if (isSprite(it.code)) ' ' else it }.joinToString("")
                 if (runText.isNotBlank()) {
                     text.draw(context, runText, left, top + text.ascent, style.attrs and Attrs.BOLD != 0, style.attrs and Attrs.ITALIC != 0)
+                }
+                for (c in run.col until run.col + run.cols) {
+                    drawSprite(context, screen.cell(r, c).codePoint, spriteCell, PADDING + c * cell.width, top)
                 }
                 if (style.underline != Underline.None) CGContextFillRect(context, CGRectMake(left, top + text.ascent + 1, width, 1.0))
                 if (style.attrs and Attrs.STRIKE != 0) CGContextFillRect(context, CGRectMake(left, top + cell.height / 2, width, 1.0))
@@ -832,7 +845,9 @@ internal class TerminalView(
         CGContextFillRect(context, rect)
         if (under.codePoint > ' '.code) {
             fill(context, palette.background)
+            stroke(context, palette.background)
             val left = rect.useContents { origin.x }
+            if (drawSprite(context, under.codePoint, spriteCell, left, PADDING + cursor.row * cell.height)) return
             text.draw(
                 context,
                 codePointText(under.codePoint),

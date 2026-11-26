@@ -141,7 +141,7 @@ Rules between core and host (research.md §7):
 - [x] **T16.** Input method and accessibility.
 - [x] **T13.4.** Selection, copy and find UI.
 - [ ] **T27.** Powerline and Nerd Font symbols.
-- [ ] **T28.** Powerline separators from cell geometry.
+- [x] **T28.** Powerline separators from cell geometry.
 
 ### Phase 7: Windows host
 
