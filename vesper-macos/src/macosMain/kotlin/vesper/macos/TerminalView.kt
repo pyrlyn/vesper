@@ -43,9 +43,11 @@ import vesper.host.Palette
 import vesper.host.RowSources
 import vesper.host.blue
 import vesper.host.cellAt
+import vesper.host.clipboardText
 import vesper.host.green
 import vesper.host.gridSize
 import vesper.host.red
+import vesper.host.windowTitle
 import vesper.input.KeyAction
 import vesper.input.MouseAction
 import vesper.input.MouseButton
@@ -55,7 +57,6 @@ import vesper.pty.SpawnOptions
 import vesper.session.Session
 import vesper.term.Event
 import vesper.term.Frame
-import vesper.term.TitleTarget
 import kotlin.math.abs
 
 private const val CHANNEL_MAX = 255.0
@@ -186,12 +187,12 @@ internal class TerminalView(
             when (val event = current.pollEvent() ?: break) {
                 Event.Bell -> NSBeep()
 
-                is Event.Title -> if (event.target != TitleTarget.Icon) onTitle(event.text)
+                is Event.Title -> event.windowTitle?.let(onTitle)
 
                 // Only a local file URL names a directory this Mac can show.
                 is Event.Directory -> NSURL.URLWithString(event.uri)?.takeIf { it.fileURL }?.let(onDirectory)
 
-                is Event.ClipboardWrite -> writeClipboard(event.data)
+                is Event.ClipboardWrite -> event.clipboardText?.let(::writeClipboard)
 
                 else -> Unit
             }
@@ -199,9 +200,7 @@ internal class TerminalView(
         if (current.exitStatus != null || current.failure != null) onExit()
     }
 
-    private fun writeClipboard(data: ByteArray) {
-        // The child's bytes need not be text; anything that is not UTF-8 is dropped.
-        val string = runCatching { data.decodeToString(throwOnInvalidSequence = true) }.getOrNull() ?: return
+    private fun writeClipboard(string: String) {
         val pasteboard = NSPasteboard.generalPasteboard
         pasteboard.clearContents()
         pasteboard.setString(string, NSPasteboardTypeString)

@@ -30,7 +30,7 @@ Lints (ktlint) and runs the native tests of every module for the host's targets.
 ./gradlew :vesper-windows:linkDebugExecutableMingwX64 && vesper-windows/build/bin/mingwX64/debugExecutable/vesper-windows.exe
 ```
 
-A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it runs only on Windows. It runs the user's shell (`COMSPEC`) in one window drawn with Direct3D 11, with keys, mouse, wheel, paste (Ctrl+Shift+V, Shift+Insert) and focus; live resize, DPI changes and the shell's title, directory and clipboard events come in a later slice of T17.
+A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it runs only on Windows. It runs the user's shell (`COMSPEC`) in one window drawn with Direct3D 11, with keys, mouse, wheel, paste (Ctrl+Shift+V, Shift+Insert) and focus. It follows live resizes and DPI changes, takes the shell's title as the window's, and puts OSC 52 writes on the clipboard.
 
 ## Layout
 
@@ -38,7 +38,7 @@ A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it
 | --- | --- |
 | `vesper-unicode`, `vesper-parser`, `vesper-grid`, `vesper-input`, `vesper-pty`, `vesper-term` | The Kotlin/Native core, layered as `PLAN.md` section 3 describes |
 | `vesper-session` | A terminal and the child it runs, under one lock: what each window holds |
-| `vesper-host` | What both apps draw with that no graphics API owns: the palette, the frame turned into quads, the glyph atlas's layout and cache, and its bitmaps |
+| `vesper-host` | What both apps draw with that no graphics API owns: the palette, the frame turned into quads, the glyph atlas's layout and cache, its bitmaps, and what a window takes from the terminal's events |
 | `vesper-macos` | The macOS app over AppKit, Metal and CoreText |
 | `vesper-windows` | The Windows app over Win32, Direct3D 11 and DirectWrite (in progress, T17) |
 | `vesper-png`, `vesper-image` | Allocation-capped PNG decoding and the image store with the kitty, iTerm2 and sixel decoders |
