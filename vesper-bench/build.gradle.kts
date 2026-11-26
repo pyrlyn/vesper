@@ -13,7 +13,7 @@ kotlin {
         }
     }
 
-    // posix_spawn feeds a reference terminal on macOS and Linux; Windows has no headless feed yet.
+    // macOS and Linux launch the reference terminals with fork and exec; Windows launches none.
     applyDefaultHierarchyTemplate()
     sourceSets {
         val posixMain by creating { dependsOn(nativeMain.get()) }

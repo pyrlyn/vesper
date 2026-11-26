@@ -1,12 +1,17 @@
 package vesper.bench
 
+import okio.FileSystem
+import okio.SYSTEM
 import vesper.harness.baselineInput
 import vesper.harness.fixed
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.nanoseconds
 
 class BaselineTest {
     // FNV-1a over the payload, so a change to the generator changes every recorded baseline.
@@ -42,6 +47,33 @@ class BaselineTest {
     fun windowsLooksForTheExecutable() {
         assertEquals("wezterm.exe", programFile("wezterm", windows = true))
         assertEquals("wezterm", programFile("wezterm", windows = false))
+    }
+
+    @Test
+    fun theMedianSkipsTheWarmUpAndTakesTheMiddleRun() {
+        var calls = 0
+        val median = medianTime(5) { calls++ }
+        assertEquals(6, calls)
+        assertTrue(median >= Duration.ZERO)
+    }
+
+    // The writer ran inside a terminal, so what it left is read as untrusted text.
+    @Test
+    fun onlyAPositiveNanosecondCountIsATime() {
+        val file = FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "vesper-bench-test-time.txt"
+
+        fun read(text: String?): Duration? {
+            FileSystem.SYSTEM.delete(file)
+            if (text != null) FileSystem.SYSTEM.write(file) { writeUtf8(text) }
+            return readTime(file)
+        }
+        assertEquals(1_500_000.nanoseconds, read("1500000\n"))
+        assertNull(read(null))
+        assertNull(read(""))
+        assertNull(read("0"))
+        assertNull(read("-4"))
+        assertNull(read("12ms"))
+        FileSystem.SYSTEM.delete(file)
     }
 
     @Test

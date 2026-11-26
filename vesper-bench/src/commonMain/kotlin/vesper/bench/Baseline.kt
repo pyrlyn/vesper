@@ -36,15 +36,35 @@ internal fun feedStub(input: ByteArray): Int {
  * about a millisecond, so a single pass mostly measures the scheduler and a cold cache.
  */
 internal fun timeStub(input: ByteArray): Duration {
-    var sink = feedStub(input)
-    val runs =
-        List(STUB_RUNS) {
+    var sink = 0
+    val median = medianTime(STUB_RUNS) { sink += feedStub(input) }
+    check(sink > 0) { "the stub inked nothing" }
+    return median
+}
+
+/** The median of [runs] timed calls of [block] after one untimed one. */
+internal fun medianTime(
+    runs: Int,
+    block: () -> Unit,
+): Duration {
+    block()
+    val times =
+        List(runs) {
             val mark = TimeSource.Monotonic.markNow()
-            sink += feedStub(input)
+            block()
             mark.elapsedNow()
         }
-    check(sink > 0) { "the stub inked nothing" }
-    return runs.sorted()[STUB_RUNS / 2]
+    return times.sorted()[runs / 2]
+}
+
+/**
+ * What a terminal runs as its program: the median of [WINDOW_RUNS] writes of [input] to the
+ * terminal after a warm-up one that also waits out the window's first frame. Null when a write fails.
+ */
+internal fun timeWindowWrites(input: ByteArray): Duration? {
+    var ok = true
+    val median = medianTime(WINDOW_RUNS) { ok = ok && writeToTerminal(input) }
+    return median.takeIf { ok }
 }
 
 internal class Row(
@@ -76,7 +96,7 @@ internal class Row(
 /** Markdown for `docs/benchmarks/baseline.md`. */
 internal fun baselineMarkdown(): String {
     val input = baselineInput()
-    val rows = listOf(Row.measured("vesper stub", input.size, timeStub(input))) + referenceRows(input)
+    val rows = listOf(Row.measured("vesper stub", input.size, timeStub(input))) + referenceRows(input.size)
     return render(rows, utcDate(), machine())
 }
 
@@ -88,12 +108,17 @@ internal fun render(
     buildString {
         append("# Baseline\n\n")
         append(
-            "One wall-clock feed of the same $INPUT_BYTES bytes on $date, $machine. " +
-                "The Vesper row is `Stub(80, 24).feed` from `vesper-harness`, the median of $STUB_RUNS feeds " +
-                "after a warm-up. A missing binary is `not installed`. A terminal with no headless stdin feed " +
-                "is `unavailable` and is not compared. Numbers are this run only.\n\n",
+            "The same $INPUT_BYTES bytes on $date, $machine. The Vesper row is `Stub(80, 24).feed` from " +
+                "`vesper-harness`, the median of $STUB_RUNS feeds after a warm-up. Each terminal opens one " +
+                "window running `vesper-bench $WRITE_COMMAND`, which writes the bytes to it once untimed and " +
+                "$WINDOW_RUNS times timed, each write ended once the terminal has read all of it; its row is " +
+                "the median. A missing binary is `not installed`; a terminal that cannot be run this way or " +
+                "fails is `unavailable` and is not compared. Numbers are this run only.\n\n",
         )
-        append("Reproduce with `./gradlew :vesper-bench:runReleaseExecutableMacosArm64` (or `LinuxX64`, or `MingwX64` on Windows).\n\n")
+        append(
+            "Reproduce with `./gradlew :vesper-bench:runReleaseExecutableMacosArm64` (or `LinuxX64`, or `MingwX64` " +
+                "on Windows); the Linux terminals run in a container through `vesper-bench/terminals.sh`.\n\n",
+        )
         append("| terminal | status | bytes | seconds | MiB/s |\n")
         append("| --- | --- | --- | --- | --- |\n")
         rows.forEach { row ->

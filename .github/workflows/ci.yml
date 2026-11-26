@@ -127,6 +127,18 @@ jobs:
           "$bench" build/baseline.md >> "$GITHUB_STEP_SUMMARY"
           "$bench" term >> "$GITHUB_STEP_SUMMARY"
 
+      # The T3 reference terminals: Linux has packages for all but Warp, so they are installed in a
+      # container and timed there, the table again to the job summary. It downloads from mirrors and
+      # releases outside this repository, so an outage there must not turn the build red.
+      - if: env.RUN == 'true' && env.SKIP_TESTS != 'true' && matrix.target == 'linuxX64'
+        name: Benchmark (reference terminals)
+        continue-on-error: true
+        timeout-minutes: 15
+        run: |
+          ./gradlew :vesper-bench:linkReleaseExecutableLinuxX64 --console=plain
+          docker run --rm -v "$PWD":/w -w /w ubuntu@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c \
+            sh vesper-bench/terminals.sh build/baseline.md >> "$GITHUB_STEP_SUMMARY"
+
       - if: env.RUN == 'true' && env.SKIP_TESTS == 'true'
         name: tests skipped (SKIP_CI_TESTS)
         run: echo "::notice title=SKIP_CI_TESTS::tests skipped by SKIP_CI_TESTS"
