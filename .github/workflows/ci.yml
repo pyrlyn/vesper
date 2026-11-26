@@ -118,17 +118,18 @@ jobs:
         run: ./gradlew check --console=plain
 
       # No machine here runs Windows, so this is where the T3 bench runs on it. The tables go to the
-      # job summary rather than docs/benchmarks: a CI VM's numbers describe that run only.
+      # job summary rather than docs/benchmarks: a CI VM's numbers describe that run only. They go to
+      # the log too, which `gh run view --log` reads without a GitHub sign-in, unlike the summary.
       - if: env.RUN == 'true' && env.SKIP_TESTS != 'true' && matrix.target == 'mingwX64'
         name: Benchmark (baseline and terminal tables)
         run: |
           ./gradlew :vesper-bench:linkReleaseExecutableMingwX64 --console=plain
           bench=vesper-bench/build/bin/mingwX64/releaseExecutable/vesper-bench.exe
-          "$bench" build/baseline.md >> "$GITHUB_STEP_SUMMARY"
-          "$bench" term >> "$GITHUB_STEP_SUMMARY"
+          "$bench" build/baseline.md | tee -a "$GITHUB_STEP_SUMMARY"
+          "$bench" term | tee -a "$GITHUB_STEP_SUMMARY"
 
       # The T3 reference terminals: Linux has packages for all but Warp, so they are installed in a
-      # container and timed there, the table again to the job summary. It downloads from mirrors and
+      # container and timed there, the table again to the job summary and the log. It downloads from mirrors and
       # releases outside this repository, so an outage there must not turn the build red.
       - if: env.RUN == 'true' && env.SKIP_TESTS != 'true' && matrix.target == 'linuxX64'
         name: Benchmark (reference terminals)
@@ -137,7 +138,7 @@ jobs:
         run: |
           ./gradlew :vesper-bench:linkReleaseExecutableLinuxX64 --console=plain
           docker run --rm -v "$PWD":/w -w /w ubuntu@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c \
-            sh vesper-bench/terminals.sh build/baseline.md >> "$GITHUB_STEP_SUMMARY"
+            sh vesper-bench/terminals.sh build/baseline.md | tee -a "$GITHUB_STEP_SUMMARY"
 
       - if: env.RUN == 'true' && env.SKIP_TESTS == 'true'
         name: tests skipped (SKIP_CI_TESTS)
