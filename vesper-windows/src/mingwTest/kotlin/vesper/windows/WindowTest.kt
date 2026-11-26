@@ -42,6 +42,21 @@ class WindowTest {
         // A second close is a no-op once the window is gone.
         window.close()
     }
+
+    @Test
+    fun textOnTheClipboardReadsBackTheSame() {
+        val window = Window("Vesper test", 100, 100, Recorder())
+        try {
+            // Outside the BMP too: a surrogate pair is two UTF-16 units on the clipboard.
+            val text = "vesper ✓ \uD834\uDD1E"
+            assertTrue(writeClipboardText(window.hwnd, text))
+            assertEquals(text, readClipboardText(window.hwnd))
+            assertTrue(writeClipboardText(window.hwnd, ""))
+            assertEquals("", readClipboardText(window.hwnd))
+        } finally {
+            window.close()
+        }
+    }
 }
 
 class SwapChainTest {

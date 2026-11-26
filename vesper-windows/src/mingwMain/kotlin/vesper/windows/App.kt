@@ -7,22 +7,34 @@ import kotlinx.cinterop.toLong
 import platform.posix.getenv
 import platform.windows.HWND__
 import platform.windows.InvalidateRect
+import platform.windows.MB_OK
+import platform.windows.MessageBeep
 import platform.windows.PostMessageW
 import platform.windows.PostQuitMessage
+import platform.windows.SetWindowTextW
 import platform.windows.WM_APP
+import platform.windows.WM_ENTERSIZEMOVE
+import platform.windows.WM_EXITSIZEMOVE
+import platform.windows.WM_SIZING
 import vesper.host.Cells
 import vesper.host.PADDING
 import vesper.host.Palette
 import vesper.host.RowSources
 import vesper.host.cellAt
+import vesper.host.clipboardText
 import vesper.host.gridSize
+import vesper.host.windowTitle
 import vesper.pty.PtySize
 import vesper.pty.SpawnOptions
 import vesper.session.Session
+import vesper.term.Event
 import vesper.term.Frame
 
 /** Posted from the PTY's thread when the session has output or events to look at. */
 private const val WM_WAKE = WM_APP
+
+/** The window's title until the shell sets one, and again when it clears its own. */
+private const val TITLE = "Vesper"
 
 /**
  * One terminal window: the user's shell in a session, drawn with Direct3D into the window's swap
@@ -45,13 +57,25 @@ class App(
     private val frame = Frame()
     private val sources = RowSources()
     private var grid = Cells(1, 1)
+
+    // The cell's size in physical pixels last told to the session, which a DPI change alters on its own.
+    private var cellPixels = 0 to 0
     private var focused = false
+    private val liveResize = LiveResize()
+    private val computerName = getenv("COMPUTERNAME")?.toKString().orEmpty()
+
+    /** The shell's working directory, from the last OSC 7 that named one on this computer. */
+    var directory: String? = null
+        private set
     override var session: Session? = null
         private set
 
     // Declared before the window: WM_SIZE arrives inside CreateWindowExW, before there is a chain.
     private var chain: SwapChain? = null
-    val window = Window("Vesper", 960, 600, this)
+    val window = Window(TITLE, 960, 600, this)
+
+    // Kept from WM_DPICHANGED rather than asked of the window, which tests cannot move between monitors.
+    private var dpi = window.dpi
     internal val swapChain: SwapChain get() = chain!!
 
     // Null while CreateWindowExW sends its first messages, before the window is assigned.
@@ -64,7 +88,7 @@ class App(
     }
 
     /** Pixels per DIP on the window's monitor. */
-    private val scale: Double get() = window.dpi.toDouble() / DEFAULT_DPI
+    private val scale: Double get() = dpi.toDouble() / DEFAULT_DPI
 
     /**
      * Starts [program] with [args] (the user's shell, `COMSPEC`, when null) in the user's profile
@@ -80,23 +104,27 @@ class App(
         val options = SpawnOptions(program, args, getenv("USERPROFILE")?.toKString(), size = PtySize(grid.rows, grid.cols))
         val started = Session.spawn(options) { PostMessageW(hwnd.toCPointer<HWND__>(), WM_WAKE.convert(), 0u, 0) }
         session = started
-        resizeSession(started)
+        cellPixels = currentCellPixels()
+        started.resize(grid.cols, grid.rows, cellPixels.first, cellPixels.second)
     }
 
     /** What the screen shows, one line per row; for tests. */
     internal fun screenText(): String = (0 until frame.rows).joinToString("\n") { frame.row(it)?.text.orEmpty() }
+
+    /** The grid and the cell's pixels the session was last told; for tests. */
+    internal val sessionSize: Pair<Cells, Pair<Int, Int>> get() = grid to cellPixels
 
     override fun resized(
         width: Int,
         height: Int,
     ) {
         chain?.resize(width, height)
-        val current = session ?: return
-        val next = currentGrid()
-        if (next == grid) return
-        grid = next
-        resizeSession(current)
-        refresh()
+        if (liveResize.held) invalidate() else fit()
+    }
+
+    // The WM_SIZE that Window's SetWindowPos sends next refits the grid at this DPI.
+    override fun dpiChanged(dpi: Int) {
+        this.dpi = dpi
     }
 
     override fun paint() {
@@ -114,9 +142,33 @@ class App(
         wParam: ULong,
         lParam: Long,
     ): Boolean {
-        if (message != WM_WAKE) return input?.handle(message, wParam, lParam) ?: false
-        refresh()
-        return true
+        // The sizing loop's messages are only watched: the default handler still runs them.
+        when (message) {
+            WM_WAKE -> {
+                refresh()
+                return true
+            }
+
+            WM_ENTERSIZEMOVE -> {
+                liveResize.enter()
+            }
+
+            WM_SIZING -> {
+                if (liveResize.sizing()) session?.pauseOutput()
+            }
+
+            WM_EXITSIZEMOVE -> {
+                if (liveResize.exit()) {
+                    fit()
+                    session?.resumeOutput()
+                }
+            }
+
+            else -> {
+                return input?.handle(message, wParam, lParam) ?: false
+            }
+        }
+        return false
     }
 
     override fun closed() {
@@ -143,17 +195,22 @@ class App(
         invalidate()
     }
 
-    /** Reads the new frame and drops the events since the last look; the window closes once the shell is gone. */
+    /** Reads the new frame and the events since the last look; the window closes once the shell is gone. */
     private fun refresh() {
         val current = session ?: return
         if (current.update(frame)) {
             sources.absorb(frame.damage, frame.rows)
             invalidate()
         }
-        // Title, directory, clipboard and the bell are slice 7's; until then they are read and let go.
-        do {
-            val event = current.pollEvent()
-        } while (event != null)
+        while (true) {
+            when (val event = current.pollEvent() ?: break) {
+                Event.Bell -> MessageBeep(MB_OK.convert())
+                is Event.Title -> event.windowTitle?.let { SetWindowTextW(window.hwnd, it.ifEmpty { TITLE }) }
+                is Event.Directory -> windowsPath(event.uri, computerName)?.let { directory = it }
+                is Event.ClipboardWrite -> event.clipboardText?.let { writeClipboardText(window.hwnd, it) }
+                else -> Unit
+            }
+        }
         if (current.exitStatus != null || current.failure != null) {
             current.close()
             session = null
@@ -166,9 +223,22 @@ class App(
         return gridSize(width / scale, height / scale, text.cell)
     }
 
-    private fun resizeSession(session: Session) {
+    private fun currentCellPixels(): Pair<Int, Int> {
         val scale = scale
-        session.resize(grid.cols, grid.rows, (text.cell.width * scale).toInt(), (text.cell.height * scale).toInt())
+        return (text.cell.width * scale).toInt() to (text.cell.height * scale).toInt()
+    }
+
+    /** Tells the session the window's grid and cell pixels when either changed. */
+    private fun fit() {
+        val current = session ?: return
+        val next = currentGrid()
+        val pixels = currentCellPixels()
+        if (next == grid && pixels == cellPixels) return
+        grid = next
+        cellPixels = pixels
+        current.resize(grid.cols, grid.rows, pixels.first, pixels.second)
+        invalidate()
+        refresh()
     }
 
     private fun invalidate() {
