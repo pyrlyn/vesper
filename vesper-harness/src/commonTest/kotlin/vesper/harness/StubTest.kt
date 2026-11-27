@@ -3,6 +3,7 @@ package vesper.harness
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class StubTest {
     @Test
@@ -90,17 +91,14 @@ class StubTest {
             )
         edges.forEach(::stubFeedKeepsSize)
 
-        // Numerical Recipes' LCG, the same seed and constants as the previous corpus.
-        var state = 0x00C0FFEEu
-        repeat(64) {
-            state = state * 1_664_525u + 1_013_904_223u
-            val length = (state and 0x1Fu).toInt()
-            val buffer =
-                ByteArray(length) {
-                    state = state * 1_664_525u + 1_013_904_223u
-                    (state shr 16).toByte()
-                }
-            stubFeedKeepsSize(buffer)
-        }
+        fuzzCases(0x00C0FFEE, 64) { stubFeedKeepsSize(it.nextBytes(it.nextInt(32))) }
+    }
+
+    @Test
+    fun aFailingFuzzCaseNamesItsIndexAndSeed() {
+        var calls = 0
+        val error = assertFailsWith<AssertionError> { fuzzCases(5, 10) { check(++calls < 4) { "boom" } } }
+        val message = error.message.orEmpty()
+        assertTrue(message.startsWith("fuzz case 3 failed (") && message.endsWith("): boom"), message)
     }
 }

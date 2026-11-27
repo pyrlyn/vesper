@@ -52,4 +52,6 @@ mise x -- hk install --mise            # install the pre-push hook once per clon
 ./gradlew :vesper-bench:runReleaseExecutableMacosArm64 --args=term    # terminal throughput table (docs/benchmarks/term.md)
 ./gradlew :vesper-unicode:generateUcd   # regenerate the Unicode tables from the pinned data files (downloads once)
 ./gradlew :vesper-unicode:checkUcd      # fail when the committed Unicode tables are stale; not in check, it needs unicode.org
+VESPER_FUZZ_SECONDS=30 ./gradlew :vesper-image:macosArm64Test  # run each fuzz corpus for 30 s from a fresh seed
+VESPER_FUZZ_SEED=<seed> VESPER_FUZZ_SECONDS=600 ./gradlew :vesper-image:macosArm64Test  # rerun the seed a failure printed
 ```

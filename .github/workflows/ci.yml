@@ -143,3 +143,51 @@ jobs:
       - if: env.RUN == 'true' && env.SKIP_TESTS == 'true'
         name: tests skipped (SKIP_CI_TESTS)
         run: echo "::notice title=SKIP_CI_TESTS::tests skipped by SKIP_CI_TESTS"
+
+  # T25: the checks kept out of `./gradlew check`, which stays offline and repeatable. checkUcd
+  # fails when the committed Unicode tables differ from what the pinned data files produce. The
+  # fuzz smoke runs the seeded fuzz corpora of the parser, the stub and the image decoders for a
+  # time budget from a fresh seed; a failure prints the VESPER_FUZZ_SEED that reproduces it.
+  fuzz-unicode:
+    name: fuzz and Unicode (linuxX64)
+    needs: config
+    if: >-
+      !cancelled()
+      && needs.config.outputs.docs-only != 'true'
+      && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install tools (mise.toml)
+        uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
+        with:
+          install: true
+
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - name: Cache the Kotlin/Native toolchain
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('gradle/libs.versions.toml') }}
+
+      # The data files are checked against the SHA-256s in Ucd.kt, so a cache keyed on it holds
+      # exactly the pinned files and spares unicode.org a download per run.
+      - name: Cache the Unicode data files
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: vesper-unicode/build/ucd
+          key: ucd-${{ hashFiles('build-logic/src/main/kotlin/vesper/ucd/Ucd.kt') }}
+
+      - name: Unicode tables match the pinned data files
+        run: ./gradlew :vesper-unicode:checkUcd --console=plain
+
+      # Nine corpora at 30 s each; the image module's seven run one after another.
+      - name: Fuzz smoke (30 s per corpus)
+        env:
+          VESPER_FUZZ_SECONDS: '30'
+        run: ./gradlew :vesper-parser:linuxX64Test :vesper-harness:linuxX64Test :vesper-image:linuxX64Test --console=plain

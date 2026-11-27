@@ -1,6 +1,6 @@
 package vesper.image
 
-import kotlin.random.Random
+import vesper.harness.fuzzCases
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -153,7 +153,6 @@ class ImageStoreTest {
 
     @Test
     fun theBookkeepingHoldsUnderRandomOperations() {
-        val rng = Random(19)
-        repeat(2000) { fuzzImageStore(rng.nextBytes(rng.nextInt(1, 200))) }
+        fuzzCases(19, 2000) { fuzzImageStore(it.nextBytes(it.nextInt(1, 200))) }
     }
 }

@@ -1,8 +1,8 @@
 package vesper.image
 
+import vesper.harness.fuzzCases
 import vesper.png.Png
 import kotlin.io.encoding.Base64
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -140,18 +140,17 @@ class ITerm2Test {
 
     @Test
     fun mutatedSequencesOnlyEverFailAsImageErrors() {
-        val rng = Random(1337)
         val seeds =
             listOf(
                 file("inline=1;width=5;height=50%"),
                 osc("1337;MultipartFile=inline=1\u0007") + b64(PNG).chunked(9).joinToString("") { "1337;FilePart=$it\u0007" }.let(::osc) +
                     osc("1337;FileEnd"),
             )
-        repeat(3000) {
+        fuzzCases(1337, 3000) { rng ->
             val input = seeds[rng.nextInt(seeds.size)].copyOf()
             repeat(rng.nextInt(1, 6)) { input[rng.nextInt(input.size)] = rng.nextInt(256).toByte() }
             fuzzInlineImages(input)
         }
-        repeat(500) { fuzzInlineImages(osc("1337;File=inline=1:") + rng.nextBytes(rng.nextInt(64))) }
+        fuzzCases(1338, 500) { fuzzInlineImages(osc("1337;File=inline=1:") + it.nextBytes(it.nextInt(64))) }
     }
 }
