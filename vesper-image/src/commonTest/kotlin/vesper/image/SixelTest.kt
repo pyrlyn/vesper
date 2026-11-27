@@ -1,6 +1,6 @@
 package vesper.image
 
-import kotlin.random.Random
+import vesper.harness.fuzzCases
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -105,9 +105,8 @@ class SixelTest {
 
     @Test
     fun cuttingTheStreamNeverChangesTheImage() {
-        val rng = Random(6)
         val alphabet = "0123456789;!\"#\$-?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abc~ \n".encodeToByteArray()
-        repeat(3000) { fuzzSixel(ByteArray(rng.nextInt(80)) { alphabet[rng.nextInt(alphabet.size)] }) }
-        repeat(500) { fuzzSixel(rng.nextBytes(rng.nextInt(80))) }
+        fuzzCases(6, 3000) { rng -> fuzzSixel(ByteArray(rng.nextInt(80)) { alphabet[rng.nextInt(alphabet.size)] }) }
+        fuzzCases(7, 500) { fuzzSixel(it.nextBytes(it.nextInt(80))) }
     }
 }

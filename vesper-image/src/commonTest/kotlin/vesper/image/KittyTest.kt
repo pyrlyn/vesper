@@ -1,9 +1,9 @@
 package vesper.image
 
+import vesper.harness.fuzzCases
 import vesper.png.Png
 import vesper.png.Zlib
 import kotlin.io.encoding.Base64
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -331,7 +331,6 @@ class KittyTest {
 
     @Test
     fun mutatedCommandsKeepTheBookkeepingSound() {
-        val rng = Random(1919)
         val png = b64(Png.encode(3, 2, rgba(3, 2)))
         val data = b64(rgba(4, 4))
         val seeds =
@@ -341,11 +340,11 @@ class KittyTest {
                 "Ga=t,f=100,I=3;$png${ESC}Ga=p,I=3,x=1,w=1,X=2${ESC}Ga=d,d=A${ESC}Ga=d,d=p,x=4,y=3",
                 "Ga=T,o=z,f=24,s=3,v=1,i=2;${b64(Zlib.deflate(ByteArray(9)))}${ESC}Ga=q,i=4,s=1,v=1;AAAAAA${ESC}Ga=d,d=R,x=1,y=9",
             ).map { it.encodeToByteArray() }
-        repeat(3000) {
+        fuzzCases(1919, 3000) { rng ->
             val input = seeds[rng.nextInt(seeds.size)].copyOf()
             repeat(rng.nextInt(1, 6)) { input[rng.nextInt(input.size)] = rng.nextInt(256).toByte() }
             fuzzKitty(input)
         }
-        repeat(500) { fuzzKitty("Ga=T,i=1,".encodeToByteArray() + rng.nextBytes(rng.nextInt(64))) }
+        fuzzCases(1920, 500) { fuzzKitty("Ga=T,i=1,".encodeToByteArray() + it.nextBytes(it.nextInt(64))) }
     }
 }

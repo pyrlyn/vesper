@@ -171,7 +171,11 @@ Rules between core and host (research.md §7):
   (dirty-row repaint equals a full repaint; no tracking point lost on reflow; encoders do not
   throw).
 - **Unicode:** `GraphemeBreakTest.txt` in full; a freshness check against pinned data files.
-- **Fuzz:** short, bounded smoke of parser and image targets in CI (T25).
+- **Fuzz:** each fuzz target (parser, stub, iTerm2, sixel, kitty, image store) has a seeded
+  corpus in its tests through `vesper.harness.fuzzCases`. `./gradlew check` runs the fixed cases;
+  the CI `fuzz and Unicode (linuxX64)` job runs every corpus for 30 s from a fresh seed
+  (`VESPER_FUZZ_SECONDS`), and a failure prints the `VESPER_FUZZ_SEED` that reproduces it. No
+  coverage-guided fuzzer runs Kotlin/Native code (T25).
 - **Hosts:** Kotlin/Native tests of each host's pure parts (input mapping, text and range
   models, policies) on every runner; renderer tests on an offscreen target (Metal) or WARP
   (Direct3D) on their own OS. Input methods, screen readers and how a window looks need a human.
@@ -181,14 +185,16 @@ Rules between core and host (research.md §7):
 
 ## 6. CI
 
-`.github/workflows/ci.yml` runs the `jactionlint` job (also the `hk.pkl` pre-push hook) and one
-`<os> (<target>)` job per target that runs `./gradlew check`. `pipeline.yml` runs the shared
-scans from `pyrlyn/ci` (configured in `.github/infra.yml`).
+`.github/workflows/ci.yml` runs the `jactionlint` job (also the `hk.pkl` pre-push hook), one
+`<os> (<target>)` job per target that runs `./gradlew check`, and the `fuzz and Unicode
+(linuxX64)` job for the checks kept out of `check` (T25). `pipeline.yml` runs the shared scans
+from `pyrlyn/ci` (configured in `.github/infra.yml`).
 
 | Runner | Target | What it runs |
 | --- | --- | --- |
 | macOS (hosted or the dedicated Mac) | `macosArm64` | `./gradlew check` (core and macOS host) |
-| Ubuntu | `linuxX64` | `./gradlew check`, later fuzz smoke and Unicode freshness (T25) |
+| Ubuntu | `linuxX64` | `./gradlew check`; the reference terminal bench (T3) |
+| Ubuntu, `fuzz and Unicode (linuxX64)` | `linuxX64` | `:vesper-unicode:checkUcd` against the pinned data files; the fuzz corpora of `vesper-parser`, `vesper-harness` and `vesper-image` for 30 s each |
 | Windows | `mingwX64` | `./gradlew check` (core and Windows host) |
 
 T29 makes the `<os> (<target>)` jobs required. Draft pull requests skip the heavy jobs until

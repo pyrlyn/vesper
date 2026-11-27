@@ -1,5 +1,6 @@
 package vesper.parser
 
+import vesper.harness.fuzzCases
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,8 +26,7 @@ private fun Random.stream(): ByteArray =
 class PropertyTest {
     @Test
     fun fuzzCorpusIsChunkingInvariant() {
-        val random = Random(SEED)
-        repeat(CASES) { parserFeedIsChunkingInvariant(random.stream()) }
+        fuzzCases(SEED, CASES) { parserFeedIsChunkingInvariant(it.stream()) }
         listOf(ByteArray(0), raw("\u001B"), raw("Â"), raw("\u001BP"), raw("\u001B]\u001B")).forEach(::parserFeedIsChunkingInvariant)
     }
 
