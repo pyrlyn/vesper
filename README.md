@@ -1,4 +1,4 @@
-# Vesper
+<h1><picture><source media="(prefers-color-scheme: dark)" srcset="brand/logo-dark.svg"><img src="brand/logo.svg" width="32" height="32" alt="" align="absmiddle"></picture> Vesper</h1>
 
 A terminal for macOS and Windows, written in Kotlin. A Kotlin/Native core parses the terminal stream, keeps the screen and scrollback, and encodes input; each platform gets a Kotlin/Native host over its own APIs (AppKit, Metal and CoreText on macOS; Win32, Direct3D 11 and DirectWrite on Windows) that calls the core directly. The design comes from the Figma file [Modern terminal](https://www.figma.com/design/tCFCAuDJvskm2XTh0cOLcX/Modern-terminal); each screen is described in [`docs/design/`](docs/design/).
 
