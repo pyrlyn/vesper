@@ -70,6 +70,7 @@ public class QuadBuilder(
     private var frameNumber = 0L
     private var version = 0L
     private var needsRebuild = true
+    private var builtGeneration = cache.generation
 
     /** Glyphs from now on are drawn at [scale] into [cache], which holds nothing rasterised at the old one. */
     public fun rescale(
@@ -85,17 +86,21 @@ public class QuadBuilder(
 
     /**
      * Builds the rows of [frame] that [sources] says changed. True when the grid changed size: the
-     * slots are new, and so must be the GPU's copy of them.
+     * slots are new, and so must be the GPU's copy of them. Builders that share one [cache] (the panes
+     * of a window) pass the same [frameNumber] for one picture, so none evicts what another draws.
      */
     public fun update(
         frame: Frame,
         sources: RowSources,
+        frameNumber: Long = this.frameNumber + 1,
     ): Boolean {
         val resized = frame.cols != cols || frame.rows != rows
         if (resized) allocate(frame.cols, frame.rows)
-        frameNumber++
+        this.frameNumber = frameNumber
+        // A builder sharing the cache may have grown it since this one last built.
+        val stale = needsRebuild || cache.generation != builtGeneration
         val dirty =
-            if (needsRebuild || sources.sources.size != rows) (0 until rows).toList() else slots.remap(sources.sources)
+            if (stale || sources.sources.size != rows) (0 until rows).toList() else slots.remap(sources.sources)
         needsRebuild = false
         sources.drawn(rows)
         // Shelves that reused rows draw from must survive this frame's evictions.
@@ -103,11 +108,12 @@ public class QuadBuilder(
         var generation = cache.generation
         dirty.forEach { build(it, frame) }
         // A grown atlas dropped every entry, so rows built before the growth point at texels that are gone.
-        repeat(4) {
-            if (cache.generation == generation) return resized
+        for (attempt in 0 until 4) {
+            if (cache.generation == generation) break
             generation = cache.generation
             for (row in 0 until rows) build(row, frame)
         }
+        builtGeneration = generation
         return resized
     }
 

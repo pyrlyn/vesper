@@ -95,9 +95,22 @@ float4 quad_pixel(Fragment f) : SV_Target {
 }
 """
 
+/** One pane's part of a picture: [frame] drawn into the [width] by [height] pixels at ([x], [y]) of the target. */
+class PaneDraw(
+    val quads: D3DRenderer.PaneQuads,
+    val frame: Frame,
+    val sources: RowSources,
+    val x: Int,
+    val y: Int,
+    val width: Int,
+    val height: Int,
+    val focused: Boolean,
+)
+
 /**
- * Draws a frame with Direct3D 11. [QuadBuilder] turns it into quads per row slot; the slots live in
- * one vertex buffer, and a slot is copied there only when its row was built again.
+ * Draws frames with Direct3D 11. [QuadBuilder] turns each into quads per row slot; a pane's slots live
+ * in one vertex buffer, and a slot is copied there only when its row was built again. The panes of a
+ * window share the shaders, the glyph atlas and its cache, so a glyph is rasterised once per window.
  */
 class D3DRenderer private constructor(
     private val gpu: Gpu,
@@ -112,17 +125,63 @@ class D3DRenderer private constructor(
     private val extra: CPointer<ID3D11Buffer>,
 ) : AutoCloseable {
     private val atlas = GpuAtlas(gpu)
-    private var builder = newBuilder()
+    private var cache = newCache()
+    private var scale = 0.0
+    private var metrics = text.metrics(1.0)
 
-    private fun newBuilder() = QuadBuilder(palette, text, GlyphCache.create(atlas) ?: error("no atlas texture"), text.metrics(1.0), 0.0)
+    // One count for every pane of a picture, so a pane's glyphs are never evicted while it shows them.
+    private var frameNumber = 0L
+    private val panes = ArrayList<PaneQuads>()
+    private val single = paneQuads()
 
-    private var slots: CPointer<ID3D11Buffer>? = null
-    private var versions = LongArray(0)
+    private fun newCache() = GlyphCache.create(atlas) ?: error("no atlas texture")
+
+    private fun newBuilder() = QuadBuilder(palette, text, cache, metrics, scale)
+
+    /** One pane's quads and their GPU copy; made by [paneQuads], closed by the pane. */
+    inner class PaneQuads internal constructor() : AutoCloseable {
+        internal var builder = newBuilder()
+        internal var slots: CPointer<ID3D11Buffer>? = null
+        private var versions = LongArray(0)
+
+        internal fun prepare(
+            frame: Frame,
+            sources: RowSources,
+        ) {
+            if (!builder.update(frame, sources, frameNumber)) return
+            release(slots)
+            slots = null
+            val bytes = maxOf(1, builder.rows * (builder.capacityBg + builder.capacityFg)) * QUAD_BYTES
+            slots = gpu.buffer(bytes, D3D11_BIND_VERTEX_BUFFER.toInt())
+            versions = LongArray(builder.rows) { -1 }
+        }
+
+        /** Copies each slot whose row was built since its last copy. */
+        internal fun upload(slots: CPointer<ID3D11Buffer>) {
+            val stride = builder.capacityBg + builder.capacityFg
+            for (slot in builder.content.indices) {
+                val row = builder.content[slot]
+                if (versions[slot] == row.version) continue
+                write(slots, slot * stride, row.bg)
+                write(slots, slot * stride + builder.capacityBg, row.fg)
+                versions[slot] = row.version
+            }
+        }
+
+        override fun close() {
+            release(slots)
+            slots = null
+            panes.remove(this)
+        }
+    }
+
+    /** Quads for one more pane, drawn with this renderer's text and palette. */
+    fun paneQuads(): PaneQuads = PaneQuads().also { panes += it }
 
     /**
      * Draws with [text] and [palette] from the next frame on. Every glyph and colour baked into the
-     * quads is stale, so the builder starts over: its first update rebuilds every row and the slots
-     * are made again at the new cell size.
+     * quads is stale, so each pane's builder starts over: its first update rebuilds every row and the
+     * slots are made again at the new cell size.
      */
     fun restyle(
         text: TextStyle,
@@ -130,10 +189,13 @@ class D3DRenderer private constructor(
     ) {
         this.text = text
         this.palette = palette
-        builder = newBuilder()
+        cache = newCache()
+        scale = 0.0
+        metrics = text.metrics(1.0)
+        panes.forEach { it.builder = newBuilder() }
     }
 
-    /** Draws [frame] into [view], [width] by [height] pixels at [scale] pixels per DIP. */
+    /** Draws [frame] into the whole of [view], [width] by [height] pixels at [scale] pixels per DIP. */
     fun render(
         frame: Frame,
         sources: RowSources,
@@ -142,22 +204,24 @@ class D3DRenderer private constructor(
         height: Int,
         scale: Double,
         focused: Boolean,
+    ) = render(view, width, height, scale, listOf(PaneDraw(single, frame, sources, 0, 0, width, height, focused)))
+
+    /** Draws each of [panes] into its part of [view], the rest in the background colour. */
+    fun render(
+        view: CPointer<ID3D11RenderTargetView>,
+        width: Int,
+        height: Int,
+        scale: Double,
+        panes: List<PaneDraw>,
     ) {
-        prepare(frame, sources, scale)
+        rescale(scale)
+        frameNumber++
+        panes.forEach { it.quads.prepare(it.frame, it.sources) }
         gpu.clear(view, palette.background)
-        val slots = slots ?: return
         if (width <= 0 || height <= 0) return
-        upload(slots)
         val context = gpu.context
         val calls = context.pointed.lpVtbl!!.pointed
         memScoped {
-            val viewport =
-                alloc<D3D11_VIEWPORT> {
-                    Width = width.toFloat()
-                    Height = height.toFloat()
-                    MaxDepth = 1f
-                }
-            calls.RSSetViewports!!.invoke(context, 1u, viewport.ptr)
             calls.RSSetState!!.invoke(context, raster)
             calls.OMSetRenderTargets!!.invoke(context, 1u, allocArrayOf(view), null)
             calls.OMSetBlendState!!.invoke(context, blend, null, 0xFFFFFFFFu)
@@ -167,41 +231,37 @@ class D3DRenderer private constructor(
             calls.VSSetConstantBuffers!!.invoke(context, 0u, 1u, allocArrayOf(constants))
             calls.PSSetShader!!.invoke(context, pixel, null, 0u)
             calls.PSSetShaderResources!!.invoke(context, 0u, 1u, allocArrayOf(atlas.view))
-            drawRows(frame, slots, width, height, focused)
+            for (pane in panes) {
+                val slots = pane.quads.slots ?: continue
+                if (pane.width <= 0 || pane.height <= 0) continue
+                pane.quads.upload(slots)
+                // The shader maps into the viewport, so a pane draws as a window of its own size would.
+                val viewport =
+                    alloc<D3D11_VIEWPORT> {
+                        TopLeftX = pane.x.toFloat()
+                        TopLeftY = pane.y.toFloat()
+                        Width = pane.width.toFloat()
+                        Height = pane.height.toFloat()
+                        MaxDepth = 1f
+                    }
+                calls.RSSetViewports!!.invoke(context, 1u, viewport.ptr)
+                drawRows(pane.quads.builder, pane.frame, slots, pane.width, pane.height, pane.focused)
+            }
         }
     }
 
-    private fun prepare(
-        frame: Frame,
-        sources: RowSources,
-        scale: Double,
-    ) {
-        if (scale != builder.scale && scale > 0) {
-            // Glyphs rasterised at the old scale are the wrong size; a new cache starts the texture afresh.
-            val cache = GlyphCache.create(atlas) ?: return
-            builder.rescale(scale, text.metrics(scale), cache)
-        }
-        if (!builder.update(frame, sources)) return
-        release(slots)
-        slots = null
-        val bytes = maxOf(1, builder.rows * (builder.capacityBg + builder.capacityFg)) * QUAD_BYTES
-        slots = gpu.buffer(bytes, D3D11_BIND_VERTEX_BUFFER.toInt())
-        versions = LongArray(builder.rows) { -1 }
-    }
-
-    /** Copies each slot whose row was built since its last copy. */
-    private fun upload(slots: CPointer<ID3D11Buffer>) {
-        val stride = builder.capacityBg + builder.capacityFg
-        for (slot in builder.content.indices) {
-            val row = builder.content[slot]
-            if (versions[slot] == row.version) continue
-            write(slots, slot * stride, row.bg)
-            write(slots, slot * stride + builder.capacityBg, row.fg)
-            versions[slot] = row.version
-        }
+    // Glyphs rasterised at the old scale are the wrong size; a new cache starts the texture afresh.
+    private fun rescale(scale: Double) {
+        if (scale == this.scale || scale <= 0) return
+        val cache = GlyphCache.create(atlas) ?: return
+        this.cache = cache
+        this.scale = scale
+        metrics = text.metrics(scale)
+        panes.forEach { it.builder.rescale(scale, metrics, cache) }
     }
 
     private fun MemScope.drawRows(
+        builder: QuadBuilder,
         frame: Frame,
         slots: CPointer<ID3D11Buffer>,
         width: Int,
@@ -271,8 +331,7 @@ class D3DRenderer private constructor(
     }
 
     override fun close() {
-        release(slots)
-        slots = null
+        panes.toList().forEach { it.close() }
         atlas.close()
         listOf(extra, constants, raster, blend, layout, pixel, vertex).forEach(::release)
     }

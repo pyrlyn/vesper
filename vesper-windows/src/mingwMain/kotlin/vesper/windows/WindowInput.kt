@@ -93,6 +93,9 @@ internal class WindowInput(
     private val vertical = Wheel()
     private val horizontal = Wheel()
 
+    /** Whether a button is still down, so the mouse stays with this input's pane. */
+    val anyHeld: Boolean get() = pointer.anyHeld
+
     // Whether the last whole wheel step went to the program, for the fractions in between.
     private var wheelTaken = false
 

@@ -84,6 +84,58 @@ class RendererTest {
     }
 
     @Test
+    fun panesDrawIntoTheirOwnViewportsOfOneTarget() {
+        val (w, h) = viewSize(Cells(4, 2), text.cell)
+        val width = (w * SCALE).toInt()
+        val height = (h * SCALE).toInt()
+        val gap = 2
+        val left = renderer.paneQuads()
+        val right = renderer.paneQuads()
+        OffscreenTarget.create(gpu, width * 2 + gap, height).use { target ->
+            try {
+                fun pane(
+                    quads: D3DRenderer.PaneQuads,
+                    x: Int,
+                    output: String,
+                    focused: Boolean,
+                ): PaneDraw {
+                    val terminal = Terminal(4, 2, 100)
+                    val frame = Frame()
+                    val sources = RowSources()
+                    terminal.feed(output.encodeToByteArray())
+                    terminal.updateFrame(frame)
+                    sources.absorb(frame.damage, frame.rows)
+                    return PaneDraw(quads, frame, sources, x, 0, width, height, focused)
+                }
+                val draws =
+                    listOf(
+                        pane(left, 0, "$ESC[48;2;200;0;0m $ESC[0m", focused = false),
+                        pane(right, width + gap, "$ESC[48;2;0;0;200m $ESC[0m", focused = true),
+                    )
+                renderer.render(target.view, target.width, target.height, SCALE, draws)
+                val pixels = target.read()
+
+                fun at(
+                    x0: Int,
+                    col: Int,
+                ): Int {
+                    val x = x0 + ((PADDING + (col + 0.5) * text.cell.width) * SCALE).toInt()
+                    val y = ((PADDING + 0.5 * text.cell.height) * SCALE).toInt()
+                    return pixels[y * target.width + x] and RGB
+                }
+                assertEquals(0xC80000, at(0, 0))
+                assertEquals(0x0000C8, at(width + gap, 0), "the right pane starts at its own corner")
+                assertEquals(palette.cursor, at(width + gap, 1), "the focused pane's cursor is a block")
+                assertEquals(palette.background, at(0, 1), "the other pane's is an outline")
+                assertEquals(palette.background, pixels[height / 2 * target.width + width] and RGB, "the divider")
+            } finally {
+                left.close()
+                right.close()
+            }
+        }
+    }
+
+    @Test
     fun backgroundsAndTheCursorLandOnTheirCells() {
         with(Screen(10, 3)) {
             target.use {

@@ -42,7 +42,7 @@ A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it
 | `vesper-config` | The config file: font, colour scheme, scrollback and key bindings, parsed and validated, edited in place and reloaded live; key binding defaults for macOS and for Windows and Linux |
 | `vesper-host` | What both apps draw with that no graphics API owns: the palette from the config's theme, its key bindings and font zoom, the pane tree of splits and its layout, the settings window's fields, the frame turned into quads, the glyph atlas's layout and cache, its bitmaps, and what a window takes from the terminal's events |
 | `vesper-macos` | The macOS app over AppKit, Metal and CoreText; it applies `~/.config/vesper/config.toml` live and has a Settings window (⌘,), windows (⌘N), native tabs (⌘T) and split panes (⌘D, ⇧⌘D, ⌘W, ⌘], ⌘[) |
-| `vesper-windows` | The Windows app over Win32, Direct3D 11 and DirectWrite (in progress, T17); it applies `%APPDATA%\vesper\config.toml` live and has a Settings dialog (Ctrl+, or the system menu) |
+| `vesper-windows` | The Windows app over Win32, Direct3D 11 and DirectWrite (in progress, T17); it applies `%APPDATA%\vesper\config.toml` live and has a Settings dialog (Ctrl+, or the system menu), windows (Ctrl+Shift+N) and split panes (Ctrl+Shift with D, E, W, ], [) |
 | `vesper-png`, `vesper-image` | Allocation-capped PNG decoding and the image store with the kitty, iTerm2 and sixel decoders |
 | `vesper-harness`, `vesper-bench` | Conformance harness and benchmarks for the core |
 | `build-logic` | Gradle convention plugins and the Unicode table generator |

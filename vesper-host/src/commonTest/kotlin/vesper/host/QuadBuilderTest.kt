@@ -75,6 +75,21 @@ class QuadBuilderTest {
     }
 
     @Test
+    fun aBuilderRebuildsOnceAnotherSharingItsCacheGrewIt() {
+        val glyphs = FakeGlyphs()
+        val cache = GlyphCache.create(NoTexture, size = 16)!!
+        val big = Fixture(QuadBuilder(palette, glyphs, cache, metrics, 1.0), glyphs, Terminal(40, 4, 10))
+        val small = Fixture(QuadBuilder(palette, glyphs, cache, metrics, 1.0), glyphs, Terminal(4, 1, 10))
+        small.feed("ab")
+        val built = small.row(0).version
+        val generation = cache.generation
+        big.feed((0x100 until 0x180).map { it.toChar() }.joinToString(""))
+        assertTrue(cache.generation > generation, "the atlas grew")
+        small.feed("")
+        assertTrue(small.row(0).version > built, "the small pane's row pointed at texels that are gone")
+    }
+
+    @Test
     fun neighbouringBackgroundsShareAQuad() {
         val f = fixture(6, 2)
         assertTrue(f.feed("$ESC[41m  $ESC[0m $ESC[41m $ESC[0m"))

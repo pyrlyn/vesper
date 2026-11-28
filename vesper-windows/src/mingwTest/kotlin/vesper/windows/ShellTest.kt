@@ -10,6 +10,8 @@ import kotlinx.cinterop.toKStringFromUtf16
 import kotlinx.cinterop.toLong
 import platform.windows.GetWindowRect
 import platform.windows.GetWindowTextW
+import platform.windows.IsWindow
+import platform.windows.MK_LBUTTON
 import platform.windows.MapVirtualKeyW
 import platform.windows.RECT
 import platform.windows.SendMessageW
@@ -21,10 +23,16 @@ import platform.windows.WM_ENTERSIZEMOVE
 import platform.windows.WM_EXITSIZEMOVE
 import platform.windows.WM_KEYDOWN
 import platform.windows.WM_KEYUP
+import platform.windows.WM_LBUTTONDOWN
+import platform.windows.WM_LBUTTONUP
 import platform.windows.WM_SIZING
+import vesper.config.Action
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -40,9 +48,14 @@ class ShellTest {
     private fun App.waitFor(
         what: String,
         done: (String) -> Boolean,
+    ) = pumpUntil(what) { done(screenText()) }
+
+    private fun App.pumpUntil(
+        what: String,
+        done: () -> Boolean,
     ) {
         val deadline = TimeSource.Monotonic.markNow() + 20.seconds
-        while (!done(screenText())) {
+        while (!done()) {
             assertTrue(deadline.hasNotPassedNow(), "$what; the screen shows:\n${screenText()}")
             Window.pumpMessages()
             Sleep(10u)
@@ -61,9 +74,13 @@ class ShellTest {
         press(VK_RETURN, '\r')
     }
 
-    private fun withShell(test: (App) -> Unit) {
+    private fun withShell(
+        onNewWindow: (() -> Unit)? = null,
+        onClosed: (App) -> Unit = {},
+        test: (App) -> Unit,
+    ) {
         Gpu.create(warp = true).use { gpu ->
-            App(gpu, quitOnClose = false).use { app ->
+            App(gpu, quitOnClose = false, configPath = null, onNewWindow = onNewWindow, onClosed = onClosed).use { app ->
                 // No AutoRun commands from the registry, so the prompt is cmd's own.
                 app.start("cmd.exe", listOf("/d"))
                 app.waitFor("no prompt") { it.contains(">") }
@@ -152,6 +169,73 @@ class ShellTest {
             assertNotEquals(before.second, after.second)
             assertTrue(after.second.first in before.second.first * 2 - 1..before.second.first * 2 + 1, "$before became $after")
             app.paint()
+        }
+    }
+
+    @Test
+    fun eachPaneRunsItsOwnShellAndTheKeysGoToTheFocusedOne() {
+        withShell { app ->
+            val first = assertNotNull(app.focusedPane)
+            app.perform(Action.SplitRight)
+            val second = app.paneList.last()
+            assertEquals(listOf(first, second), app.paneList)
+            assertSame(second, app.focusedPane)
+            val (width, height) = app.window.clientSize
+            val left = first.viewport
+            val right = second.viewport
+            assertEquals(listOf(0, 0, height), listOf(left.x, left.y, left.height))
+            assertTrue(right.x > left.width, "no divider between $left and $right")
+            assertEquals(width, right.x + right.width)
+            val half = first.sessionSize.first.cols
+
+            app.waitFor("no prompt in the new pane") { it.contains(">") }
+            app.command("echo right")
+            app.waitFor("no echo") { screen -> screen.lines().any { it.trimEnd() == "right" } }
+            assertTrue(first.screenText().lines().none { it.trimEnd() == "right" }, "the left pane took the keys")
+
+            // A click focuses the pane under it.
+            val point = (left.x + 4).toLong() or ((left.y + 4).toLong() shl 16)
+            SendMessageW(app.window.hwnd, WM_LBUTTONDOWN.convert(), MK_LBUTTON.convert(), point)
+            SendMessageW(app.window.hwnd, WM_LBUTTONUP.convert(), 0u, point)
+            assertSame(first, app.focusedPane)
+            app.perform(Action.NextPane)
+            assertSame(second, app.focusedPane)
+
+            app.perform(Action.ClosePane)
+            assertEquals(listOf(first), app.paneList)
+            assertEquals(width, first.viewport.width)
+            assertTrue(first.sessionSize.first.cols > half, "the pane left kept half the window")
+            app.command("echo left")
+            app.waitFor("the first shell stopped") { screen -> screen.lines().any { it.trimEnd() == "left" } }
+        }
+    }
+
+    @Test
+    fun aShellThatExitsClosesItsPaneAndTheLastOneTheWindow() {
+        var closed: App? = null
+        withShell(onClosed = { closed = it }) { app ->
+            val first = app.focusedPane
+            app.perform(Action.SplitDown)
+            app.waitFor("no prompt below") { it.contains(">") }
+            app.command("exit")
+            app.pumpUntil("the pane outlived its shell") { app.paneList.size == 1 }
+            assertSame(first, app.focusedPane)
+            assertNull(closed, "a pane's exit closed the window")
+            app.command("exit")
+            app.pumpUntil("the window outlived its last shell") { closed != null }
+            assertSame(app, closed)
+            assertEquals(0, IsWindow(app.window.hwnd))
+        }
+    }
+
+    @Test
+    fun aNewWindowIsTheOwnersToOpen() {
+        var asked = 0
+        withShell(onNewWindow = { asked++ }) { app ->
+            app.perform(Action.NewWindow)
+            assertEquals(1, asked)
+            app.perform(Action.NewTab)
+            assertEquals(1, app.paneList.size, "a tab waits for the tab strip")
         }
     }
 }

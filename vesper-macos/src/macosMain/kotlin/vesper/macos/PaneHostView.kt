@@ -106,6 +106,7 @@ internal class PaneHostView(
 
     /** Splits the focused pane and starts the new pane's program; a beep, and no new pane, when it cannot start. */
     fun split(axis: SplitAxis) {
+        val before = panes.tree.focused
         val id = panes.split(axis)
         // The program starts at the grid of its frame, so the frame comes first.
         layoutPanes()
@@ -114,6 +115,8 @@ internal class PaneHostView(
             view.start(scale, program)
         } catch (_: PtyException) {
             panes.close(id)
+            // Closing a pane focuses its neighbour, which need not be the pane that was split.
+            panes.tree.focus(before)
             layoutPanes()
             NSBeep()
             return
