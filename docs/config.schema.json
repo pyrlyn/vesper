@@ -4,13 +4,6 @@
   "description": "The file as written; anything it leaves out is the default.",
   "type": "object",
   "properties": {
-    "colors": {
-      "$ref": "#/$defs/ColorsSection",
-      "default": {
-        "ansi": [],
-        "scheme": "vesper-dark"
-      }
-    },
     "font": {
       "$ref": "#/$defs/FontSection",
       "default": {
@@ -18,24 +11,31 @@
         "size": 13.0
       }
     },
-    "keybind": {
-      "description": "Key bindings laid over the defaults.",
-      "$ref": "#/$defs/Keybinds",
-      "default": []
+    "colors": {
+      "$ref": "#/$defs/ColorsSection",
+      "default": {
+        "scheme": "vesper-dark",
+        "ansi": []
+      }
     },
     "scrollback": {
       "description": "History rows kept per terminal; applies to terminals opened afterwards.",
       "$ref": "#/$defs/Scrollback",
       "default": 10000
+    },
+    "keybind": {
+      "description": "Key bindings laid over the defaults.",
+      "$ref": "#/$defs/Keybinds",
+      "default": []
     }
   },
   "additionalProperties": false,
   "$defs": {
     "Action": {
-      "description": "What a binding does. The numbers never change.",
+      "description": "What a binding does.",
       "oneOf": [
         {
-          "description": "Removes a default binding of the same chord; never in [`crate::Settings::bindings`].",
+          "description": "Removes a default binding of the same chord.",
           "type": "string",
           "const": "none"
         },
@@ -108,10 +108,14 @@
       "description": "`[colors]`.",
       "type": "object",
       "properties": {
-        "ansi": {
-          "description": "Palette entries 0 to 15, from the first; fewer than 16 keeps the rest.",
-          "$ref": "#/$defs/AnsiOverrides",
-          "default": []
+        "scheme": {
+          "description": "The built-in scheme everything below overrides.",
+          "$ref": "#/$defs/Scheme",
+          "default": "vesper-dark"
+        },
+        "foreground": {
+          "description": "Default text colour.",
+          "$ref": "#/$defs/Rgb"
         },
         "background": {
           "description": "Default background colour.",
@@ -121,14 +125,10 @@
           "description": "Cursor colour.",
           "$ref": "#/$defs/Rgb"
         },
-        "foreground": {
-          "description": "Default text colour.",
-          "$ref": "#/$defs/Rgb"
-        },
-        "scheme": {
-          "description": "The built-in scheme everything below overrides.",
-          "$ref": "#/$defs/Scheme",
-          "default": "vesper-dark"
+        "ansi": {
+          "description": "Palette entries 0 to 15, from the first; fewer than 16 keeps the rest.",
+          "$ref": "#/$defs/AnsiOverrides",
+          "default": []
         }
       },
       "additionalProperties": false
@@ -137,13 +137,13 @@
       "description": "One `[[keybind]]` table.",
       "type": "object",
       "properties": {
-        "action": {
-          "description": "The action; `none` frees a default chord.",
-          "$ref": "#/$defs/Action"
-        },
         "key": {
           "description": "The chord that triggers the action.",
           "$ref": "#/$defs/Chord"
+        },
+        "action": {
+          "description": "The action; `none` frees a default chord.",
+          "$ref": "#/$defs/Action"
         }
       },
       "additionalProperties": false,
@@ -177,9 +177,8 @@
     "FontSize": {
       "description": "A font size in points.",
       "type": "number",
-      "format": "float",
-      "maximum": 200.0,
-      "minimum": 4.0
+      "minimum": 4.0,
+      "maximum": 200.0
     },
     "Keybinds": {
       "description": "The `[[keybind]]` list, checked as a whole.",
@@ -190,7 +189,7 @@
       "maxItems": 256
     },
     "Rgb": {
-      "description": "A colour as `0xRRGGBB`.",
+      "description": "A colour as `#rrggbb`.",
       "type": "string",
       "pattern": "^#[0-9a-fA-F]{6}$"
     },
@@ -217,9 +216,8 @@
     "Scrollback": {
       "description": "History rows to keep.",
       "type": "integer",
-      "format": "uint32",
-      "maximum": 1000000,
-      "minimum": 0
+      "minimum": 0,
+      "maximum": 1000000
     }
   }
 }
