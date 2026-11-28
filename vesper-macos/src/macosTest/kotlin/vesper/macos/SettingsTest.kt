@@ -5,14 +5,11 @@ import okio.Path.Companion.toPath
 import okio.SYSTEM
 import platform.AppKit.NSApplication
 import platform.AppKit.NSBackingStoreBuffered
-import platform.AppKit.NSEvent
 import platform.AppKit.NSEventModifierFlagCommand
-import platform.AppKit.NSEventTypeKeyDown
 import platform.AppKit.NSWindow
 import platform.AppKit.NSWindowStyleMaskBorderless
 import platform.CoreText.CTFontCopyFamilyName
 import platform.Foundation.CFBridgingRelease
-import platform.Foundation.NSMakePoint
 import platform.Foundation.NSMakeRect
 import vesper.config.Font
 import vesper.config.LiveConfig
@@ -97,31 +94,14 @@ class SettingsTest {
         view.apply(Settings.DEFAULT.copy(font = Font("", 20.0)))
         assertEquals(20.0, view.text.font.size)
         assertTrue(view.text.cell.height > text.cell.height)
-        assertTrue(view.performKeyEquivalent(command(KEY_EQUAL, "=")))
+        assertTrue(view.performKeyEquivalent(keyEvent(KEY_EQUAL, "=", NSEventModifierFlagCommand)))
         assertEquals(21.0, view.text.font.size)
         view.apply(Settings.DEFAULT.copy(font = Font("", 20.0), scheme = Scheme.VesperLight, colors = Scheme.VesperLight.theme))
         assertEquals(21.0, view.text.font.size, "a colour change keeps the zoom")
-        assertTrue(view.performKeyEquivalent(command(KEY_ZERO, "0")))
+        assertTrue(view.performKeyEquivalent(keyEvent(KEY_ZERO, "0", NSEventModifierFlagCommand)))
         assertEquals(20.0, view.text.font.size, "reset goes to the configured size")
         assertEquals(3, cells)
     }
 
     private fun familyOf(text: TextStyle) = CFBridgingRelease(CTFontCopyFamilyName(text.faces[0])) as? String
-
-    private fun command(
-        keyCode: UShort,
-        characters: String,
-    ): NSEvent =
-        NSEvent.keyEventWithType(
-            NSEventTypeKeyDown,
-            NSMakePoint(0.0, 0.0),
-            NSEventModifierFlagCommand,
-            0.0,
-            0,
-            null,
-            characters,
-            characters,
-            false,
-            keyCode,
-        )!!
 }

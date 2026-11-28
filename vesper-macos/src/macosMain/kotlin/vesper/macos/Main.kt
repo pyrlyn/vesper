@@ -6,20 +6,14 @@ import kotlinx.cinterop.toKString
 import platform.AppKit.NSApplication
 import platform.AppKit.NSApplicationActivationPolicy
 import platform.AppKit.NSApplicationDelegateProtocol
-import platform.AppKit.NSBackingStoreBuffered
 import platform.AppKit.NSBeep
 import platform.AppKit.NSFloatingWindowLevel
 import platform.AppKit.NSMenu
 import platform.AppKit.NSMenuItem
-import platform.AppKit.NSWindow
-import platform.AppKit.NSWindowStyleMaskClosable
-import platform.AppKit.NSWindowStyleMaskMiniaturizable
-import platform.AppKit.NSWindowStyleMaskResizable
-import platform.AppKit.NSWindowStyleMaskTitled
+import platform.AppKit.NSWindowAbove
 import platform.Foundation.NSActivityLatencyCritical
 import platform.Foundation.NSActivityUserInitiated
-import platform.Foundation.NSMakeRect
-import platform.Foundation.NSMakeSize
+import platform.Foundation.NSMakePoint
 import platform.Foundation.NSNotification
 import platform.Foundation.NSProcessInfo
 import platform.Foundation.NSSelectorFromString
@@ -31,26 +25,25 @@ import platform.darwin.dispatch_get_main_queue
 import platform.posix.fflush
 import platform.posix.getenv
 import platform.posix.stdout
+import vesper.config.Action
 import vesper.config.LiveConfig
 import vesper.config.Settings
 import vesper.config.defaultConfigPath
-import vesper.host.Cells
-import vesper.host.viewSize
+import vesper.pty.PtyException
 
-/** The size a new window opens at. */
-private val DEFAULT_GRID = Cells(80, 24)
-
-/** The app: one window running the user's shell, closed when the shell exits. */
+/** The app: windows and tabs of panes running the user's shell; it quits when the last window closes. */
 private class AppDelegate(
     // Measures key-to-screen latency in a window running cat, prints it and quits.
     private val probe: Boolean,
 ) : NSObject(),
     NSApplicationDelegateProtocol {
-    private var view: TerminalView? = null
+    // AppKit keeps a window's delegate weakly, so the app holds every window here.
+    private val windows = ArrayList<TerminalWindow>()
 
     // Null when the environment names no home for the file: the defaults then, and no settings to save.
     private var live: LiveConfig? = null
     private var settingsWindow: SettingsWindow? = null
+    private var settings = Settings.DEFAULT
 
     override fun applicationDidFinishLaunching(notification: NSNotification) {
         val config =
@@ -58,39 +51,69 @@ private class AppDelegate(
                 LiveConfig(path) { dispatch_async(dispatch_get_main_queue()) { configChanged() } }
             }
         live = config
-        val settings = config?.snapshot()?.settings ?: Settings.DEFAULT
-        val text = TextStyle(settings.font)
-        val (width, height) = viewSize(DEFAULT_GRID, text.cell)
-        val window =
-            NSWindow(
-                contentRect = NSMakeRect(0.0, 0.0, width, height),
-                styleMask =
-                    NSWindowStyleMaskTitled or NSWindowStyleMaskClosable or NSWindowStyleMaskMiniaturizable or NSWindowStyleMaskResizable,
-                backing = NSBackingStoreBuffered,
-                defer = false,
-            )
-        window.title = "vesper"
-        window.releasedWhenClosed = false
-        window.contentResizeIncrements = NSMakeSize(text.cell.width, text.cell.height)
-        val terminal = TerminalView(text, NSMakeRect(0.0, 0.0, width, height))
-        terminal.apply(settings)
-        terminal.onCellSize = { window.contentResizeIncrements = NSMakeSize(it.width, it.height) }
-        terminal.onTitle = { window.title = it }
-        terminal.onDirectory = { window.representedURL = it }
-        terminal.onExit = { window.close() }
-        window.contentView = terminal
-        window.center()
-        window.makeKeyAndOrderFront(null)
-        window.makeFirstResponder(terminal)
-        terminal.start(window.backingScaleFactor, program = if (probe) "/bin/cat" else null)
-        if (probe) startProbe(terminal)
-        view = terminal
+        settings = config?.snapshot()?.settings ?: Settings.DEFAULT
+        val first = makeWindow()
+        first.window.center()
+        first.start()
+        if (probe) startProbe(first.panes.focusedView)
         NSApplication.sharedApplication.activate()
+    }
+
+    private fun makeWindow(): TerminalWindow =
+        TerminalWindow(
+            TextStyle(settings.font),
+            settings,
+            program = if (probe) "/bin/cat" else null,
+            onClosed = { windows.remove(it) },
+            onWindowAction = ::perform,
+        ).also { windows += it }
+
+    private fun perform(
+        from: TerminalWindow,
+        action: Action,
+    ): Boolean {
+        when (action) {
+            Action.NewTab -> open(from, tab = true)
+            Action.NewWindow -> open(from, tab = false)
+            else -> return false
+        }
+        return true
+    }
+
+    /** Opens a window next to [from], or a tab in its group; a beep, and nothing, when its shell cannot start. */
+    private fun open(
+        from: TerminalWindow?,
+        tab: Boolean,
+    ) {
+        val next = makeWindow()
+        val near = from?.window
+        when {
+            near == null -> next.window.center()
+
+            tab -> near.addTabbedWindow(next.window, NSWindowAbove)
+
+            // A point of (0, 0) leaves the window in place and returns where the next one cascades to.
+            else -> next.window.cascadeTopLeftFromPoint(near.cascadeTopLeftFromPoint(NSMakePoint(0.0, 0.0)))
+        }
+        try {
+            next.start()
+        } catch (_: PtyException) {
+            next.window.close()
+            NSBeep()
+        }
+    }
+
+    /** The tab bar's + button; AppKit shows it only when something in the responder chain answers this. */
+    @OptIn(BetaInteropApi::class)
+    @ObjCAction
+    fun newWindowForTab(sender: NSObject?) {
+        open(windows.firstOrNull { it.window.keyWindow } ?: windows.lastOrNull(), tab = true)
     }
 
     private fun configChanged() {
         val snapshot = live?.snapshot() ?: return
-        view?.apply(snapshot.settings)
+        settings = snapshot.settings
+        windows.forEach { it.apply(snapshot.settings) }
         settingsWindow?.show(snapshot)
     }
 
@@ -120,7 +143,7 @@ private class AppDelegate(
     override fun applicationShouldTerminateAfterLastWindowClosed(sender: NSApplication): Boolean = true
 
     override fun applicationWillTerminate(notification: NSNotification) {
-        view?.stop()
+        windows.toList().forEach { it.panes.stop() }
         live?.close()
     }
 }

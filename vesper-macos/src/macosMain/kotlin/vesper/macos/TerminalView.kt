@@ -244,6 +244,12 @@ internal class TerminalView(
     var onDirectory: (NSURL) -> Unit = {}
     var onExit: () -> Unit = {}
 
+    /** Runs what the window owns (tabs, windows, panes); false when nothing did. */
+    var onAction: (Action) -> Boolean = { false }
+
+    /** Called when the view takes the keys, so its pane becomes the focused one. */
+    var onFocused: () -> Unit = {}
+
     /** Where Copy, Paste and the program's OSC 52 writes go; a test swaps in a private one. */
     internal var pasteboard: NSPasteboard = NSPasteboard.generalPasteboard
 
@@ -318,6 +324,7 @@ internal class TerminalView(
 
     override fun becomeFirstResponder(): Boolean {
         focusChanged(true)
+        onFocused()
         return true
     }
 
@@ -613,9 +620,7 @@ internal class TerminalView(
         }
         when (action) {
             Action.Paste -> paste(null)
-
-            // Tabs, windows and panes wait for T21's macOS slice.
-            else -> NSBeep()
+            else -> if (!onAction(action)) NSBeep()
         }
     }
 

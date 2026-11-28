@@ -57,14 +57,7 @@ private class Pane {
         await { view.screenText.lines().first() == "one two two" }
     }
 
-    fun await(done: () -> Boolean) {
-        val end = TimeSource.Monotonic.markNow() + 10.seconds
-        while (!done()) {
-            if (end.hasPassedNow()) fail("timed out; the screen shows:\n${view.screenText}")
-            NSRunLoop.mainRunLoop.runUntilDate(NSDate.dateWithTimeIntervalSinceNow(0.05))
-            view.refresh()
-        }
-    }
+    fun await(done: () -> Boolean): Unit = awaitViews({ listOf(view) }, done)
 
     /** A left-button event over the middle of cell ([row], [col]); window y counts up from the bottom. */
     fun mouse(
