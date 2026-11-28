@@ -43,6 +43,8 @@ public data class Settings(
     val colors: Theme,
     /** History rows for terminals opened from now on. */
     val scrollback: Int,
+    /** [DEFAULT_BINDINGS] with the file's `[[keybind]]` entries laid over them. */
+    val bindings: List<Binding>,
 ) {
     public companion object {
         /** What a fresh install, with no file, runs with. */
@@ -122,5 +124,32 @@ private fun resolve(
             cursor = c.cursor?.let { color("colors.cursor", it) } ?: base.cursor,
             ansi = ansi,
         )
-    return Settings(Font(family, size), scheme, colors, file.scrollback.toInt())
+    return Settings(Font(family, size), scheme, colors, file.scrollback.toInt(), bindings(file.keybind, ::invalid))
+}
+
+private fun bindings(
+    entries: List<KeybindEntry>,
+    invalid: (String) -> Nothing,
+): List<Binding> {
+    if (entries.size > MAX_KEYBINDS) invalid("at most $MAX_KEYBINDS keybind entries, not ${entries.size}")
+    val parsed =
+        entries.mapIndexed { i, entry ->
+            val chord =
+                try {
+                    parseChord(entry.key)
+                } catch (e: IllegalArgumentException) {
+                    invalid("keybind[$i].key: ${e.message}")
+                }
+            val action =
+                Action.byId(entry.action)
+                    ?: invalid("keybind[$i].action `${entry.action}` is not one of ${Action.entries.joinToString { it.id }}")
+            Binding(chord, action)
+        }
+    // Two entries for one chord would leave the later silently winning; spellings differ, chords do not.
+    parsed
+        .groupBy { it.chord }
+        .values
+        .firstOrNull { it.size > 1 }
+        ?.let { invalid("keybind `${it.first().chord}` appears twice") }
+    return resolveBindings(parsed)
 }

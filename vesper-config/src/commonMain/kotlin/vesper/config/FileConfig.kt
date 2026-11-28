@@ -22,6 +22,7 @@ internal data class FileConfig(
     val font: FontSection = FontSection(),
     val colors: ColorsSection = ColorsSection(),
     val scrollback: Long = DEFAULT_SCROLLBACK.toLong(),
+    val keybind: List<KeybindEntry> = emptyList(),
 )
 
 @Serializable
@@ -37,6 +38,13 @@ internal data class ColorsSection(
     val background: String? = null,
     val cursor: String? = null,
     val ansi: List<String> = emptyList(),
+)
+
+/** One `[[keybind]]` table; both keys are required. */
+@Serializable
+internal data class KeybindEntry(
+    val key: String,
+    val action: String,
 )
 
 // TOML keeps integers and floats apart, so `size = 13` is an integer; people write sizes that way.
