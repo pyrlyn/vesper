@@ -1,6 +1,6 @@
 # T900. Done
 
-Merged through the T900 pull request (`t900-dependency-advisories`).
+Merged through https://github.com/pyrlyn/vesper/pull/51.
 
 - **The audit.** It ran on the whole resolved Gradle graph, 113 artifacts, against OSV, which carries the GitHub advisories. `toolchain.md` → *Advisory audit (T900)* records how to rerun it and what it found.
 - **Fixed: `ch.qos.logback:logback-core` 1.3.16.** It has GHSA-qqpg-mvqg-649v, GHSA-p47f-322f-whfh and GHSA-jhq6-gfmj-v8fx, all low.
