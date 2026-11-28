@@ -31,6 +31,8 @@ include(
     ":vesper-image",
     // A terminal and the child it runs: what each host window holds (T14).
     ":vesper-session",
+    // The config file: parse, validate, edit, live reload (T20).
+    ":vesper-config",
     // What both apps draw with that no graphics API owns: the glyph atlas and its bitmaps (T17).
     ":vesper-host",
     // The macOS app: Kotlin/Native over AppKit and CoreText (T14).
