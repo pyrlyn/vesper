@@ -34,6 +34,8 @@ import platform.windows.WM_SYSKEYUP
 import platform.windows.WM_XBUTTONDOWN
 import platform.windows.WM_XBUTTONUP
 import vesper.input.Key
+import vesper.input.KeyAction
+import vesper.input.KeyEvent
 import vesper.input.Modifiers
 import vesper.input.MouseButton
 import vesper.input.windowsKey
@@ -71,11 +73,14 @@ interface InputTarget {
     fun scrolled()
 
     fun focusChanged(focused: Boolean)
+
+    /** Runs what [event] is bound to, if anything: true when the host took the key from the program. */
+    fun shortcut(event: KeyEvent): Boolean
 }
 
 /**
  * A window's keyboard, mouse and focus messages to the session: keys with the text `WM_CHAR` brings,
- * the paste shortcuts, buttons with the mouse captured while one is held, and the wheel, which goes
+ * less the host's shortcuts, buttons with the mouse captured while one is held, and the wheel, which goes
  * to a program that reports the mouse and otherwise scrolls the history.
  */
 internal class WindowInput(
@@ -100,7 +105,7 @@ internal class WindowInput(
         val session = target.session ?: return false
         when (message) {
             WM_KEYDOWN, WM_SYSKEYDOWN -> {
-                return keyDown(session, wParam.toInt(), lParam)
+                return keyDown(wParam.toInt(), lParam)
             }
 
             WM_KEYUP, WM_SYSKEYUP -> {
@@ -155,7 +160,6 @@ internal class WindowInput(
     }
 
     private fun keyDown(
-        session: Session,
         vk: Int,
         lParam: Long,
     ): Boolean {
@@ -165,13 +169,10 @@ internal class WindowInput(
         val key = windowsKey(vk, scan, extended)
         // Alt+F4 closes the window, as everywhere on Windows: the default handler turns it into SC_CLOSE.
         if (key == Key.F(4) && Modifiers.ALT in held && !held.intersects(Modifiers.CTRL + Modifiers.SHIFT)) return false
-        val paste = isPaste(key, held)
-        swallowed.press(vk, paste)
-        if (paste) {
-            readClipboardText(hwnd)?.let(session::paste)
-        } else {
-            pairing.keyDown(vk, scan, extended, lParam and (1L shl REPEAT_BIT) != 0L, held)
-        }
+        val repeat = lParam and (1L shl REPEAT_BIT) != 0L
+        val ran = key != null && target.shortcut(KeyEvent(key, if (repeat) KeyAction.Repeat else KeyAction.Press, held))
+        swallowed.press(vk, ran)
+        if (!ran) pairing.keyDown(vk, scan, extended, repeat, held)
         return true
     }
 

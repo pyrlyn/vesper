@@ -23,10 +23,10 @@ import platform.Foundation.NSEdgeInsetsMake
 import platform.Foundation.NSMakeRect
 import platform.Foundation.NSSelectorFromString
 import platform.darwin.NSObject
-import vesper.config.ConfigException
 import vesper.config.LiveConfig
 import vesper.config.Scheme
 import vesper.config.Snapshot
+import vesper.host.SettingField
 
 private const val MARGIN = 20.0
 private const val FIELD_WIDTH = 220.0
@@ -65,10 +65,10 @@ internal class SettingsWindow(
         val grid =
             NSGridView.gridViewWithViews(
                 listOf(
-                    listOf(label("Font family:"), family),
-                    listOf(label("Font size:"), size),
-                    listOf(label("Colour scheme:"), scheme),
-                    listOf(label("Scrollback lines:"), scrollback),
+                    listOf(label(SettingField.FontFamily), family),
+                    listOf(label(SettingField.FontSize), size),
+                    listOf(label(SettingField.ColorScheme), scheme),
+                    listOf(label(SettingField.Scrollback), scrollback),
                 ),
             )
         val stack = NSStackView.stackViewWithViews(listOf(grid, status))
@@ -90,35 +90,26 @@ internal class SettingsWindow(
     /** Shows [snapshot], leaving alone a field being typed in. */
     fun show(snapshot: Snapshot) {
         val settings = snapshot.settings
-        family.showUnlessEditing(settings.font.family)
-        size.showUnlessEditing(settings.font.size.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() })
-        scheme.selectItemWithTitle(settings.scheme.id)
-        scrollback.showUnlessEditing(settings.scrollback.toString())
+        family.showUnlessEditing(SettingField.FontFamily.shown(settings))
+        size.showUnlessEditing(SettingField.FontSize.shown(settings))
+        scheme.selectItemWithTitle(SettingField.ColorScheme.shown(settings))
+        scrollback.showUnlessEditing(SettingField.Scrollback.shown(settings))
         status.stringValue = snapshot.error.orEmpty()
     }
 
     @OptIn(BetaInteropApi::class)
     @ObjCAction
     fun commit(sender: NSObject?) {
-        val (key, value) =
+        val (field, text) =
             when (sender) {
-                // An empty family is the system's monospace font, which the file says by leaving it out.
-                family -> "font.family" to family.stringValue.trim().ifEmpty { null }
-
-                size -> "font.size" to size.stringValue
-
-                scheme -> "colors.scheme" to scheme.titleOfSelectedItem
-
-                scrollback -> "scrollback" to scrollback.stringValue
-
+                family -> SettingField.FontFamily to family.stringValue
+                size -> SettingField.FontSize to size.stringValue
+                scheme -> SettingField.ColorScheme to scheme.titleOfSelectedItem.orEmpty()
+                scrollback -> SettingField.Scrollback to scrollback.stringValue
                 else -> return
             }
-        try {
-            live.set(key, value)
-            show(live.snapshot())
-        } catch (e: ConfigException) {
-            status.stringValue = e.message.orEmpty()
-        }
+        val refused = field.commit(text, live.snapshot().settings, live::set)
+        if (refused == null) show(live.snapshot()) else status.stringValue = refused
     }
 }
 
@@ -129,7 +120,7 @@ private fun field(placeholder: String): NSTextField =
         it.cell?.sendsActionOnEndEditing = true
     }
 
-private fun label(text: String): NSTextField = NSTextField.labelWithString(text)
+private fun label(field: SettingField): NSTextField = NSTextField.labelWithString(field.label)
 
 private fun NSTextField.showUnlessEditing(text: String) {
     if (currentEditor() == null) stringValue = text

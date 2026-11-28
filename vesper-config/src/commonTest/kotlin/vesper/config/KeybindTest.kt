@@ -38,8 +38,15 @@ class KeybindTest {
     @Test
     fun noKeybindTablesIsTheDefaults() {
         assertEquals(DEFAULT_BINDINGS, Settings.DEFAULT.bindings)
-        assertEquals(11, DEFAULT_BINDINGS.size)
-        assertTrue(DEFAULT_BINDINGS.none { it.action == Action.None })
+        assertTrue(DEFAULT_BINDINGS === MAC_BINDINGS || DEFAULT_BINDINGS === PC_BINDINGS)
+        // Both sets offer every action, so a binding learnt on one platform has a twin on the other.
+        val actions = Action.entries - Action.None
+        for (set in listOf(MAC_BINDINGS, PC_BINDINGS)) {
+            assertEquals(actions.toSet(), set.map { it.action }.toSet())
+            assertEquals(set.size, set.map { it.chord }.toSet().size, "a chord is bound twice")
+        }
+        // The Windows key belongs to the system on Windows.
+        assertTrue(PC_BINDINGS.none { Modifiers.SUPER in it.chord.mods })
     }
 
     @Test
@@ -60,7 +67,7 @@ class KeybindTest {
     fun aChordWritesItsCanonicalSpelling() {
         assertEquals("ctrl+shift+super+a", parseChord("super+shift+ctrl+a").toString())
         assertEquals("alt+page-down", parseChord("option+PAGE-DOWN").toString())
-        for (binding in DEFAULT_BINDINGS) assertEquals(binding.chord, parseChord(binding.chord.toString()))
+        for (binding in MAC_BINDINGS + PC_BINDINGS) assertEquals(binding.chord, parseChord(binding.chord.toString()))
     }
 
     @Test
@@ -80,14 +87,20 @@ class KeybindTest {
 
     @Test
     fun entriesLayOverTheDefaults() {
-        val bindings =
-            bindingsOf(
-                entry("super+v", "none") + entry("ctrl+shift+v", "paste") + entry("cmd+=", "font-reset"),
+        val entries =
+            listOf(
+                Binding(parseChord("super+v"), Action.None),
+                Binding(parseChord("ctrl+alt+v"), Action.Paste),
+                Binding(parseChord("cmd+="), Action.FontReset),
             )
+        val bindings = resolveBindings(entries, MAC_BINDINGS)
         assertTrue(bindings.none { it.chord == Chord(char('v'), Modifiers.SUPER) })
-        assertTrue(Binding(Chord(char('v'), Modifiers.CTRL + Modifiers.SHIFT), Action.Paste) in bindings)
+        assertTrue(Binding(Chord(char('v'), Modifiers.CTRL + Modifiers.ALT), Action.Paste) in bindings)
         assertEquals(Action.FontReset, bindings.single { it.chord == Chord(char('='), Modifiers.SUPER) }.action)
-        assertEquals(DEFAULT_BINDINGS.size, bindings.size)
+        assertEquals(MAC_BINDINGS.size, bindings.size)
+        // A file reaches the same code with this platform's defaults.
+        val first = DEFAULT_BINDINGS.first()
+        assertEquals(DEFAULT_BINDINGS - first, bindingsOf(entry(first.chord.toString(), "none")))
         // `none` on a chord with no default is allowed and changes nothing.
         assertEquals(DEFAULT_BINDINGS, bindingsOf(entry("ctrl+alt+x", "none")))
     }

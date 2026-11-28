@@ -45,14 +45,11 @@ private val CHORD = ALT_GR + Modifiers.SUPER
 fun heldModifiers(state: (Int) -> Int): Modifiers =
     HELD_KEYS.fold(Modifiers.NONE) { held, (vk, bit, modifier) -> if (state(vk) and bit != 0) held + modifier else held }
 
-/** Whether [key] with [held] is a paste shortcut: Ctrl+Shift+V or Shift+Insert. */
-fun isPaste(
+/** Whether [key] with [held] opens the settings window: Ctrl+comma, as in Windows Terminal. */
+fun isSettings(
     key: Key?,
     held: Modifiers,
-): Boolean {
-    val chord = Modifiers.of(held.bits and SHORTCUT.bits)
-    return (key == Key.Character('v'.code) && chord == Modifiers.CTRL + Modifiers.SHIFT) || (key == Key.Insert && chord == Modifiers.SHIFT)
-}
+): Boolean = key == Key.Character(','.code) && Modifiers.of(held.bits and SHORTCUT.bits) == Modifiers.CTRL
 
 /** The modifier a modifier key holds, which the core counts as held during its own event. */
 private fun modifierOf(key: Key): Modifiers =

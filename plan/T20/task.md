@@ -2,7 +2,7 @@
 status: in progress
 priority: P2
 complexity: 3
-readiness: 80%
+readiness: 100%
 agent: Claude Code / claude-opus-5-5
 ---
 
@@ -15,8 +15,8 @@ The earlier Rust `config` crate and the removed Swift and C# settings code in `m
 Check: `./gradlew check` with tests for parsing, defaults, every validation error and cap, key binding parsing, atomic edits and the flood test.
 
 Acceptance:
-- [ ] The work described above is implemented in Kotlin/Native.
-- [ ] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
+- [x] The work described above is implemented in Kotlin/Native.
+- [x] Tests and the `./gradlew check` gate (plus the host tests this task names) pass.
 
 ## Execution plan
 

@@ -101,8 +101,8 @@ float4 quad_pixel(Fragment f) : SV_Target {
  */
 class D3DRenderer private constructor(
     private val gpu: Gpu,
-    private val text: TextStyle,
-    private val palette: Palette,
+    private var text: TextStyle,
+    private var palette: Palette,
     private val vertex: CPointer<ID3D11VertexShader>,
     private val pixel: CPointer<ID3D11PixelShader>,
     private val layout: CPointer<ID3D11InputLayout>,
@@ -112,10 +112,26 @@ class D3DRenderer private constructor(
     private val extra: CPointer<ID3D11Buffer>,
 ) : AutoCloseable {
     private val atlas = GpuAtlas(gpu)
-    private val builder =
-        QuadBuilder(palette, text, GlyphCache.create(atlas) ?: error("no atlas texture"), text.metrics(1.0), 0.0)
+    private var builder = newBuilder()
+
+    private fun newBuilder() = QuadBuilder(palette, text, GlyphCache.create(atlas) ?: error("no atlas texture"), text.metrics(1.0), 0.0)
+
     private var slots: CPointer<ID3D11Buffer>? = null
     private var versions = LongArray(0)
+
+    /**
+     * Draws with [text] and [palette] from the next frame on. Every glyph and colour baked into the
+     * quads is stale, so the builder starts over: its first update rebuilds every row and the slots
+     * are made again at the new cell size.
+     */
+    fun restyle(
+        text: TextStyle,
+        palette: Palette,
+    ) {
+        this.text = text
+        this.palette = palette
+        builder = newBuilder()
+    }
 
     /** Draws [frame] into [view], [width] by [height] pixels at [scale] pixels per DIP. */
     fun render(

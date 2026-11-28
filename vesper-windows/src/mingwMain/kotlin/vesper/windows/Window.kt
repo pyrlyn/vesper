@@ -13,6 +13,7 @@ import kotlinx.cinterop.staticCFunction
 import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.wcstr
+import platform.windows.COLOR_BTNFACE
 import platform.windows.CREATESTRUCTW
 import platform.windows.CS_HREDRAW
 import platform.windows.CS_VREDRAW
@@ -21,15 +22,19 @@ import platform.windows.CreateWindowExW
 import platform.windows.DefWindowProcW
 import platform.windows.DestroyWindow
 import platform.windows.DispatchMessageW
+import platform.windows.FillRect
 import platform.windows.GWLP_USERDATA
 import platform.windows.GetClientRect
 import platform.windows.GetLastError
 import platform.windows.GetMessageW
 import platform.windows.GetModuleHandleW
+import platform.windows.GetSysColorBrush
 import platform.windows.GetWindowLongPtrW
 import platform.windows.GetWindowRect
+import platform.windows.HDC__
 import platform.windows.HWND
 import platform.windows.IDC_ARROW
+import platform.windows.IsDialogMessageW
 import platform.windows.LoadCursorW
 import platform.windows.MSG
 import platform.windows.PM_REMOVE
@@ -81,14 +86,28 @@ interface WindowListener {
         wParam: ULong,
         lParam: Long,
     ): Boolean = false
+
+    /** [message]'s result for a message whose answer is a value, such as a brush; null for the default. */
+    fun reply(
+        message: Int,
+        wParam: ULong,
+        lParam: Long,
+    ): Long? = if (message(message, wParam, lParam)) 0 else null
 }
 
-/** A top-level Win32 window of [width] by [height] device-independent pixels of client area. */
+/**
+ * A top-level Win32 window of [width] by [height] device-independent pixels of client area. A
+ * [canvas] is drawn whole by its owner; otherwise the window paints the dialog background behind its
+ * child controls. An [owner] keeps the window above it and out of the taskbar.
+ */
 class Window(
     title: String,
     width: Int,
     height: Int,
     private val listener: WindowListener,
+    style: Int = WS_OVERLAPPEDWINDOW,
+    owner: HWND? = null,
+    private val canvas: Boolean = true,
 ) : AutoCloseable {
     private val self = StableRef.create(this)
     private var open = true
@@ -99,12 +118,12 @@ class Window(
             0u,
             windowClass,
             title,
-            WS_OVERLAPPEDWINDOW.convert(),
+            style.convert(),
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            null,
+            owner,
             null,
             GetModuleHandleW(null),
             self.asCPointer(),
@@ -191,13 +210,18 @@ class Window(
             }
 
             WM_PAINT -> {
-                listener.paint()
-                ValidateRect(hwnd, null)
-                0
+                if (canvas) {
+                    listener.paint()
+                    ValidateRect(hwnd, null)
+                    0
+                } else {
+                    null
+                }
             }
 
             // The swap chain covers the whole client area; erasing first would flicker.
             WM_ERASEBKGND -> {
+                if (!canvas) eraseDialog(hwnd, wParam)
                 1
             }
 
@@ -214,19 +238,22 @@ class Window(
             }
 
             else -> {
-                if (listener.message(message, wParam, lParam)) 0 else null
+                listener.reply(message, wParam, lParam)
             }
         }
 
     companion object {
+        /**
+         * Windows whose child controls take Tab, Enter and Escape as a dialog's do. Their keys go
+         * through IsDialogMessageW first, which only acts on messages for them and their children.
+         */
+        internal val dialogs = HashSet<HWND>()
+
         /** Pumps messages until WM_QUIT and returns its exit code. */
         fun runMessageLoop(): Int =
             memScoped {
                 val message = alloc<MSG>()
-                while (GetMessageW(message.ptr, null, 0u, 0u) > 0) {
-                    TranslateMessage(message.ptr)
-                    DispatchMessageW(message.ptr)
-                }
+                while (GetMessageW(message.ptr, null, 0u, 0u) > 0) dispatch(message)
                 message.wParam.toInt()
             }
 
@@ -234,12 +261,27 @@ class Window(
         fun pumpMessages() {
             memScoped {
                 val message = alloc<MSG>()
-                while (PeekMessageW(message.ptr, null, 0u, 0u, PM_REMOVE.convert()) != 0) {
-                    TranslateMessage(message.ptr)
-                    DispatchMessageW(message.ptr)
-                }
+                while (PeekMessageW(message.ptr, null, 0u, 0u, PM_REMOVE.convert()) != 0) dispatch(message)
             }
         }
+
+        private fun dispatch(message: MSG) {
+            if (dialogs.any { IsDialogMessageW(it, message.ptr) != 0 }) return
+            TranslateMessage(message.ptr)
+            DispatchMessageW(message.ptr)
+        }
+    }
+}
+
+// The colour Windows draws dialogs in, which static controls already paint their own backgrounds with.
+private fun eraseDialog(
+    hwnd: HWND,
+    wParam: ULong,
+) {
+    memScoped {
+        val rect = alloc<RECT>()
+        GetClientRect(hwnd, rect.ptr)
+        FillRect(wParam.toLong().toCPointer<HDC__>(), rect.ptr, GetSysColorBrush(COLOR_BTNFACE))
     }
 }
 
