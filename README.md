@@ -40,8 +40,8 @@ A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it
 | `vesper-sync` | The system's locks, condition variables and threads, for every module that runs its own |
 | `vesper-session` | A terminal and the child it runs, under one lock: what each window holds |
 | `vesper-config` | The config file: font, colour scheme, scrollback and key bindings, parsed and validated, edited in place and reloaded live (in progress, T20) |
-| `vesper-host` | What both apps draw with that no graphics API owns: the palette, the frame turned into quads, the glyph atlas's layout and cache, its bitmaps, and what a window takes from the terminal's events |
-| `vesper-macos` | The macOS app over AppKit, Metal and CoreText |
+| `vesper-host` | What both apps draw with that no graphics API owns: the palette from the config's theme, its key bindings and font zoom, the frame turned into quads, the glyph atlas's layout and cache, its bitmaps, and what a window takes from the terminal's events |
+| `vesper-macos` | The macOS app over AppKit, Metal and CoreText; it applies `~/.config/vesper/config.toml` live and has a Settings window (⌘,) |
 | `vesper-windows` | The Windows app over Win32, Direct3D 11 and DirectWrite (in progress, T17) |
 | `vesper-png`, `vesper-image` | Allocation-capped PNG decoding and the image store with the kitty, iTerm2 and sixel decoders |
 | `vesper-harness`, `vesper-bench` | Conformance harness and benchmarks for the core |

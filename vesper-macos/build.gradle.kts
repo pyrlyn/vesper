@@ -20,10 +20,14 @@ kotlin {
         }
         macosMain.dependencies {
             implementation(projects.vesperSession)
+            // The live config; its pure types already come through vesper-host.
+            implementation(projects.vesperConfig)
             implementation(projects.vesperUnicode)
             // The T3 input the renderer bench feeds.
             implementation(projects.vesperHarness)
         }
+        // The settings test reads back the file the window wrote.
+        macosTest.dependencies { implementation(libs.okio) }
         all { languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi") }
     }
 }

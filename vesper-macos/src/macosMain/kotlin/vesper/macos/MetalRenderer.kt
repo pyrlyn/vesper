@@ -125,38 +125,37 @@ internal class MetalRenderer private constructor(
     private val device: MTLDeviceProtocol,
     private val queue: MTLCommandQueueProtocol,
     private val pipeline: MTLRenderPipelineStateProtocol,
-    private val text: TextStyle,
-    private val palette: Palette,
+    private var text: TextStyle,
+    private var palette: Palette,
 ) {
     val layer = CAMetalLayer()
-    private val shaper = RunShaper(text)
+    private var shaper = RunShaper(text)
     private var atlas = GlyphAtlas.create(device) ?: error("no atlas texture")
     private val images = HashMap<Long, MTLTextureProtocol>()
-    private val builder =
-        QuadBuilder(
-            palette,
-            object : GlyphSource {
-                override fun shape(
-                    text: String,
-                    face: Int,
-                    width: Int,
-                ) = shaper.shape(text, face, width)
+    private val glyphs =
+        object : GlyphSource {
+            override fun shape(
+                text: String,
+                face: Int,
+                width: Int,
+            ) = shaper.shape(text, face, width)
 
-                override fun rasterize(
-                    key: Long,
-                    metrics: CellMetrics,
-                    scale: Double,
-                ): Bitmap? =
-                    if (isSpriteKey(key)) {
-                        spriteBitmap(keySprite(key), metrics)
-                    } else {
-                        shaper.registry.font(keyFont(key))?.let { Bitmap.glyph(keyGlyph(key), it, scale) }
-                    }
-            },
-            atlas.cache,
-            CellMetrics.of(text.faces[0], text.cell, 1.0),
-            0.0,
-        )
+            override fun rasterize(
+                key: Long,
+                metrics: CellMetrics,
+                scale: Double,
+            ): Bitmap? =
+                if (isSpriteKey(key)) {
+                    spriteBitmap(keySprite(key), metrics)
+                } else {
+                    shaper.registry.font(keyFont(key))?.let { Bitmap.glyph(keyGlyph(key), it, scale) }
+                }
+        }
+
+    // Scale 0 matches no real one, so the first frame rasterises into a fresh atlas at its scale.
+    private fun newBuilder() = QuadBuilder(palette, glyphs, atlas.cache, CellMetrics.of(text.faces[0], text.cell, 1.0), 0.0)
+
+    private var builder = newBuilder()
     private val metrics get() = builder.metrics
     private val scale get() = builder.scale
     private var buffers = emptyList<InFlight>()
@@ -177,6 +176,21 @@ internal class MetalRenderer private constructor(
         layer.colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB)
         layer.opaque = true
         layer.maximumDrawableCount = FRAMES_IN_FLIGHT.toULong()
+    }
+
+    /**
+     * Draws with another font or palette from the next frame on. Every glyph, quad and buffer is
+     * built again: the cell size, the colours baked into the quads and the shaped runs all change.
+     */
+    fun restyle(
+        text: TextStyle,
+        palette: Palette,
+    ) {
+        this.text = text
+        this.palette = palette
+        shaper = RunShaper(text)
+        builder = newBuilder()
+        buffers = emptyList()
     }
 
     /** Draws [frame] into [layer]; [width] and [height] in points. */
