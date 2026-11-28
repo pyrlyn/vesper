@@ -162,8 +162,8 @@ Rules between core and host (research.md §7):
 ### Phase 10: CI and hardening
 
 - [x] **T25.** Fuzz smoke and Unicode table freshness in CI.
-- [ ] **T29.** Green required checks on `main`.
-- [ ] **T900.** Dependency advisory updates on the Gradle graph.
+- [x] **T29.** Green required checks on `main`.
+- [x] **T900.** Dependency advisory updates on the Gradle graph.
 
 ## 5. Testing strategy
 
