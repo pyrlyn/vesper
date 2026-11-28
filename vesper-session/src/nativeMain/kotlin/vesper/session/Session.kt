@@ -125,6 +125,12 @@ public class Session private constructor(
     /** Scrolls the view by [delta] lines, up when positive; the next [update] shows it. */
     public fun scrollDisplay(delta: Int): Unit = guarded(Unit) { terminal.scrollDisplay(delta) }
 
+    /**
+     * Scrolls the view so that the shell prompt before its top row, or after it when [forward], is the
+     * top row; false, moving nothing, when there is none. The next [update] shows it.
+     */
+    public fun scrollToPrompt(forward: Boolean): Boolean = guarded(false) { terminal.scrollToPrompt(forward) }
+
     /** The viewport's text and the selection in it, for a screen reader. */
     public fun viewportText(): ViewportText = guarded(ViewportText.EMPTY) { terminal.viewportText() }
 

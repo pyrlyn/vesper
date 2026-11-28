@@ -60,6 +60,7 @@ public class Terminal(
         parser.feed(bytes, from, to, state)
         if (sync.fed(state.modes.synchronizedOutput, to - from)) endSync()
         state.images.prune(state.grid.firstLine)
+        state.prompts.prune(state.mainGrid.firstLine)
         selected?.let { if (!state.grid.holds(it, state.altActive)) selected = null }
     }
 
@@ -126,6 +127,16 @@ public class Terminal(
 
     /** Moves the viewport [delta] rows back into history (negative: towards the screen), clamped to what history holds. */
     public fun scrollDisplay(delta: Int): Unit = state.grid.scrollDisplay(delta)
+
+    /**
+     * Moves the viewport so that the shell prompt (OSC 133 `A`) before its top row, or after it when
+     * [forward], is the top row, as far as history allows. False, moving nothing, when there is no
+     * such prompt or the viewport cannot go further; the alternate screen has none.
+     */
+    public fun scrollToPrompt(forward: Boolean): Boolean = !state.altActive && state.prompts.step(state.grid, forward)
+
+    /** The primary screen's prompt lines, oldest first; for tests. */
+    internal fun promptLines(): List<Long> = state.prompts.toList()
 
     /**
      * Brings [frame] up to date with the viewport: the only call that copies out of the terminal, so a

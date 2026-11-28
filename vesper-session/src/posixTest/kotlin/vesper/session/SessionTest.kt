@@ -91,6 +91,22 @@ class SessionTest {
     }
 
     @Test
+    fun theViewWalksTheShellsPromptMarks() {
+        val script = "printf '\\033]133;A\\007one\\n'; seq 40; printf '\\033]133;A\\007two\\n'; seq 30; echo done; sleep 30"
+        Session.spawn(shell(script)) {}.use { session ->
+            val frame = Frame()
+            session.await(frame) { it.lines().any { line -> line == "done" } }
+            assertEquals(true, session.scrollToPrompt(forward = false))
+            assertEquals("two", session.await(frame) { it.startsWith("two") }.lines().first())
+            assertEquals(true, session.scrollToPrompt(forward = false))
+            session.await(frame) { it.startsWith("one") }
+            assertEquals(false, session.scrollToPrompt(forward = false), "no prompt above the first")
+            assertEquals(true, session.scrollToPrompt(forward = true))
+            session.await(frame) { it.startsWith("two") }
+        }
+    }
+
+    @Test
     fun theSelectionCopiesAndASearchStepsAndCounts() {
         Session.spawn(SpawnOptions.command("cat")) {}.use { session ->
             assertEquals(false, session.hasSelection)

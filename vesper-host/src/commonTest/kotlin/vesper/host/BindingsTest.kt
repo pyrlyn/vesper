@@ -6,6 +6,7 @@ import vesper.config.Chord
 import vesper.config.MAC_BINDINGS
 import vesper.config.MAX_FONT_SIZE
 import vesper.config.MIN_FONT_SIZE
+import vesper.config.PC_BINDINGS
 import vesper.config.Rgb
 import vesper.config.Scheme
 import vesper.grid.Color
@@ -56,6 +57,22 @@ class BindingsTest {
         assertEquals(Int.MAX_VALUE, scrollDelta(Action.ScrollToTop, 24))
         assertEquals(-Int.MAX_VALUE, scrollDelta(Action.ScrollToBottom, 24))
         assertNull(scrollDelta(Action.PreviousPrompt, 24))
+    }
+
+    @Test
+    fun eachPlatformsPromptChordsWalkThePromptsBothWays() {
+        val pc = KeyBindings(PC_BINDINGS)
+        val chords =
+            listOf(
+                Triple(bindings, Modifiers.SUPER, "Cmd"),
+                Triple(pc, Modifiers.CTRL + Modifiers.SHIFT, "Ctrl+Shift"),
+            )
+        for ((keys, mods, name) in chords) {
+            assertEquals(false, keys.action(KeyEvent(Key.Up, mods = mods))?.let(::promptDirection), "$name+Up")
+            assertEquals(true, keys.action(KeyEvent(Key.Down, mods = mods + Modifiers.NUM_LOCK))?.let(::promptDirection), "$name+Down")
+            assertNull(keys.action(KeyEvent(Key.Up)), "a plain arrow is the program's")
+        }
+        assertNull(promptDirection(Action.ScrollPageUp))
     }
 
     @Test

@@ -92,6 +92,7 @@ import vesper.host.gridSize
 import vesper.host.isSprite
 import vesper.host.launchEnvironment
 import vesper.host.preeditLines
+import vesper.host.promptDirection
 import vesper.host.red
 import vesper.host.scrollDelta
 import vesper.host.selectionPress
@@ -601,12 +602,16 @@ internal class TerminalView(
             redraw()
             return
         }
-        when (action) {
-            Action.Paste -> paste(null)
-
-            // Prompt jumps wait for the core to keep prompt positions (T33).
-            else -> NSBeep()
+        promptDirection(action)?.let { forward ->
+            if (session?.scrollToPrompt(forward) == true) {
+                refresh()
+                redraw()
+            } else {
+                NSBeep()
+            }
+            return
         }
+        if (action == Action.Paste) paste(null)
     }
 
     private fun mapKey(
