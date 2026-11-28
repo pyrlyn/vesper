@@ -20,6 +20,21 @@ The PTY bindings (POSIX PTY, ConPTY) need no package: `vesper-pty` declares them
 
 Fuzzing needs no package either (T25). No coverage-guided fuzzer runs Kotlin/Native code: kotlinx.fuzz (https://github.com/JetBrains-Research/kotlinx.fuzz) is built on Jazzer and runs only on the JVM, the modules have no JVM target, and Kotlin/Native has no libFuzzer integration. Each fuzz target therefore keeps a seeded corpus in its tests through `vesper.harness.fuzzCases`, on `kotlin.random` and `kotlin.time`. The CI job `fuzz and Unicode (linuxX64)` runs those corpora for 30 s each from a fresh seed (`VESPER_FUZZ_SECONDS`, `VESPER_FUZZ_SEED`), and runs `:vesper-unicode:checkUcd`, which downloads the pinned data files from unicode.org with the JDK's HTTP client and checks their SHA-256s. That job uses only the programs above.
 
+### Advisory audit (T900)
+
+The audit covers the whole resolved Gradle graph: the build-logic and plugin classpaths, every module's configurations, `okio` and `kotlin-native-prebuilt`. To run it:
+
+1. `./gradlew --write-verification-metadata sha256 --dry-run help` writes `gradle/verification-metadata.dryrun.xml` with every artifact the build resolves. The file is ignored by git and is not a verification file.
+2. Each `group:name:version` in it goes to the OSV batch API (https://api.osv.dev/v1/querybatch, ecosystem `Maven`), which carries the GitHub advisories.
+
+On 2026-11-28 the audit covered 113 artifacts:
+
+- **Fixed: `ch.qos.logback:logback-core` 1.3.16.** It has GHSA-qqpg-mvqg-649v, GHSA-p47f-322f-whfh and GHSA-jhq6-gfmj-v8fx, all low, fixed by 1.5.34. It comes from the `ktlint` configuration through `ktlint-cli` 1.8.0 (the latest release). `vesper.kmp` constrains logback on that configuration to the catalog's 1.5.38, which pulls slf4j-api 2.0.17.
+- **Waived: `io.opentelemetry:opentelemetry-api` 1.41.0.** It has GHSA-ccrj-gw8r-854m and GHSA-rcgg-9c38-7xpx, both moderate, fixed by 1.67.0 and 1.62.0. Both concern parsing W3C `tracestate` and baggage headers.
+  - It reaches the graph only through `kotlin-gradle-plugin` 2.4.21 (the latest stable release): `swift-export-embeddable`, on the `swiftExportClasspathResolvable` configuration of the Swift Export worker.
+  - Nothing here runs that worker. It serves `embedSwiftExportForXcode`, which only an Xcode build invokes. A logged run of the gate resolved that configuration in no module.
+  - Recheck the waiver when Kotlin moves on, or if a module ever uses Swift Export.
+
 ## Kotlin/Native platform libraries
 
 | Package | Where | Source | Why here |
@@ -34,6 +49,7 @@ Fuzzing needs no package either (T25). No coverage-guided fuzzer runs Kotlin/Nat
 | org.jlleitschuh.gradle:ktlint-gradle 14.2.0 | local (`gradle/libs.versions.toml`, used by `build-logic`) | https://github.com/JLLeitschuh/ktlint-gradle | Runs ktlint 1.8.0 as part of `check` |
 | org.jetbrains.kotlin:kotlin-test | local (every module's `commonTest`, version from the Kotlin plugin) | https://github.com/JetBrains/kotlin | Test API of the native tests |
 | com.squareup.okio:okio 3.18.2 | local (`vesper-harness`, `vesper-bench`) | https://github.com/square/okio | Multiplatform file access: the harness reads the golden frames and the conformance fixtures in `tests/`, the bench writes `docs/benchmarks/baseline.md`; Kotlin/Native has no `java.io` |
+| ch.qos.logback:logback-classic, logback-core 1.5.38 | local (`gradle/libs.versions.toml`, a constraint on the `ktlint` configuration in `vesper.kmp`) | https://github.com/qos-ch/logback | Not a direct dependency: raises the logback that ktlint-cli 1.8.0 runs on past its advisories (T900) |
 
 ## Linkers
 

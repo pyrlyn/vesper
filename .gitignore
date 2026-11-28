@@ -4,6 +4,8 @@ build/
 */build/
 .kotlin/
 local.properties
+# Written by the advisory audit (toolchain.md); a list of what resolved, not a verification file.
+gradle/verification-metadata.dryrun.xml
 # The wrapper jar is committed so `./gradlew` works from a fresh clone.
 !gradle/wrapper/gradle-wrapper.jar
 
