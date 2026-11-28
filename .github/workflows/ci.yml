@@ -1,5 +1,6 @@
-# Gradle build of the Kotlin/Native core (PLAN.md, section 6) plus the workflow lint. Job names
-# `<os> (<target>)` are the checks to require on main (T29).
+# Gradle build of the Kotlin/Native core (PLAN.md, section 6) plus the workflow lint. The main
+# ruleset requires the three `<os> (<target>)` jobs, `jactionlint` and `fuzz and Unicode (linuxX64)`
+# by name (T29), so renaming a job or a matrix entry needs the ruleset changed with it.
 name: ci
 
 on:
@@ -13,8 +14,10 @@ on:
 permissions:
   contents: read
 
+# A push gets its own group: with one group for main, each newly queued run cancelled the one
+# queued before it, so a burst of merges left commits on main that CI never ran.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -143,6 +146,11 @@ jobs:
       - if: env.RUN == 'true' && env.SKIP_TESTS == 'true'
         name: tests skipped (SKIP_CI_TESTS)
         run: echo "::notice title=SKIP_CI_TESTS::tests skipped by SKIP_CI_TESTS"
+
+      # The no-op job is green, so without a notice nothing in the run says macOS was not built.
+      - if: vars.MACOS_CI_DISABLED == 'true' && startsWith(matrix.os, 'macos')
+        name: macOS skipped (MACOS_CI_DISABLED)
+        run: echo "::notice title=MACOS_CI_DISABLED::macOS build and tests skipped by MACOS_CI_DISABLED"
 
   # T25: the checks kept out of `./gradlew check`, which stays offline and repeatable. checkUcd
   # fails when the committed Unicode tables differ from what the pinned data files produce. The

@@ -161,7 +161,7 @@ Rules between core and host (research.md §7):
 
 ### Phase 10: CI and hardening
 
-- [ ] **T25.** Fuzz smoke and Unicode table freshness in CI.
+- [x] **T25.** Fuzz smoke and Unicode table freshness in CI.
 - [ ] **T29.** Green required checks on `main`.
 - [ ] **T900.** Dependency advisory updates on the Gradle graph.
 
@@ -185,10 +185,14 @@ Rules between core and host (research.md §7):
 
 ## 6. CI
 
-`.github/workflows/ci.yml` runs the `jactionlint` job (also the `hk.pkl` pre-push hook), one
-`<os> (<target>)` job per target that runs `./gradlew check`, and the `fuzz and Unicode
-(linuxX64)` job for the checks kept out of `check` (T25). `pipeline.yml` runs the shared scans
-from `pyrlyn/ci` (configured in `.github/infra.yml`).
+`.github/workflows/ci.yml` runs on every pull request to `main` and every push to it. It has:
+
+- the `jactionlint` job, the same check as the `hk.pkl` pre-push hook;
+- one `<os> (<target>)` job per target, running `./gradlew check`;
+- the `fuzz and Unicode (linuxX64)` job, for the checks kept out of `check` (T25).
+
+SonarCloud runs through its GitHub app. The shared `pyrlyn/ci` scans are off: `pipeline.yml` was
+removed in 1669905, and `.github/infra.yml` stays for when that workflow is restored.
 
 | Runner | Target | What it runs |
 | --- | --- | --- |
@@ -197,9 +201,29 @@ from `pyrlyn/ci` (configured in `.github/infra.yml`).
 | Ubuntu, `fuzz and Unicode (linuxX64)` | `linuxX64` | `:vesper-unicode:checkUcd` against the pinned data files; the fuzz corpora of `vesper-parser`, `vesper-harness` and `vesper-image` for 30 s each |
 | Windows | `mingwX64` | `./gradlew check` (core and Windows host) |
 
-T29 makes the `<os> (<target>)` jobs required. Draft pull requests skip the heavy jobs until
-they are marked ready. `SKIP_CI_TESTS` and `MACOS_CI_DISABLED` remain the only explicit skip
-switches.
+### Required checks on `main`
+
+The `main` ruleset requires these checks from GitHub Actions (T29):
+
+- `macos-14 (macosArm64)`
+- `ubuntu-24.04 (linuxX64)`
+- `windows-2025 (mingwX64)`
+- `jactionlint`
+- `fuzz and Unicode (linuxX64)`
+
+The names are the job names in `ci.yml`. Renaming a job or a matrix entry needs the ruleset changed
+with it, or every pull request waits on a check that never reports.
+
+Each push to `main` runs in its own concurrency group, so every commit there gets a run. A pull
+request cancels its own older run.
+
+What skips, and how it shows:
+
+- **Draft pull requests:** the heavy jobs skip until the pull request is marked ready.
+- **Documentation-only changes:** the `<os> (<target>)` jobs run with every step a no-op, and the
+  fuzz job skips. GitHub counts a job skipped by its `if` as passing.
+- **`SKIP_CI_TESTS` and `MACOS_CI_DISABLED`:** the only explicit switches. Each leaves a notice in
+  the run that it skipped the tests, or the macOS build.
 
 ## 7. Repository history
 
