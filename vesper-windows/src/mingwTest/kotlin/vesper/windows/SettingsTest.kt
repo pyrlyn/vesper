@@ -117,6 +117,19 @@ class SettingsTest {
     }
 
     @Test
+    fun thePromptChordsAreTheAppsAndMoveNothingWithoutMarks() {
+        Gpu.create(warp = true).use { gpu ->
+            App(gpu, quitOnClose = false, configPath = path.toString()).use { app ->
+                val jump = Modifiers.CTRL + Modifiers.SHIFT
+                assertTrue(app.shortcut(KeyEvent(Key.Up, mods = jump)), "Ctrl+Shift+Up")
+                assertTrue(app.shortcut(KeyEvent(Key.Down, mods = jump + Modifiers.NUM_LOCK)), "Ctrl+Shift+Down")
+                assertFalse(app.shortcut(KeyEvent(Key.Up, mods = Modifiers.CTRL)), "Ctrl+Up is the program's")
+                assertFalse(app.shortcut(KeyEvent(Key.Up)))
+            }
+        }
+    }
+
+    @Test
     fun theAppTakesTheFileLiveAndItsBindingsZoom() {
         write("[font]\nsize = 20\n")
         Gpu.create(warp = true).use { gpu ->

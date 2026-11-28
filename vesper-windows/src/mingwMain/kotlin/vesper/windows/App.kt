@@ -35,6 +35,7 @@ import vesper.host.cellAt
 import vesper.host.clipboardText
 import vesper.host.gridSize
 import vesper.host.launchEnvironment
+import vesper.host.promptDirection
 import vesper.host.scrollDelta
 import vesper.host.windowTitle
 import vesper.host.zoomedSize
@@ -289,12 +290,11 @@ class App(
             refresh()
             return
         }
-        when (action) {
-            Action.Paste -> readClipboardText(window.hwnd)?.let { session?.paste(it) }
-
-            // Prompt jumps need the prompt marks T33 keeps.
-            else -> MessageBeep(MB_OK.convert())
+        promptDirection(action)?.let { forward ->
+            if (session?.scrollToPrompt(forward) == true) refresh() else MessageBeep(MB_OK.convert())
+            return
         }
+        if (action == Action.Paste) readClipboardText(window.hwnd)?.let { session?.paste(it) }
     }
 
     /**

@@ -92,6 +92,9 @@ internal class State(
     var images = ScreenImages()
     var hiddenImages = ScreenImages()
 
+    /** The primary screen's prompt lines; they stay with it while the alternate screen is shown. */
+    val prompts = PromptMarks()
+
     /** What images are measured with until the host reports its cell. */
     var cellWidth = DEFAULT_CELL_WIDTH
     var cellHeight = DEFAULT_CELL_HEIGHT

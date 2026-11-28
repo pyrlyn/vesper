@@ -61,3 +61,11 @@ public fun scrollDelta(
 
         else -> null
     }
+
+/** Whether [action] walks to the next shell prompt (true) or the previous one (false); null for an action that is no prompt jump. */
+public fun promptDirection(action: Action): Boolean? =
+    when (action) {
+        Action.PreviousPrompt -> false
+        Action.NextPrompt -> true
+        else -> null
+    }

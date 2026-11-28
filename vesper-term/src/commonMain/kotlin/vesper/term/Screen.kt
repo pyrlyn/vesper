@@ -90,6 +90,7 @@ internal fun State.fullReset() {
     leaveAltScreen(clear = true)
     clearScreen(grid)
     images = ScreenImages()
+    erasePrompts()
     sixel = null
     goto(0, 0)
     pen.set(Style.DEFAULT)

@@ -97,6 +97,7 @@ private fun State.shellMark(payload: ByteArray) {
     if (mark.size != 1) return
     val kind = ShellMarkKind.entries.firstOrNull { it.letter.code == mark[0].toInt() } ?: return
     val exit = if (kind == ShellMarkKind.CommandFinished) fields.getOrNull(1)?.let { utf8(it)?.toIntOrNull() } else null
+    if (kind == ShellMarkKind.PromptStart) markPrompt()
     events.push(Event.ShellMark(kind, exit))
 }
 

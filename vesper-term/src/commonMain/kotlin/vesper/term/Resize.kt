@@ -38,6 +38,7 @@ internal fun State.resize(
             mainCursor,
             saved[MAIN_SLOT],
             if (altActive) hiddenImages else images,
+            prompts,
         )
     val (altAt, altSaved) =
         other.resizeScreen(
@@ -68,7 +69,7 @@ private val SavedCursor.cursor: Cursor get() = Cursor(row, col, pendingWrap)
 
 /**
  * Resizes this screen and moves [cursor] and [saved] (screen positions) with their cells, then clamps both onto the
- * screen. [images]' placements move with their top-left cells; one whose cell is lost goes.
+ * screen. [images]' placements move with their top-left cells, and [prompts] with their lines; one whose cell is lost goes.
  */
 private fun Grid.resizeScreen(
     cols: Int,
@@ -77,13 +78,17 @@ private fun Grid.resizeScreen(
     cursor: Cursor,
     saved: SavedCursor?,
     images: ScreenImages,
+    prompts: PromptMarks? = null,
 ): Pair<Cursor, SavedCursor?> {
     val base = historyLength
     val anchors = images.anchors(this)
-    val points = listOfNotNull(saved?.let { TrackPoint(base + it.row, it.col) }) + anchors.points
+    val marks = prompts?.points(this).orEmpty()
+    val points = listOfNotNull(saved?.let { TrackPoint(base + it.row, it.col) }) + anchors.points + marks
     val tracked = resize(cols, rows, reflow, TrackPoint(base + cursor.row, cursor.col), points)
     val savedPoints = if (saved == null) 0 else 1
-    images.reanchor(this, anchors, tracked.points.subList(savedPoints, tracked.points.size))
+    val markPoints = savedPoints + anchors.points.size
+    images.reanchor(this, anchors, tracked.points.subList(savedPoints, markPoints))
+    prompts?.reanchor(this, tracked.points.subList(markPoints, tracked.points.size))
     images.prune(firstLine)
     val top = historyLength
     val onScreen = { p: TrackPoint -> (p.row - top).coerceIn(0, rows - 1) to p.col.coerceAtMost(cols - 1) }
