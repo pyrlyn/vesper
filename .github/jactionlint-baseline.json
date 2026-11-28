@@ -1,13 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {
-      "file": ".github/workflows/pipeline.yml",
-      "rule": "unpinned-uses",
-      "fingerprint": "10b726717e2a34a0",
-      "context": "abe5e0308a3cc54a",
-      "occurrence": 0,
-      "message": "reusable workflow call \"pyrlyn/ci/.github/workflows/ci.yml@main\" must be pinned to a full-length commit SHA like \"owner/repo/path/to/workflow.yml@{sha}\" because the \"unpinned-uses\" rule is enabled"
-    }
-  ]
+  "entries": []
 }
