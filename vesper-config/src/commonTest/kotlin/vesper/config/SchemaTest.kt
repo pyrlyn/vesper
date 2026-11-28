@@ -84,6 +84,13 @@ private val actionDescriptions =
         Action.ScrollToBottom to "Scroll back to the screen.",
         Action.PreviousPrompt to "Scroll to the previous shell prompt (OSC 133 `A`).",
         Action.NextPrompt to "Scroll to the next shell prompt.",
+        Action.NewTab to "Open a tab with a new shell.",
+        Action.NewWindow to "Open a window with a new shell.",
+        Action.SplitRight to "Split the focused pane; the new shell goes to its right.",
+        Action.SplitDown to "Split the focused pane; the new shell goes below it.",
+        Action.ClosePane to "Close the focused pane and end its shell.",
+        Action.NextPane to "Focus the next pane.",
+        Action.PreviousPane to "Focus the previous pane.",
     )
 
 private fun <E : Enum<E>> oneOf(

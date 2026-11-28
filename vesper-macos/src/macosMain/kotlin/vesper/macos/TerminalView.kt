@@ -611,7 +611,12 @@ internal class TerminalView(
             }
             return
         }
-        if (action == Action.Paste) paste(null)
+        when (action) {
+            Action.Paste -> paste(null)
+
+            // Tabs, windows and panes wait for T21's macOS slice.
+            else -> NSBeep()
+        }
     }
 
     private fun mapKey(

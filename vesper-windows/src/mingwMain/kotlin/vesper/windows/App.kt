@@ -294,7 +294,12 @@ class App(
             if (session?.scrollToPrompt(forward) == true) refresh() else MessageBeep(MB_OK.convert())
             return
         }
-        if (action == Action.Paste) readClipboardText(window.hwnd)?.let { session?.paste(it) }
+        when (action) {
+            Action.Paste -> readClipboardText(window.hwnd)?.let { session?.paste(it) }
+
+            // Tabs, windows and panes wait for T21's Windows slices.
+            else -> MessageBeep(MB_OK.convert())
+        }
     }
 
     /**
