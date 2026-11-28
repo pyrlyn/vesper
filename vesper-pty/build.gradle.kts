@@ -6,10 +6,9 @@ plugins {
 }
 
 kotlin {
-    // sys: locks and threads everywhere; posix or conpty: the pseudo-terminal of the target.
+    // posix or conpty: the pseudo-terminal of the target; locks and threads come from vesper-sync.
     targets.withType<KotlinNativeTarget>().configureEach {
         compilations.getByName("main").cinterops {
-            create("sys")
             create(if (konanTarget.family == Family.MINGW) "conpty" else "posix")
         }
     }
@@ -22,6 +21,8 @@ kotlin {
         val posixTest by creating { dependsOn(nativeTest.get()) }
         macosTest.get().dependsOn(posixTest)
         linuxTest.get().dependsOn(posixTest)
+
+        nativeMain.dependencies { implementation(projects.vesperSync) }
 
         all { languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi") }
     }

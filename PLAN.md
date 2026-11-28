@@ -53,13 +53,14 @@ Not in scope until they move from [`ideas.md`](ideas.md) to [`roadmap.md`](roadm
               └────────── direct Kotlin calls ───────┘
                                │
    vesper-session  a terminal and its PTY child under one lock; wakeups, replies, resize
-   vesper-config   the config file: parse and validate (ktoml), defaults, schemes
+   vesper-config   the config file: parse and validate (ktoml), key bindings, edits, live reload
    vesper-term     session: screens, modes, cursor, selection, search, frame
    vesper-input    key, mouse, paste, focus encoders
    vesper-grid     cells, rows, ring, reflow, damage, links
    vesper-unicode  generated width and grapheme tables
    vesper-parser   bulk scanner + sequence machine → typed actions
    vesper-pty      PTY, reader thread, back-pressure
+   vesper-sync     system locks, condition variables and threads
    vesper-image    images and placements under a byte quota; iTerm2, sixel and kitty decoders
    vesper-png      header-first PNG decode under a caller-set allocation cap
 ```

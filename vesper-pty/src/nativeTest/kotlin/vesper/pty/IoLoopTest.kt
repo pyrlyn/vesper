@@ -1,6 +1,7 @@
 package vesper.pty
 
 import vesper.pty.PtyLimits.MAX_LOCKED_BYTES
+import vesper.sync.Monitor
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

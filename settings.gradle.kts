@@ -23,6 +23,8 @@ include(
     ":vesper-parser",
     ":vesper-grid",
     ":vesper-input",
+    // Locks and threads for the modules that run their own (T20).
+    ":vesper-sync",
     ":vesper-pty",
     ":vesper-term",
     // PNG decode with a caller-set allocation cap, for the image protocols (T19).

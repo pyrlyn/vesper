@@ -26,6 +26,7 @@ import vesper.pty.conpty.vesper_conpty_resize
 import vesper.pty.conpty.vesper_conpty_spawn
 import vesper.pty.conpty.vesper_conpty_wait
 import vesper.pty.conpty.vesper_conpty_write_all
+import vesper.sync.Monitor
 
 private const val STAGE_OPEN = 1
 

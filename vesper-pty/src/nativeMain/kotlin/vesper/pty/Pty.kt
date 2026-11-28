@@ -1,5 +1,9 @@
 package vesper.pty
 
+import vesper.sync.Monitor
+import vesper.sync.ThreadStartException
+import vesper.sync.startThread
+
 /**
  * One child on one pseudo-terminal (ConPTY on Windows), with the four threads that serve it:
  *
@@ -33,7 +37,11 @@ public class Pty private constructor(
         name: String,
         body: () -> Unit,
     ) {
-        startThread(name) { shared.runWorker(worker, body) }
+        try {
+            startThread(name) { shared.runWorker(worker, body) }
+        } catch (e: ThreadStartException) {
+            throw PtyException.Thread(e.name, e.code)
+        }
         started = started or worker.bit
     }
 

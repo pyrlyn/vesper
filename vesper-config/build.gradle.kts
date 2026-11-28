@@ -15,6 +15,10 @@ kotlin {
             // Chords are vesper-input's keys and modifiers, which hosts already build from key events.
             api(projects.vesperInput)
         }
+        nativeMain.dependencies {
+            // LiveConfig's watcher thread and its monotonic timed waits.
+            implementation(projects.vesperSync)
+        }
         commonTest.dependencies {
             // Finds docs/config.schema.json beside the tests directory.
             implementation(projects.vesperHarness)
