@@ -1,5 +1,7 @@
 package vesper.host
 
+import vesper.config.Scheme
+import vesper.config.Theme
 import vesper.grid.Attrs
 import vesper.grid.Color
 import vesper.grid.Style
@@ -8,30 +10,16 @@ import vesper.term.FrameCell
 private const val CHANNEL = 0xFF
 private const val RED_SHIFT = 16
 private const val GREEN_SHIFT = 8
+private const val SYSTEM_COLORS = 16
 private const val GREY_RAMP = 24
 private const val GREY_FIRST = 8
 private const val GREY_STEP = 10
+private const val HALF_LUMINANCE = 127.5
 
-// xterm's 16 system colours.
-private val ANSI =
-    intArrayOf(
-        0x000000,
-        0xCD0000,
-        0x00CD00,
-        0xCDCD00,
-        0x0000EE,
-        0xCD00CD,
-        0x00CDCD,
-        0xE5E5E5,
-        0x7F7F7F,
-        0xFF0000,
-        0x00FF00,
-        0xFFFF00,
-        0x5C5CFF,
-        0xFF00FF,
-        0x00FFFF,
-        0xFFFFFF,
-    )
+// Rec. 601 weights: enough to tell a light ground from a dark one.
+private const val RED_WEIGHT = 0.299
+private const val GREEN_WEIGHT = 0.587
+private const val BLUE_WEIGHT = 0.114
 
 // xterm's cube levels (256colres.pl), which most terminals copy, so indexed colours match what
 // programs were tuned against.
@@ -43,20 +31,24 @@ public data class CellColors(
     public val bg: Int,
 )
 
-/** Colours as the core names them (default, palette index or RGB) resolved to sRGB, xterm's palette until themes arrive (T20). */
+/** Colours as the core names them (default, palette index or RGB) resolved to sRGB, from a [Theme]. */
 public class Palette(
-    public val foreground: Int = 0xE5E5E5,
-    public val background: Int = 0x141414,
-    public val cursor: Int = 0xE5E5E5,
-    // Dark enough that the default foreground stays readable on each.
-    public val selection: Int = 0x264F78,
-    public val match: Int = 0x5A4A14,
-    public val currentMatch: Int = 0x9A6700,
+    theme: Theme = Scheme.VesperDark.theme,
 ) {
+    public val foreground: Int = theme.foreground.value
+    public val background: Int = theme.background.value
+    public val cursor: Int = theme.cursor.value
+
+    // Each pair dark or light enough that the theme's own foreground stays readable on it.
+    private val light = luminance(background) > HALF_LUMINANCE
+    public val selection: Int = if (light) 0xB4D5FE else 0x264F78
+    public val match: Int = if (light) 0xFFF1A8 else 0x5A4A14
+    public val currentMatch: Int = if (light) 0xFFC24D else 0x9A6700
+
     private val indexed =
         IntArray(256).also { table ->
-            ANSI.copyInto(table)
-            var at = ANSI.size
+            theme.ansi.take(SYSTEM_COLORS).forEachIndexed { i, color -> table[i] = color.value }
+            var at = SYSTEM_COLORS
             for (r in CUBE_LEVELS) for (g in CUBE_LEVELS) for (b in CUBE_LEVELS) table[at++] = rgb(r, g, b)
             for (i in 0 until GREY_RAMP) {
                 val level = GREY_FIRST + GREY_STEP * i
@@ -118,3 +110,5 @@ public fun blend(
     a: Int,
     b: Int,
 ): Int = rgb((red(a) + red(b)) / 2, (green(a) + green(b)) / 2, (blue(a) + blue(b)) / 2)
+
+private fun luminance(color: Int): Double = RED_WEIGHT * red(color) + GREEN_WEIGHT * green(color) + BLUE_WEIGHT * blue(color)

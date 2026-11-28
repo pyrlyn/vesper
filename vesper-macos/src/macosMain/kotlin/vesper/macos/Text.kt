@@ -22,8 +22,10 @@ import platform.CoreFoundation.kCFTypeDictionaryValueCallBacks
 import platform.CoreGraphics.CGContextRef
 import platform.CoreGraphics.CGContextSetTextPosition
 import platform.CoreGraphics.CGGlyphVar
+import platform.CoreText.CTFontCopyFamilyName
 import platform.CoreText.CTFontCreateCopyWithSymbolicTraits
 import platform.CoreText.CTFontCreateUIFontForLanguage
+import platform.CoreText.CTFontCreateWithName
 import platform.CoreText.CTFontGetAdvancesForGlyphs
 import platform.CoreText.CTFontGetAscent
 import platform.CoreText.CTFontGetDescent
@@ -39,7 +41,10 @@ import platform.CoreText.kCTFontTraitItalic
 import platform.CoreText.kCTFontUIFontUserFixedPitch
 import platform.CoreText.kCTForegroundColorFromContextAttributeName
 import platform.CoreText.kCTKernAttributeName
+import platform.Foundation.CFBridgingRelease
 import platform.darwin.UniCharVar
+import vesper.config.Font
+import vesper.config.Settings
 import vesper.host.CellSize
 import vesper.host.FACES
 import vesper.host.face
@@ -47,18 +52,18 @@ import vesper.host.isBoldFace
 import vesper.host.isItalicFace
 import kotlin.math.ceil
 
-/** Points; T20 makes it a setting. */
-private const val FONT_SIZE = 13.0
-
 // What a fixed-pitch face's advance is, as a share of its size, should it report none.
 private const val FALLBACK_ADVANCE = 0.6
 
 /**
- * The user's fixed-pitch font and its bold and italic faces, and one line of text drawn with
- * CoreText. Text takes its colour from the context's fill colour, so one attribute set per face
- * serves every colour. CoreText falls back to other fonts for characters this one lacks.
+ * The configured [font] (the user's fixed-pitch font for an empty family or one this Mac lacks) and
+ * its bold and italic faces, and one line of text drawn with CoreText. Text takes its colour from the
+ * context's fill colour, so one attribute set per face serves every colour. CoreText falls back to
+ * other fonts for characters this one lacks.
  */
-internal class TextStyle {
+internal class TextStyle(
+    val font: Font = Settings.DEFAULT.font,
+) {
     /** Regular, bold, italic and bold italic, indexed by [face]. */
     val faces: List<CTFontRef?>
     private val attributes: List<CFDictionaryRef?>
@@ -70,7 +75,7 @@ internal class TextStyle {
     val ascent: Double
 
     init {
-        val regular = CTFontCreateUIFontForLanguage(kCTFontUIFontUserFixedPitch, FONT_SIZE, null)
+        val regular = named(font) ?: CTFontCreateUIFontForLanguage(kCTFontUIFontUserFixedPitch, font.size, null)
         // A face the font lacks comes back null; the regular face stands in for it.
         faces =
             (0 until FACES).map { traits ->
@@ -129,8 +134,20 @@ internal class TextStyle {
             val glyph = alloc<CGGlyphVar>()
             CTFontGetGlyphsForCharacters(font, chars, glyph.ptr, 1)
             CTFontGetAdvancesForGlyphs(font, kCTFontOrientationHorizontal, glyph.ptr, null, 1).takeIf { it > 0 }
-                ?: FONT_SIZE * FALLBACK_ADVANCE
+                ?: this@TextStyle.font.size * FALLBACK_ADVANCE
         }
+}
+
+// CoreText answers a name it does not know with some other font, so the family it gave is checked.
+private fun named(font: Font): CTFontRef? {
+    if (font.family.isEmpty()) return null
+    val name = CFStringCreateWithCString(null, font.family, kCFStringEncodingUTF8) ?: return null
+    val made = CTFontCreateWithName(name, font.size, null)
+    CFRelease(name)
+    val family = CFBridgingRelease(CTFontCopyFamilyName(made)) as? String
+    if (family.equals(font.family, ignoreCase = true)) return made
+    CFRelease(made)
+    return null
 }
 
 /** The text of one code point, for a cell drawn on its own. */

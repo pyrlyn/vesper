@@ -1,9 +1,13 @@
 package vesper.macos
 
+import kotlinx.cinterop.BetaInteropApi
+import kotlinx.cinterop.ObjCAction
+import kotlinx.cinterop.toKString
 import platform.AppKit.NSApplication
 import platform.AppKit.NSApplicationActivationPolicy
 import platform.AppKit.NSApplicationDelegateProtocol
 import platform.AppKit.NSBackingStoreBuffered
+import platform.AppKit.NSBeep
 import platform.AppKit.NSFloatingWindowLevel
 import platform.AppKit.NSMenu
 import platform.AppKit.NSMenuItem
@@ -22,8 +26,14 @@ import platform.Foundation.NSSelectorFromString
 import platform.Foundation.beginActivityWithOptions
 import platform.darwin.NSObject
 import platform.darwin.NSObjectProtocol
+import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_main_queue
 import platform.posix.fflush
+import platform.posix.getenv
 import platform.posix.stdout
+import vesper.config.LiveConfig
+import vesper.config.Settings
+import vesper.config.defaultConfigPath
 import vesper.host.Cells
 import vesper.host.viewSize
 
@@ -38,8 +48,18 @@ private class AppDelegate(
     NSApplicationDelegateProtocol {
     private var view: TerminalView? = null
 
+    // Null when the environment names no home for the file: the defaults then, and no settings to save.
+    private var live: LiveConfig? = null
+    private var settingsWindow: SettingsWindow? = null
+
     override fun applicationDidFinishLaunching(notification: NSNotification) {
-        val text = TextStyle()
+        val config =
+            defaultConfigPath(windows = false) { getenv(it)?.toKString() }?.let { path ->
+                LiveConfig(path) { dispatch_async(dispatch_get_main_queue()) { configChanged() } }
+            }
+        live = config
+        val settings = config?.snapshot()?.settings ?: Settings.DEFAULT
+        val text = TextStyle(settings.font)
         val (width, height) = viewSize(DEFAULT_GRID, text.cell)
         val window =
             NSWindow(
@@ -53,6 +73,8 @@ private class AppDelegate(
         window.releasedWhenClosed = false
         window.contentResizeIncrements = NSMakeSize(text.cell.width, text.cell.height)
         val terminal = TerminalView(text, NSMakeRect(0.0, 0.0, width, height))
+        terminal.apply(settings)
+        terminal.onCellSize = { window.contentResizeIncrements = NSMakeSize(it.width, it.height) }
         terminal.onTitle = { window.title = it }
         terminal.onDirectory = { window.representedURL = it }
         terminal.onExit = { window.close() }
@@ -64,6 +86,19 @@ private class AppDelegate(
         if (probe) startProbe(terminal)
         view = terminal
         NSApplication.sharedApplication.activate()
+    }
+
+    private fun configChanged() {
+        val snapshot = live?.snapshot() ?: return
+        view?.apply(snapshot.settings)
+        settingsWindow?.show(snapshot)
+    }
+
+    @OptIn(BetaInteropApi::class)
+    @ObjCAction
+    fun showSettings(sender: NSObject?) {
+        val config = live ?: return NSBeep()
+        (settingsWindow ?: SettingsWindow(config).also { settingsWindow = it }).present()
     }
 
     private var activity: NSObjectProtocol? = null
@@ -86,12 +121,15 @@ private class AppDelegate(
 
     override fun applicationWillTerminate(notification: NSNotification) {
         view?.stop()
+        live?.close()
     }
 }
 
 private fun mainMenu(): NSMenu {
     val menu = NSMenu()
     val app = NSMenu()
+    app.addItemWithTitle("Settings…", NSSelectorFromString("showSettings:"), ",")
+    app.addItem(NSMenuItem.separatorItem())
     app.addItemWithTitle("Quit vesper", NSSelectorFromString("terminate:"), "q")
     menu.addItem(NSMenuItem().also { it.submenu = app })
     val edit = NSMenu(title = "Edit")

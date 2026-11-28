@@ -64,14 +64,19 @@ import platform.darwin.NSObject
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
 import platform.posix.getenv
+import vesper.config.Action
+import vesper.config.Font
+import vesper.config.Settings
 import vesper.grid.Attrs
 import vesper.grid.Style
 import vesper.grid.Underline
 import vesper.host.Bitmap
 import vesper.host.CellMetrics
+import vesper.host.CellSize
 import vesper.host.Cells
 import vesper.host.FindEffect
 import vesper.host.FindState
+import vesper.host.KeyBindings
 import vesper.host.PADDING
 import vesper.host.Palette
 import vesper.host.RowSources
@@ -88,9 +93,12 @@ import vesper.host.isSprite
 import vesper.host.launchEnvironment
 import vesper.host.preeditLines
 import vesper.host.red
+import vesper.host.scrollDelta
 import vesper.host.selectionPress
 import vesper.host.windowTitle
+import vesper.host.zoomedSize
 import vesper.input.KeyAction
+import vesper.input.KeyEvent
 import vesper.input.MouseAction
 import vesper.input.MouseButton
 import vesper.input.MouseEvent
@@ -117,12 +125,14 @@ private const val FIND_BAR_MARGIN = 6.0
  * only posts [refresh] to the main queue.
  */
 internal class TerminalView(
-    private val text: TextStyle,
+    text: TextStyle,
     frame: CValue<CGRect>,
 ) : NSView(frame),
     NSTextInputClientProtocol,
     NSMenuItemValidationProtocol {
-    private val palette = Palette()
+    internal var text = text
+        private set
+    private var palette = Palette()
     private val screen = Frame()
     private var session: Session? = null
     private var grid = Cells(0, 0)
@@ -191,6 +201,43 @@ internal class TerminalView(
     fun snapshot(scale: Double): Bitmap? =
         renderer?.let { metal -> bounds.useContents { metal.render(screen, sources, size.width, size.height, scale, focused) } }
 
+    // What the config decides; [apply] changes them while the terminal runs.
+    private var bindings = KeyBindings()
+    private var configuredFont = text.font
+    private var scrollback = Settings.DEFAULT.scrollback
+    private var applied: Settings? = null
+
+    /** Takes [settings] at once: colours, font and bindings now, scrollback for the next terminal started. */
+    fun apply(settings: Settings) {
+        // A fresh error leaves the settings as they were, and rebuilding the glyphs for nothing shows.
+        if (settings == applied) return
+        applied = settings
+        bindings = KeyBindings(settings.bindings)
+        scrollback = settings.scrollback
+        val font = if (settings.font != configuredFont) settings.font else text.font
+        configuredFont = settings.font
+        restyle(if (font != text.font) TextStyle(font) else text, Palette(settings.colors))
+    }
+
+    private fun restyle(
+        next: TextStyle,
+        colors: Palette,
+    ) {
+        val cellChanged = next.cell != text.cell
+        text = next
+        palette = colors
+        renderer?.restyle(next, colors)
+        // Masks are cut to the cell, and a CoreText draw paints the whole view anyway.
+        spriteMasks?.close()
+        spriteMasks = null
+        if (cellChanged) onCellSize(next.cell)
+        applySize()
+        redraw()
+    }
+
+    /** Called when the font gives the cells another size; the window then steps its resizing by it. */
+    var onCellSize: (CellSize) -> Unit = {}
+
     /** The window's title and directory follow the program; the app closes the window when the child exits. */
     var onTitle: (String) -> Unit = {}
     var onDirectory: (NSURL) -> Unit = {}
@@ -218,7 +265,7 @@ internal class TerminalView(
         val home = NSHomeDirectory()
         val environment = launchEnvironment { name -> getenv(name)?.toKString() }
         val options = SpawnOptions(program = program, cwd = home, env = environment, size = PtySize(grid.rows, grid.cols))
-        val started = Session.spawn(options) { dispatch_async(dispatch_get_main_queue()) { refresh() } }
+        val started = Session.spawn(options, scrollback) { dispatch_async(dispatch_get_main_queue()) { refresh() } }
         session = started
         started.resize(grid.cols, grid.rows, (text.cell.width * scale).toInt(), (text.cell.height * scale).toInt())
         addTrackingArea(NSTrackingArea(bounds, NSTrackingMouseMoved or NSTrackingActiveInKeyWindow or NSTrackingInVisibleRect, this, null))
@@ -323,6 +370,9 @@ internal class TerminalView(
     private val composedKeys = HashSet<UShort>()
 
     override fun keyDown(event: NSEvent) {
+        // A press means the key was let go since; a release AppKit never sent must not swallow the next.
+        composedKeys.remove(event.keyCode)
+        if (runBinding(event)) return
         input.beginKey()
         interpretKeyEvents(listOf(event))
         when (val outcome = input.endKey()) {
@@ -526,20 +576,57 @@ internal class TerminalView(
         return viewportText.rangeAt(at.rows, at.cols).toNSRange()
     }
 
+    // Command chords come here before the menu sees them, so a binding wins over a menu's shortcut.
+    override fun performKeyEquivalent(event: NSEvent): Boolean =
+        (window?.firstResponder == this && runBinding(event)) || super.performKeyEquivalent(event)
+
+    /** Runs the binding of [event], if it has one and nothing is being composed; whether it did. */
+    private fun runBinding(event: NSEvent): Boolean {
+        if (input.hasMarkedText) return false
+        val action = mapKey(event, KeyAction.Press)?.let(bindings::action) ?: return false
+        // Its release is not the program's either.
+        composedKeys += event.keyCode
+        perform(action)
+        return true
+    }
+
+    private fun perform(action: Action) {
+        zoomedSize(action, text.font.size, configuredFont.size)?.let { size ->
+            if (size != text.font.size) restyle(TextStyle(Font(configuredFont.family, size)), palette)
+            return
+        }
+        scrollDelta(action, grid.rows)?.let { delta ->
+            session?.scrollDisplay(delta)
+            refresh()
+            redraw()
+            return
+        }
+        when (action) {
+            Action.Paste -> paste(null)
+
+            // Prompt jumps wait for the core to keep prompt positions (T33).
+            else -> NSBeep()
+        }
+    }
+
+    private fun mapKey(
+        event: NSEvent,
+        action: KeyAction,
+    ): KeyEvent? =
+        macKeyEvent(
+            event.keyCode.toInt(),
+            event.modifierFlags.toLong(),
+            event.characters,
+            event.charactersIgnoringModifiers,
+            event.charactersByApplyingModifiers(0u),
+            action,
+        )
+
     private fun key(
         event: NSEvent,
         action: KeyAction,
     ) {
-        val unmodified = event.charactersByApplyingModifiers(0u)
-        val mapped =
-            macKeyEvent(
-                event.keyCode.toInt(),
-                event.modifierFlags.toLong(),
-                event.characters,
-                event.charactersIgnoringModifiers,
-                unmodified,
-                action,
-            )
+        val mapped = mapKey(event, action)
         val current = session ?: return
         if (mapped != null) {
             current.key(mapped)
