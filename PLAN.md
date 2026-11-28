@@ -53,6 +53,7 @@ Not in scope until they move from [`ideas.md`](ideas.md) to [`roadmap.md`](roadm
               └────────── direct Kotlin calls ───────┘
                                │
    vesper-session  a terminal and its PTY child under one lock; wakeups, replies, resize
+   vesper-config   the config file: parse and validate (ktoml), defaults, schemes
    vesper-term     session: screens, modes, cursor, selection, search, frame
    vesper-input    key, mouse, paste, focus encoders
    vesper-grid     cells, rows, ring, reflow, damage, links

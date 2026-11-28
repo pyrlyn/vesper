@@ -4,6 +4,8 @@ kotlin = "2.4.21"
 ktlint-gradle = "14.2.0"
 ktlint = "1.8.0"
 okio = "3.18.2"
+ktoml = "0.7.1"
+kotlinx-serialization = "1.13.0"
 # Not a direct dependency: ktlint's logback, raised past its advisories (vesper.kmp, T900).
 logback = "1.5.38"
 
@@ -12,8 +14,11 @@ logback = "1.5.38"
 # by id without a version.
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 ktlint-gradle-plugin = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint-gradle" }
+kotlin-serialization-plugin = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
 
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
+ktoml-core = { module = "com.akuleshov7:ktoml-core", version.ref = "ktoml" }
+kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 logback-core = { module = "ch.qos.logback:logback-core", version.ref = "logback" }
