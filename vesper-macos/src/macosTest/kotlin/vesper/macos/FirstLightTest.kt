@@ -4,11 +4,8 @@ import kotlinx.cinterop.toKString
 import kotlinx.cinterop.useContents
 import platform.AppKit.NSApplication
 import platform.AppKit.NSBitmapImageFileType
-import platform.AppKit.NSEvent
-import platform.AppKit.NSEventTypeKeyDown
 import platform.AppKit.representationUsingType
 import platform.Foundation.NSDate
-import platform.Foundation.NSMakePoint
 import platform.Foundation.NSMakeRect
 import platform.Foundation.NSRunLoop
 import platform.Foundation.dateWithTimeIntervalSinceNow
@@ -56,8 +53,8 @@ class FirstLightTest {
         // sh rather than the login shell: a fresh CI account's zsh may stop at its setup wizard.
         view.start(2.0, program = "/bin/sh")
         try {
-            for (char in "echo vesper; ls /") key(view, KEY_CODES.getValue(char), char.toString())
-            key(view, RETURN, "\r")
+            for (char in "echo vesper; ls /") view.keyDown(keyEvent(KEY_CODES.getValue(char).toUShort(), char.toString()))
+            view.keyDown(keyEvent(RETURN.toUShort(), "\r"))
             val end = TimeSource.Monotonic.markNow() + 10.seconds
             while (view.screenText.lines().none { it == "vesper" }) {
                 if (end.hasPassedNow()) fail("no output; the screen shows:\n${view.screenText}")
@@ -68,27 +65,6 @@ class FirstLightTest {
         } finally {
             view.stop()
         }
-    }
-
-    private fun key(
-        view: TerminalView,
-        keyCode: Int,
-        characters: String,
-    ) {
-        val event =
-            NSEvent.keyEventWithType(
-                NSEventTypeKeyDown,
-                NSMakePoint(0.0, 0.0),
-                0u,
-                0.0,
-                0,
-                null,
-                characters,
-                characters,
-                false,
-                keyCode.toUShort(),
-            ) ?: fail("no key event for $characters")
-        view.keyDown(event)
     }
 
     private fun savePng(view: TerminalView) {
