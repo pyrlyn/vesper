@@ -298,9 +298,10 @@ class LiveConfigTest {
     @Test
     fun keybindsSurviveALiveReload() {
         val live = open()
-        write(live.file, "[[keybind]]\nkey = \"super+v\"\naction = \"none\"\n")
+        // Paste comes first in both platforms' defaults.
+        write(live.file, "[[keybind]]\nkey = \"${DEFAULT_BINDINGS.first().chord}\"\naction = \"none\"\n")
         val snapshot = live.waitFor("the unbound paste") { it.settings.bindings.size == DEFAULT_BINDINGS.size - 1 }
-        assertTrue(snapshot.settings.bindings.none { it.action == Action.Paste })
+        assertTrue(snapshot.settings.bindings.none { it.chord == DEFAULT_BINDINGS.first().chord })
     }
 
     @Test

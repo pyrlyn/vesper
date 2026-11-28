@@ -76,15 +76,21 @@ public data class Binding(
     val action: Action,
 )
 
-/** What a file with no `[[keybind]]` runs with. */
-public val DEFAULT_BINDINGS: List<Binding> =
+private fun bind(
+    c: Char,
+    mods: Modifiers,
+    action: Action,
+) = Binding(Chord(Key.Character(c.code), mods), action)
+
+/** The macOS defaults: shortcuts on Command, as every Mac app has them. */
+public val MAC_BINDINGS: List<Binding> =
     listOf(
-        Binding(Chord(Key.Character('v'.code), Modifiers.SUPER), Action.Paste),
-        Binding(Chord(Key.Character('='.code), Modifiers.SUPER), Action.FontLarger),
+        bind('v', Modifiers.SUPER, Action.Paste),
+        bind('=', Modifiers.SUPER, Action.FontLarger),
         // `+` is Shift and `=` on a US layout, and people press it to grow text.
-        Binding(Chord(Key.Character('='.code), Modifiers.SUPER + Modifiers.SHIFT), Action.FontLarger),
-        Binding(Chord(Key.Character('-'.code), Modifiers.SUPER), Action.FontSmaller),
-        Binding(Chord(Key.Character('0'.code), Modifiers.SUPER), Action.FontReset),
+        bind('=', Modifiers.SUPER + Modifiers.SHIFT, Action.FontLarger),
+        bind('-', Modifiers.SUPER, Action.FontSmaller),
+        bind('0', Modifiers.SUPER, Action.FontReset),
         Binding(Chord(Key.PageUp, Modifiers.SHIFT), Action.ScrollPageUp),
         Binding(Chord(Key.PageDown, Modifiers.SHIFT), Action.ScrollPageDown),
         Binding(Chord(Key.Home, Modifiers.SUPER), Action.ScrollToTop),
@@ -92,6 +98,35 @@ public val DEFAULT_BINDINGS: List<Binding> =
         Binding(Chord(Key.Up, Modifiers.SUPER), Action.PreviousPrompt),
         Binding(Chord(Key.Down, Modifiers.SUPER), Action.NextPrompt),
     )
+
+/**
+ * The Windows and Linux defaults. The Windows key belongs to the system there (Win+V is clipboard
+ * history), and Ctrl alone is the program's, so shortcuts that would clash take Ctrl+Shift, as
+ * Windows Terminal does.
+ */
+public val PC_BINDINGS: List<Binding> =
+    listOf(
+        bind('v', Modifiers.CTRL + Modifiers.SHIFT, Action.Paste),
+        Binding(Chord(Key.Insert, Modifiers.SHIFT), Action.Paste),
+        // Zoom keeps Ctrl alone, as Windows Terminal and browsers have it; a file can hand Ctrl+- (^_,
+        // readline's undo) back to the program with `none`.
+        bind('=', Modifiers.CTRL, Action.FontLarger),
+        bind('=', Modifiers.CTRL + Modifiers.SHIFT, Action.FontLarger),
+        bind('-', Modifiers.CTRL, Action.FontSmaller),
+        bind('0', Modifiers.CTRL, Action.FontReset),
+        Binding(Chord(Key.PageUp, Modifiers.SHIFT), Action.ScrollPageUp),
+        Binding(Chord(Key.PageDown, Modifiers.SHIFT), Action.ScrollPageDown),
+        Binding(Chord(Key.Home, Modifiers.CTRL + Modifiers.SHIFT), Action.ScrollToTop),
+        Binding(Chord(Key.End, Modifiers.CTRL + Modifiers.SHIFT), Action.ScrollToBottom),
+        Binding(Chord(Key.Up, Modifiers.CTRL + Modifiers.SHIFT), Action.PreviousPrompt),
+        Binding(Chord(Key.Down, Modifiers.CTRL + Modifiers.SHIFT), Action.NextPrompt),
+    )
+
+/** Whether this build runs on macOS, which picks [DEFAULT_BINDINGS]. */
+internal expect val isMacOs: Boolean
+
+/** What a file with no `[[keybind]]` runs with on this platform. */
+public val DEFAULT_BINDINGS: List<Binding> = if (isMacOs) MAC_BINDINGS else PC_BINDINGS
 
 internal val KEY_NAMES: List<Pair<String, Key>> =
     listOf(
@@ -157,9 +192,12 @@ internal fun parseChord(text: String): Chord {
     return Chord(key, mods)
 }
 
-/** The defaults with [entries] laid over them in order: the same chord replaces a default, `none` removes it. */
-internal fun resolveBindings(entries: List<Binding>): List<Binding> {
-    val bindings = DEFAULT_BINDINGS.toMutableList()
+/** [defaults] with [entries] laid over them in order: the same chord replaces a default, `none` removes it. */
+internal fun resolveBindings(
+    entries: List<Binding>,
+    defaults: List<Binding> = DEFAULT_BINDINGS,
+): List<Binding> {
+    val bindings = defaults.toMutableList()
     for (entry in entries) {
         bindings.removeAll { it.chord == entry.chord }
         if (entry.action != Action.None) bindings += entry

@@ -5,9 +5,13 @@ import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.toLong
 import platform.posix.getenv
+import platform.windows.AppendMenuW
+import platform.windows.GetSystemMenu
 import platform.windows.HWND__
 import platform.windows.InvalidateRect
 import platform.windows.MB_OK
+import platform.windows.MF_SEPARATOR
+import platform.windows.MF_STRING
 import platform.windows.MessageBeep
 import platform.windows.PostMessageW
 import platform.windows.PostQuitMessage
@@ -16,7 +20,14 @@ import platform.windows.WM_APP
 import platform.windows.WM_ENTERSIZEMOVE
 import platform.windows.WM_EXITSIZEMOVE
 import platform.windows.WM_SIZING
+import platform.windows.WM_SYSCOMMAND
+import vesper.config.Action
+import vesper.config.Font
+import vesper.config.LiveConfig
+import vesper.config.Settings
+import vesper.config.defaultConfigPath
 import vesper.host.Cells
+import vesper.host.KeyBindings
 import vesper.host.PADDING
 import vesper.host.Palette
 import vesper.host.RowSources
@@ -24,37 +35,77 @@ import vesper.host.cellAt
 import vesper.host.clipboardText
 import vesper.host.gridSize
 import vesper.host.launchEnvironment
+import vesper.host.scrollDelta
 import vesper.host.windowTitle
+import vesper.host.zoomedSize
+import vesper.input.KeyEvent
 import vesper.pty.PtySize
 import vesper.pty.SpawnOptions
 import vesper.session.Session
 import vesper.term.Event
 import vesper.term.Frame
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /** Posted from the PTY's thread when the session has output or events to look at. */
 private const val WM_WAKE = WM_APP
 
+/** Posted from the config watcher's thread when the file's settings or its error changed. */
+private const val WM_CONFIG = WM_APP + 1
+
+/** The system menu's Settings item; WM_SYSCOMMAND keeps the low four bits of an id for itself. */
+private const val SC_SETTINGS = 0x0010
+
 /** The window's title until the shell sets one, and again when it clears its own. */
 private const val TITLE = "Vesper"
 
+/** `%APPDATA%\vesper\config.toml`, or null when the environment has no APPDATA. */
+fun defaultConfigFile(): String? = defaultConfigPath(windows = true) { getenv(it)?.toKString() }
+
 /**
  * One terminal window: the user's shell in a session, drawn with Direct3D into the window's swap
- * chain, with the window's keyboard, mouse and focus going to it.
+ * chain, with the window's keyboard, mouse and focus going to it. The config file at [configPath]
+ * (none when null) is watched, and its settings apply as soon as it changes.
  */
+@OptIn(ExperimentalAtomicApi::class)
 class App(
     private val gpu: Gpu,
     private val quitOnClose: Boolean = true,
+    configPath: String? = defaultConfigFile(),
 ) : WindowListener,
     InputTarget,
     AutoCloseable {
-    private val palette = Palette()
+    // The window's handle once there is one, for the watcher's thread to post to; until then a
+    // change is only missed, since the window applies the latest snapshot as it is made.
+    private val configTarget = AtomicLong(0)
+    private val live =
+        configPath?.let { path ->
+            LiveConfig(path) {
+                val hwnd = configTarget.load()
+                if (hwnd != 0L) PostMessageW(hwnd.toCPointer<HWND__>(), WM_CONFIG.convert(), 0u, 0)
+            }
+        }
+
+    /** The settings in force: the file's when it was read. */
+    internal var applied = live?.snapshot()?.settings ?: Settings.DEFAULT
+        private set
+    private var palette = Palette(applied.colors)
     private val fonts = FontSystem.create()
-    private val text =
-        TextStyle.create(fonts) ?: TextStyle.create(fonts, "Courier New") ?: run {
+
+    /** The text in use, at the zoomed size after a zoom. */
+    internal var text =
+        TextStyle.of(fonts, applied.font) ?: run {
             fonts.close()
+            live?.close()
             error("neither Consolas nor Courier New is installed")
         }
+        private set
     private val renderer = D3DRenderer.create(gpu, text, palette)
+    private var bindings = KeyBindings(applied.bindings)
+
+    /** The settings dialog once opened. */
+    internal var settingsDialog: SettingsDialog? = null
+        private set
     private val frame = Frame()
     private val sources = RowSources()
     private var grid = Cells(1, 1)
@@ -86,6 +137,13 @@ class App(
         val (width, height) = window.clientSize
         chain = SwapChain.create(gpu, window.hwnd, width, height)
         input = WindowInput(window.hwnd, this)
+        if (live != null) {
+            val menu = GetSystemMenu(window.hwnd, 0)
+            AppendMenuW(menu, MF_SEPARATOR.convert(), 0u, null)
+            AppendMenuW(menu, MF_STRING.convert(), SC_SETTINGS.convert(), "Settings…\tCtrl+,")
+            configTarget.store(window.hwnd.toLong())
+            configChanged()
+        }
     }
 
     /** Pixels per DIP on the window's monitor. */
@@ -105,7 +163,7 @@ class App(
         // Programs under WSL or ssh read TERM and the locale; native ones ignore them.
         val environment = launchEnvironment { name -> getenv(name)?.toKString() }
         val options = SpawnOptions(program, args, getenv("USERPROFILE")?.toKString(), environment, PtySize(grid.rows, grid.cols))
-        val started = Session.spawn(options) { PostMessageW(hwnd.toCPointer<HWND__>(), WM_WAKE.convert(), 0u, 0) }
+        val started = Session.spawn(options, applied.scrollback) { PostMessageW(hwnd.toCPointer<HWND__>(), WM_WAKE.convert(), 0u, 0) }
         session = started
         cellPixels = currentCellPixels()
         started.resize(grid.cols, grid.rows, cellPixels.first, cellPixels.second)
@@ -152,6 +210,17 @@ class App(
                 return true
             }
 
+            WM_CONFIG -> {
+                configChanged()
+                return true
+            }
+
+            WM_SYSCOMMAND -> {
+                if (wParam.toInt() and 0xFFF0 != SC_SETTINGS) return false
+                openSettings()
+                return true
+            }
+
             WM_ENTERSIZEMOVE -> {
                 liveResize.enter()
             }
@@ -195,6 +264,78 @@ class App(
 
     override fun focusChanged(focused: Boolean) {
         this.focused = focused
+        invalidate()
+    }
+
+    override fun shortcut(event: KeyEvent): Boolean {
+        val action = bindings.action(event)
+        if (action != null) {
+            perform(action)
+            return true
+        }
+        if (!isSettings(event.key, event.mods)) return false
+        openSettings()
+        return true
+    }
+
+    /** Runs a key binding's [action]. */
+    internal fun perform(action: Action) {
+        zoomedSize(action, text.font.size, applied.font.size)?.let { size ->
+            TextStyle.of(fonts, Font(applied.font.family, size))?.let { restyle(it, palette) }
+            return
+        }
+        scrollDelta(action, grid.rows)?.let { rows ->
+            session?.scrollDisplay(rows)
+            refresh()
+            return
+        }
+        when (action) {
+            Action.Paste -> readClipboardText(window.hwnd)?.let { session?.paste(it) }
+
+            // Prompt jumps need the prompt marks T33 keeps.
+            else -> MessageBeep(MB_OK.convert())
+        }
+    }
+
+    /**
+     * Takes [settings] as they are: the bindings at once, the scrollback for the next session, and
+     * the font and colours redrawn. A colour change keeps a zoom; a font change replaces it.
+     */
+    internal fun apply(settings: Settings) {
+        if (settings == applied) return
+        val previous = applied
+        applied = settings
+        bindings = KeyBindings(settings.bindings)
+        val font = if (settings.font != previous.font) TextStyle.of(fonts, settings.font) else null
+        if (font != null || settings.colors != previous.colors) restyle(font ?: text, Palette(settings.colors))
+    }
+
+    private fun configChanged() {
+        val snapshot = live?.snapshot() ?: return
+        apply(snapshot.settings)
+        settingsDialog?.show(snapshot)
+    }
+
+    /** Opens the settings dialog, made the first time; a beep when there is no config file to write. */
+    internal fun openSettings() {
+        val config = live
+        if (config == null) {
+            MessageBeep(MB_OK.convert())
+            return
+        }
+        (settingsDialog ?: SettingsDialog(config, window.hwnd).also { settingsDialog = it }).present(window.hwnd)
+    }
+
+    private fun restyle(
+        next: TextStyle,
+        colors: Palette,
+    ) {
+        val old = text
+        text = next
+        palette = colors
+        renderer.restyle(next, colors)
+        if (old !== next) old.close()
+        fit()
         invalidate()
     }
 
@@ -249,6 +390,10 @@ class App(
     }
 
     override fun close() {
+        // Stopped first, so no change is posted to a window on its way out.
+        live?.close()
+        settingsDialog?.close()
+        settingsDialog = null
         session?.close()
         session = null
         chain?.close()

@@ -3,6 +3,7 @@ package vesper.host
 import vesper.config.Action
 import vesper.config.Binding
 import vesper.config.Chord
+import vesper.config.MAC_BINDINGS
 import vesper.config.MAX_FONT_SIZE
 import vesper.config.MIN_FONT_SIZE
 import vesper.config.Rgb
@@ -18,7 +19,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 
 class BindingsTest {
-    private val bindings = KeyBindings()
+    private val bindings = KeyBindings(MAC_BINDINGS)
     private val equals = Key.Character('='.code)
 
     @Test

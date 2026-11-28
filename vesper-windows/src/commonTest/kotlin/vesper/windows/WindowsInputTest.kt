@@ -82,14 +82,14 @@ class WindowsInputTest {
     }
 
     @Test
-    fun heldModifiersAndThePasteShortcuts() {
+    fun heldModifiersAndTheSettingsShortcut() {
         val state = mapOf(0x10 to 0x8000, 0x11 to 0xFF80, 0x14 to 1, 0x90 to 0)
         assertEquals(Modifiers.SHIFT + Modifiers.CTRL + Modifiers.CAPS_LOCK, heldModifiers { state[it] ?: 0 })
-        val v = Key.Character('v'.code)
-        assertTrue(isPaste(v, Modifiers.CTRL + Modifiers.SHIFT + Modifiers.NUM_LOCK))
-        assertTrue(isPaste(Key.Insert, Modifiers.SHIFT))
-        assertFalse(isPaste(v, Modifiers.CTRL))
-        assertFalse(isPaste(Key.Insert, Modifiers.SHIFT + Modifiers.CTRL))
+        val comma = Key.Character(','.code)
+        assertTrue(isSettings(comma, Modifiers.CTRL + Modifiers.NUM_LOCK))
+        assertFalse(isSettings(comma, Modifiers.CTRL + Modifiers.SHIFT))
+        assertFalse(isSettings(comma, Modifiers.NONE))
+        assertFalse(isSettings(Key.Character('.'.code), Modifiers.CTRL))
     }
 
     @Test

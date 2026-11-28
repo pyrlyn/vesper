@@ -1,5 +1,7 @@
 package vesper.windows
 
+import vesper.config.Font
+import vesper.config.Settings
 import vesper.host.Bitmap
 import vesper.host.CellMetrics
 import vesper.host.CellSize
@@ -21,12 +23,15 @@ import vesper.host.spriteKey
 import vesper.unicode.forEachCodePoint
 import kotlin.math.ceil
 
-/** DIPs, Windows' 1/96 inch, which a scale of 1 draws one pixel each; T20 makes it a setting. */
-private const val FONT_SIZE = 13.0
+/** What an empty `font.family` means on Windows, and the stand-in for a family that is not installed. */
+private const val DEFAULT_FAMILY = "Consolas"
+
+/** In every Windows install, so a window always has a font. */
+private const val LAST_RESORT_FAMILY = "Courier New"
 private const val REGULAR = 400
 private const val BOLD = 700
 
-private class Font(
+private class SizedFace(
     val face: FontFace,
     /** The em size in DIPs. */
     val size: Double,
@@ -47,9 +52,12 @@ class TextStyle private constructor(
 ) : GlyphSource,
     AutoCloseable {
     // Glyph keys name fonts by their index here: the four faces first, then each fallback as it turns up.
-    private val registry = faces.mapTo(ArrayList()) { Font(it, size) }
+    private val registry = faces.mapTo(ArrayList()) { SizedFace(it, size) }
     private val fallbacks = HashMap<Pair<String, Int>, Int>()
     private val shapes = ShapeCache(layout = ::layout)
+
+    /** The family in use, which differs from the configured one after a fallback, at its size in DIPs. */
+    val font: Font get() = Font(family, size)
 
     /** The cell in DIPs, from the advance of `M` and the line height. */
     val cell: CellSize
@@ -138,7 +146,7 @@ class TextStyle private constructor(
                 fallback.close()
                 known
             } else {
-                registry.add(Font(fallback, scaled))
+                registry.add(SizedFace(fallback, scaled))
                 registry.size - 1
             }
         }
@@ -150,11 +158,25 @@ class TextStyle private constructor(
     }
 
     companion object {
+        /**
+         * The configured [font], its size in DIPs (Windows' 1/96 inch, which a scale of 1 draws one
+         * pixel each). A family that is not installed falls back to Consolas, then Courier New, rather
+         * than leaving the window without text; null only when none of them is.
+         */
+        fun of(
+            fonts: FontSystem,
+            font: Font = Settings.DEFAULT.font,
+        ): TextStyle? =
+            listOf(font.family, DEFAULT_FAMILY, LAST_RESORT_FAMILY)
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .firstNotNullOfOrNull { create(fonts, it, font.size) }
+
         /** [family] at [size] DIPs, or null when it is not installed. */
         fun create(
             fonts: FontSystem,
-            family: String = "Consolas",
-            size: Double = FONT_SIZE,
+            family: String = DEFAULT_FAMILY,
+            size: Double = Settings.DEFAULT.font.size,
         ): TextStyle? {
             // GetFirstMatchingFont gives the nearest face, so a family without bold or italic still has four.
             val faces = ArrayList<FontFace>()

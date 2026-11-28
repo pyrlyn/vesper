@@ -41,10 +41,12 @@ kotlin {
             implementation(projects.vesperInput)
         }
         mingwMain.dependencies {
+            implementation(projects.vesperConfig)
             implementation(projects.vesperHost)
             implementation(projects.vesperSession)
             implementation(projects.vesperUnicode)
         }
+        mingwTest.dependencies { implementation(libs.okio) }
         all { languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi") }
     }
 }
