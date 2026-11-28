@@ -9,7 +9,7 @@ public sealed class ConfigException(
     detail: String,
     cause: Throwable? = null,
 ) : Exception("$path: $detail", cause) {
-    /** The file exists but could not be read. */
+    /** The file exists but could not be read, or an edit could not be written. */
     public class Io(
         path: String,
         detail: String,
