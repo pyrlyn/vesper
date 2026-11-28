@@ -88,6 +88,41 @@
           "description": "Scroll to the next shell prompt.",
           "type": "string",
           "const": "next-prompt"
+        },
+        {
+          "description": "Open a tab with a new shell.",
+          "type": "string",
+          "const": "new-tab"
+        },
+        {
+          "description": "Open a window with a new shell.",
+          "type": "string",
+          "const": "new-window"
+        },
+        {
+          "description": "Split the focused pane; the new shell goes to its right.",
+          "type": "string",
+          "const": "split-right"
+        },
+        {
+          "description": "Split the focused pane; the new shell goes below it.",
+          "type": "string",
+          "const": "split-down"
+        },
+        {
+          "description": "Close the focused pane and end its shell.",
+          "type": "string",
+          "const": "close-pane"
+        },
+        {
+          "description": "Focus the next pane.",
+          "type": "string",
+          "const": "next-pane"
+        },
+        {
+          "description": "Focus the previous pane.",
+          "type": "string",
+          "const": "previous-pane"
         }
       ]
     },

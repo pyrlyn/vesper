@@ -202,6 +202,9 @@ public class Session private constructor(
     /** Lets output flow again after [pauseOutput]. */
     public fun resumeOutput(): Unit = pty.resumeOutput()
 
+    /** Stops this session as a throw inside its terminal would; for tests. */
+    internal fun fail(failure: Throwable): Unit = lock.withLock { adapter.failure = failure }
+
     /** Ends the child and the PTY's threads; no wakeup follows. */
     override fun close(): Unit = pty.close()
 

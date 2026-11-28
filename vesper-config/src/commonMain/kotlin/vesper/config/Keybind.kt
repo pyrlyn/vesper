@@ -39,6 +39,19 @@ public enum class Action(
     /** The previous shell prompt that OSC 133 `A` marked. */
     PreviousPrompt("previous-prompt"),
     NextPrompt("next-prompt"),
+    NewTab("new-tab"),
+    NewWindow("new-window"),
+
+    /** Splits the focused pane; the new one goes to its right. */
+    SplitRight("split-right"),
+
+    /** Splits the focused pane; the new one goes below it. */
+    SplitDown("split-down"),
+
+    /** Closes the focused pane; its last pane closes the tab. */
+    ClosePane("close-pane"),
+    NextPane("next-pane"),
+    PreviousPane("previous-pane"),
     ;
 
     public companion object {
@@ -97,6 +110,14 @@ public val MAC_BINDINGS: List<Binding> =
         Binding(Chord(Key.End, Modifiers.SUPER), Action.ScrollToBottom),
         Binding(Chord(Key.Up, Modifiers.SUPER), Action.PreviousPrompt),
         Binding(Chord(Key.Down, Modifiers.SUPER), Action.NextPrompt),
+        bind('t', Modifiers.SUPER, Action.NewTab),
+        bind('n', Modifiers.SUPER, Action.NewWindow),
+        // iTerm2's chords for splits and for walking the panes.
+        bind('d', Modifiers.SUPER, Action.SplitRight),
+        bind('d', Modifiers.SUPER + Modifiers.SHIFT, Action.SplitDown),
+        bind('w', Modifiers.SUPER, Action.ClosePane),
+        bind(']', Modifiers.SUPER, Action.NextPane),
+        bind('[', Modifiers.SUPER, Action.PreviousPane),
     )
 
 /**
@@ -120,6 +141,14 @@ public val PC_BINDINGS: List<Binding> =
         Binding(Chord(Key.End, Modifiers.CTRL + Modifiers.SHIFT), Action.ScrollToBottom),
         Binding(Chord(Key.Up, Modifiers.CTRL + Modifiers.SHIFT), Action.PreviousPrompt),
         Binding(Chord(Key.Down, Modifiers.CTRL + Modifiers.SHIFT), Action.NextPrompt),
+        // Windows Terminal's letters where it has one; D and E for the splits.
+        bind('t', Modifiers.CTRL + Modifiers.SHIFT, Action.NewTab),
+        bind('n', Modifiers.CTRL + Modifiers.SHIFT, Action.NewWindow),
+        bind('d', Modifiers.CTRL + Modifiers.SHIFT, Action.SplitRight),
+        bind('e', Modifiers.CTRL + Modifiers.SHIFT, Action.SplitDown),
+        bind('w', Modifiers.CTRL + Modifiers.SHIFT, Action.ClosePane),
+        bind(']', Modifiers.CTRL + Modifiers.SHIFT, Action.NextPane),
+        bind('[', Modifiers.CTRL + Modifiers.SHIFT, Action.PreviousPane),
     )
 
 /** Whether this build runs on macOS, which picks [DEFAULT_BINDINGS]. */

@@ -91,6 +91,24 @@ class SessionTest {
     }
 
     @Test
+    fun aFailedSessionStopsAloneAndItsSiblingKeepsWorking() {
+        Session.spawn(SpawnOptions.command("cat")) {}.use { sick ->
+            Session.spawn(SpawnOptions.command("cat")) {}.use { well ->
+                val failure = IllegalStateException("broken grid")
+                sick.fail(failure)
+                assertEquals(failure, sick.failure)
+                sick.text("lost")
+                assertEquals(false, sick.update(Frame()), "a failed session changes nothing")
+                assertEquals(false, sick.scrollToPrompt(forward = false))
+
+                well.text("still here")
+                well.await(Frame()) { it.startsWith("still here") }
+                assertEquals(null, well.failure)
+            }
+        }
+    }
+
+    @Test
     fun theViewWalksTheShellsPromptMarks() {
         val script = "printf '\\033]133;A\\007one\\n'; seq 40; printf '\\033]133;A\\007two\\n'; seq 30; echo done; sleep 30"
         Session.spawn(shell(script)) {}.use { session ->
