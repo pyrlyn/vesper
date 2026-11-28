@@ -1,9 +1,9 @@
-# Locks, condition variables and threads for the PTY workers, on every target. In C rather than
+# Locks, condition variables and threads for every module that runs its own threads, on every target. In C rather than
 # Kotlin because the timed wait must run on a monotonic clock, which each system spells differently
 # (a condattr clock on Linux, a relative wait on macOS, a millisecond timeout on Windows).
-package = vesper.pty.sys
+package = vesper.sync.sys
 ---
-/* ptsname_r and pthread_setname_np are GNU extensions in glibc. */
+/* pthread_setname_np is a GNU extension in glibc. */
 #if defined(__linux__) && !defined(_GNU_SOURCE)
 #define _GNU_SOURCE
 #endif

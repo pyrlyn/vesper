@@ -37,6 +37,7 @@ A macOS host builds the same `.exe` (Zig from `mise.toml` must be installed); it
 | Path | Contents |
 | --- | --- |
 | `vesper-unicode`, `vesper-parser`, `vesper-grid`, `vesper-input`, `vesper-pty`, `vesper-term` | The Kotlin/Native core, layered as `PLAN.md` section 3 describes |
+| `vesper-sync` | The system's locks, condition variables and threads, for every module that runs its own |
 | `vesper-session` | A terminal and the child it runs, under one lock: what each window holds |
 | `vesper-config` | The config file: font, colour scheme and scrollback, parsed and validated (in progress, T20) |
 | `vesper-host` | What both apps draw with that no graphics API owns: the palette, the frame turned into quads, the glyph atlas's layout and cache, its bitmaps, and what a window takes from the terminal's events |

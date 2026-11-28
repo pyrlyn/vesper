@@ -2,6 +2,7 @@ package vesper.pty
 
 import vesper.pty.PtyLimits.MAX_PENDING_READ_BYTES
 import vesper.pty.PtyLimits.WRITE_CHUNK_BYTES
+import vesper.sync.Monitor
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

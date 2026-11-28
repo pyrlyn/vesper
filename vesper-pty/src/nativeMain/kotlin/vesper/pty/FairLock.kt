@@ -1,5 +1,6 @@
 package vesper.pty
 
+import vesper.sync.Monitor
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract

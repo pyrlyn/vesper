@@ -1,5 +1,6 @@
 package vesper.pty
 
+import vesper.sync.Monitor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

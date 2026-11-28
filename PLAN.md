@@ -60,6 +60,7 @@ Not in scope until they move from [`ideas.md`](ideas.md) to [`roadmap.md`](roadm
    vesper-unicode  generated width and grapheme tables
    vesper-parser   bulk scanner + sequence machine → typed actions
    vesper-pty      PTY, reader thread, back-pressure
+   vesper-sync     system locks, condition variables and threads
    vesper-image    images and placements under a byte quota; iTerm2, sixel and kitty decoders
    vesper-png      header-first PNG decode under a caller-set allocation cap
 ```

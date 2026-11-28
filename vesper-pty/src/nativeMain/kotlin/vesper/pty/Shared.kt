@@ -6,6 +6,7 @@ import vesper.pty.PtyLimits.MAX_LOCKED_BYTES
 import vesper.pty.PtyLimits.MAX_PENDING_READ_BYTES
 import vesper.pty.PtyLimits.MAX_PENDING_WRITE_BYTES
 import vesper.pty.PtyLimits.WRITE_CHUNK_BYTES
+import vesper.sync.Monitor
 import kotlin.time.TimeSource
 
 internal typealias Instant = TimeSource.Monotonic.ValueTimeMark

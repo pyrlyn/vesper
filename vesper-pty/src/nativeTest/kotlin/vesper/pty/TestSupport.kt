@@ -1,5 +1,7 @@
 package vesper.pty
 
+import vesper.sync.Monitor
+import vesper.sync.startThread
 import kotlin.test.fail
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
